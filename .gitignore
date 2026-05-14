@@ -6,4 +6,5 @@ coverage
 .idea
 .vscode
 fixtures/*.pdf
+fixtures/png
 !fixtures/.gitkeep

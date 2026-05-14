@@ -71,6 +71,7 @@ Container `style`:
 | `padding` / `margin` | number \| `{ top, right, bottom, left }` | Shorthand or per-side. |
 | `background` | RGB | Solid fill. |
 | `border` | `{ color, width }` | 1pt+ stroke around the box. |
+| `borderRadius` | number | Corner radius in points. Applied to background fill and border (rendered via `drawSvgPath`). |
 | `grow` | number | Flex grow weight along the parent's main axis. |
 | `gap` | number | Spacing between children. |
 | `justify` | `"start"` \| `"center"` \| `"end"` \| `"between"` \| `"around"` \| `"evenly"` | Main-axis distribution. |
@@ -97,6 +98,10 @@ Container `style`:
   already have a `PDFPage` and want to draw a subtree at a known position.
 - `measure(node, parentWidth)` — compute intrinsic size without drawing
   (useful for custom paginators).
+
+Pass `{ debug: true }` to `renderToPdf` / `renderFlow` to overlay every
+node's content box (red) and margin box (orange). Handy when a layout
+isn't going where you expect.
 
 ### Colors
 
@@ -170,6 +175,7 @@ See [`examples/`](./examples) for runnable scripts.
 - `examples/itinerary.ts` — a two-band travel itinerary (the case this library
   was extracted from).
 - `examples/invoice.ts` — multi-page invoice with line items and pagination.
+- `examples/debug.ts` — the same layout twice, once with `{ debug: true }`.
 
 ```sh
 pnpm install
@@ -178,13 +184,16 @@ pnpm run example   # writes example PDFs to ./fixtures/
 
 ## Known limits
 
-- No `border-radius` (pdf-lib doesn't expose stroked rounded rects natively).
-  Fake it with overlapping rectangles if you really need it.
-- No `position: absolute` — by design. Drop to `render()` with explicit
+- **No flex-shrink yet.** Children that exceed their parent's main-axis
+  dimension overflow rather than shrinking proportionally. Workaround:
+  give wrapping text an explicit `width`, or size containers explicitly.
+  Planned for v0.2.
+- **No `position: absolute`** — by design. Drop to `render()` with explicit
   coordinates if you must.
-- Font shaping is whatever `pdf-lib` supports (Helvetica/Times/Courier
-  built-ins, plus any TTF you embed). If you need fancy script shaping, you
-  need a different stack — `boxpdf` won't help.
+- **Font shaping** is whatever `pdf-lib` supports (Helvetica/Times/Courier
+  built-ins, plus any TTF you embed). If you need fancy script shaping
+  (Arabic, complex Indic, etc.), `boxpdf` won't help — you'd want a stack
+  with HarfBuzz/fontkit. None of those run in Cloudflare Workers today.
 
 ## License
 

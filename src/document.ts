@@ -1,6 +1,6 @@
 import { PDFDocument, type PDFPage } from "pdf-lib";
 import { measure } from "./measure.js";
-import { render } from "./render.js";
+import { render, type RenderOptions } from "./render.js";
 import { edges, type EdgesInput, type Node } from "./types.js";
 
 export interface PageSize {
@@ -17,7 +17,7 @@ export const PageSizes = {
   A6: { width: 297, height: 420 }
 } as const;
 
-export interface PageOptions {
+export interface PageOptions extends RenderOptions {
   size?: PageSize;
   margin?: EdgesInput;
 }
@@ -60,7 +60,7 @@ export async function renderFlow(
       pages.push(page);
       cursorY = contentTop;
     }
-    render(node, page, m.left, cursorY, contentWidth);
+    render(node, page, m.left, cursorY, contentWidth, { debug: options.debug });
     cursorY -= nodeSize.height;
   }
 
@@ -80,7 +80,7 @@ export async function renderToPdf(
   const contentWidth = size.width - m.left - m.right;
   const pdf = await PDFDocument.create();
   const page = pdf.addPage([size.width, size.height]);
-  render(node, page, m.left, size.height - m.top, contentWidth);
+  render(node, page, m.left, size.height - m.top, contentWidth, { debug: options.debug });
   return pdf.save();
 }
 

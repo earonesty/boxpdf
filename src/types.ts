@@ -22,6 +22,8 @@ export interface BoxStyle {
   background?: RGB;
   /** Border specification. */
   border?: { color: RGB; width: number };
+  /** Corner radius in points. Applies to background and border. */
+  borderRadius?: number;
   /** Flex grow weight (siblings divide remaining main-axis space proportionally). */
   grow?: number;
 }

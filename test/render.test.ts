@@ -70,6 +70,33 @@ describe("render", () => {
     expect(bytes.byteLength).toBeGreaterThan(100);
   });
 
+  it("borderRadius emits an SVG path stroke instead of throwing", async () => {
+    const bytes = await renderToPdf(
+      vstack(
+        {
+          padding: 16,
+          background: hex("#fff7e0"),
+          border: { color: hex("#d29922"), width: 1 },
+          borderRadius: 12,
+          width: 300
+        },
+        text("Rounded", { size: 14, font })
+      )
+    );
+    expect(bytes.byteLength).toBeGreaterThan(200);
+  });
+
+  it("debug option produces a larger PDF than non-debug for the same layout", async () => {
+    const tree = vstack(
+      { padding: 16, gap: 8, width: 300 },
+      text("Line one", { size: 12, font }),
+      hstack({ gap: 6 }, text("L", { size: 10, font }), text("R", { size: 10, font }))
+    );
+    const plain = await renderToPdf(tree);
+    const debugged = await renderToPdf(tree, { debug: true });
+    expect(debugged.byteLength).toBeGreaterThan(plain.byteLength);
+  });
+
   it("hline takes parent width when no width supplied", async () => {
     const bytes = await renderToPdf(
       vstack(

@@ -2,3 +2,4 @@
 import "./receipt.js";
 import "./itinerary.js";
 import "./invoice.js";
+import "./debug.js";

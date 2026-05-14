@@ -45,18 +45,18 @@ const itemsTable = vstack(
 const totals = vstack(
   { gap: 4, width: 515 },
   hstack(
-    { justify: "end", gap: 32 },
+    { width: 515, justify: "end", gap: 32 },
     text("Subtotal", { size: 10, font, color: muted }),
     text(`$${subtotal.toFixed(2)}`, { size: 10, font, color: ink, align: "right", width: 80 })
   ),
   hstack(
-    { justify: "end", gap: 32 },
+    { width: 515, justify: "end", gap: 32 },
     text("Tax (8.75%)", { size: 10, font, color: muted }),
     text(`$${tax.toFixed(2)}`, { size: 10, font, color: ink, align: "right", width: 80 })
   ),
   hline({ color: border, margin: { top: 6, bottom: 6 } }),
   hstack(
-    { justify: "end", gap: 32 },
+    { width: 515, justify: "end", gap: 32 },
     text("Total", { size: 14, font: bold, color: ink }),
     text(`$${total.toFixed(2)}`, { size: 14, font: bold, color: ink, align: "right", width: 80 })
   )

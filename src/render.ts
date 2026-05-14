@@ -3,21 +3,84 @@ import { edges, type Justify, type Node, type RGB } from "./types.js";
 import { fontAscent, measureText } from "./text.js";
 import { layoutText, measure, measureContent, nodeGrow, nodeMargin } from "./measure.js";
 
+export interface RenderOptions {
+  /** When true, overlay every node's bounding box in red for layout debugging. */
+  debug?: boolean;
+}
+
+let currentOptions: RenderOptions = {};
+
 function toRgb(color: RGB | undefined): ReturnType<typeof rgb> | undefined {
   return color ? rgb(color.r, color.g, color.b) : undefined;
 }
+
+const DEBUG_STROKE: RGB = { r: 1, g: 0.2, b: 0.2 };
+const DEBUG_MARGIN_STROKE: RGB = { r: 1, g: 0.65, b: 0 };
 
 /**
  * Render `node` at the given position. `yTop` is in pdf-lib coordinates (higher = further from page bottom).
  * Returns the total vertical height consumed including the node's own margin.
  */
-export function render(node: Node, page: PDFPage, x: number, yTop: number, parentWidth: number): number {
+export function render(
+  node: Node,
+  page: PDFPage,
+  x: number,
+  yTop: number,
+  parentWidth: number,
+  options: RenderOptions = {}
+): number {
+  currentOptions = options;
+  try {
+    return renderWithCurrent(node, page, x, yTop, parentWidth);
+  } finally {
+    currentOptions = {};
+  }
+}
+
+function renderWithCurrent(
+  node: Node,
+  page: PDFPage,
+  x: number,
+  yTop: number,
+  parentWidth: number
+): number {
   const m = nodeMargin(node);
+  if (currentOptions.debug) {
+    const outer = measure(node, parentWidth);
+    if (m.top || m.right || m.bottom || m.left) {
+      strokeDebugRect(page, x, yTop, outer.width, outer.height, DEBUG_MARGIN_STROKE);
+    }
+  }
   const innerX = x + m.left;
   const innerYTop = yTop - m.top;
   const innerParentWidth = parentWidth - m.left - m.right;
   const consumed = renderContent(node, page, innerX, innerYTop, innerParentWidth);
+  if (currentOptions.debug) {
+    strokeDebugRect(page, innerX, innerYTop, parentWidth - m.left - m.right, consumed, DEBUG_STROKE);
+  }
   return consumed + m.top + m.bottom;
+}
+
+function strokeDebugRect(
+  page: PDFPage,
+  x: number,
+  yTop: number,
+  width: number,
+  height: number,
+  color: RGB
+): void {
+  if (width <= 0 || height <= 0) return;
+  page.drawRectangle({
+    x,
+    y: yTop - height,
+    width,
+    height,
+    borderColor: toRgb(color),
+    borderWidth: 0.5,
+    borderOpacity: 0.9,
+    opacity: 0,
+    color: undefined
+  });
 }
 
 function renderContent(node: Node, page: PDFPage, x: number, yTop: number, parentWidth: number): number {
@@ -96,8 +159,8 @@ function renderVStack(
   const boxWidth = node.style.width ?? intrinsic.width;
   const boxHeight = node.style.height ?? intrinsic.height;
 
-  drawBackground(page, x, yTop, boxWidth, boxHeight, node.style.background);
-  drawBorder(page, x, yTop, boxWidth, boxHeight, node.style.border);
+  drawBackground(page, x, yTop, boxWidth, boxHeight, node.style.background, node.style.borderRadius);
+  drawBorder(page, x, yTop, boxWidth, boxHeight, node.style.border, node.style.borderRadius);
 
   const innerX = x + inset.left;
   const innerWidth = boxWidth - inset.left - inset.right;
@@ -158,8 +221,8 @@ function renderHStack(
   const boxWidth = node.style.width ?? intrinsic.width;
   const boxHeight = node.style.height ?? intrinsic.height;
 
-  drawBackground(page, x, yTop, boxWidth, boxHeight, node.style.background);
-  drawBorder(page, x, yTop, boxWidth, boxHeight, node.style.border);
+  drawBackground(page, x, yTop, boxWidth, boxHeight, node.style.background, node.style.borderRadius);
+  drawBorder(page, x, yTop, boxWidth, boxHeight, node.style.border, node.style.borderRadius);
 
   const innerX = x + inset.left;
   const innerWidth = boxWidth - inset.left - inset.right;
@@ -218,7 +281,7 @@ function renderWithFixedHeight(
 ): number {
   // Currently we ignore slotHeight enforcement for non-grown children; flex grow
   // is handled by passing the resolved height into render via the slot above.
-  return render(child, page, x, yTop, parentWidth);
+  return renderWithCurrent(child, page, x, yTop, parentWidth);
 }
 
 function renderWithFixedWidth(
@@ -228,7 +291,7 @@ function renderWithFixedWidth(
   yTop: number,
   _slotWidth: number
 ): number {
-  return render(child, page, x, yTop, _slotWidth);
+  return renderWithCurrent(child, page, x, yTop, _slotWidth);
 }
 
 interface MainAxisOffsets {
@@ -323,15 +386,20 @@ function drawBackground(
   yTop: number,
   width: number,
   height: number,
-  color: RGB | undefined
+  color: RGB | undefined,
+  radius: number | undefined
 ): void {
   if (!color) return;
-  page.drawRectangle({
+  const yBottom = yTop - height;
+  if (!radius || radius <= 0) {
+    page.drawRectangle({ x, y: yBottom, width, height, color: toRgb(color) });
+    return;
+  }
+  page.drawSvgPath(roundedRectPath(width, height, radius), {
     x,
-    y: yTop - height,
-    width,
-    height,
-    color: toRgb(color)
+    y: yTop,
+    color: toRgb(color),
+    borderWidth: 0
   });
 }
 
@@ -341,15 +409,48 @@ function drawBorder(
   yTop: number,
   width: number,
   height: number,
-  border: { color: RGB; width: number } | undefined
+  border: { color: RGB; width: number } | undefined,
+  radius: number | undefined
 ): void {
   if (!border) return;
-  page.drawRectangle({
+  const yBottom = yTop - height;
+  if (!radius || radius <= 0) {
+    page.drawRectangle({
+      x,
+      y: yBottom,
+      width,
+      height,
+      borderColor: toRgb(border.color),
+      borderWidth: border.width
+    });
+    return;
+  }
+  page.drawSvgPath(roundedRectPath(width, height, radius), {
     x,
-    y: yTop - height,
-    width,
-    height,
+    y: yTop,
     borderColor: toRgb(border.color),
     borderWidth: border.width
   });
+}
+
+/**
+ * Build an SVG path for a rounded rectangle starting from (0, 0) at the
+ * top-left, in pdf-lib's drawSvgPath coordinate system (origin = pen
+ * position, y grows downward when interpreted by drawSvgPath).
+ */
+function roundedRectPath(width: number, height: number, radius: number): string {
+  const r = Math.max(0, Math.min(radius, Math.min(width, height) / 2));
+  if (r === 0) return `M 0 0 H ${width} V ${height} H 0 Z`;
+  return [
+    `M ${r} 0`,
+    `H ${width - r}`,
+    `A ${r} ${r} 0 0 1 ${width} ${r}`,
+    `V ${height - r}`,
+    `A ${r} ${r} 0 0 1 ${width - r} ${height}`,
+    `H ${r}`,
+    `A ${r} ${r} 0 0 1 0 ${height - r}`,
+    `V ${r}`,
+    `A ${r} ${r} 0 0 1 ${r} 0`,
+    "Z"
+  ].join(" ");
 }

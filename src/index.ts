@@ -21,7 +21,7 @@ export {
 export type { TextOptions } from "./nodes.js";
 
 export { measure, measureContent } from "./measure.js";
-export { render } from "./render.js";
+export { render, type RenderOptions } from "./render.js";
 export { renderFlow, renderToPdf, PageSizes } from "./document.js";
 export type { PageOptions, FlowOptions, PageSize } from "./document.js";
 
