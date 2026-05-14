@@ -63,6 +63,20 @@ Copy-paste files in [`templates/`](./templates) — receipt, boarding pass,
 resume, order confirmation, certificate. Each one is a single file that
 renders to a polished PDF.
 
+Or scaffold one into your app with the CLI:
+
+```sh
+npx boxpdf init receipt --out src/pdf/receipt.ts
+npx boxpdf list
+```
+
+`boxpdf` also ships a tiny resource-only MCP server so agents can load the
+README, usage guide, and template sources without you pasting docs into chat:
+
+```sh
+claude mcp add boxpdf -- npx -y boxpdf mcp
+```
+
 ```sh
 pnpm install
 pnpm run gallery   # renders all templates + every showcase example

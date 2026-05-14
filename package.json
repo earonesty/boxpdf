@@ -1,6 +1,6 @@
 {
   "name": "boxpdf",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Tiny box-layout DSL over pdf-lib. Flexbox-lite for server-side PDF generation in any JS runtime (Node, Cloudflare Workers, Deno, browsers).",
   "keywords": [
     "pdf",
@@ -30,6 +30,9 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "boxpdf": "./dist/cli.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -44,6 +47,7 @@
   },
   "files": [
     "dist",
+    "templates",
     "README.md",
     "LICENSE"
   ],
