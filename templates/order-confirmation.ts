@@ -85,6 +85,8 @@ const theme = cleanTheme(font, bold);
 const BLUE = theme.colors.accent;
 
 const PAGE_INNER = 515;
+const CARD_PAD = theme.spacing.lg;
+const CARD_INNER = PAGE_INNER - CARD_PAD * 2;
 const SECTION_GAP = theme.spacing.lg;
 
 const header: Node = vstack(
@@ -107,7 +109,7 @@ const header: Node = vstack(
 
 const itemRow = (it: Item): Node =>
   hstack(
-    { width: PAGE_INNER, gap: theme.spacing.md, padding: { top: theme.spacing.sm, bottom: theme.spacing.sm } },
+    { width: CARD_INNER, gap: theme.spacing.md, padding: { top: theme.spacing.sm, bottom: theme.spacing.sm } },
     vstack({ width: 52, height: 52, background: it.thumb, borderRadius: 6 }),
     vstack(
       { gap: 2 },
@@ -120,7 +122,7 @@ const itemRow = (it: Item): Node =>
   );
 
 const itemsCard: Node = vstack(
-  { ...theme.card, width: PAGE_INNER, padding: theme.spacing.lg },
+  { ...theme.card, width: PAGE_INNER, padding: CARD_PAD },
   ...items.flatMap((it, i) => (i === 0 ? [itemRow(it)] : [hline(theme.hr), itemRow(it)]))
 );
 
@@ -148,7 +150,7 @@ const totalsRow = (label: string, amount: number, emphasize = false): Node => {
   const labelStyle = emphasize ? theme.type.h2 : { ...theme.type.bodySmall, color: theme.colors.muted };
   const amountStyle = emphasize ? theme.type.h2 : theme.type.body;
   return hstack(
-    { width: PAGE_INNER, gap: theme.spacing.md, padding: { top: 4, bottom: 4 } },
+    { width: CARD_INNER, gap: theme.spacing.md, padding: { top: 4, bottom: 4 } },
     flex(),
     text(label, { ...labelStyle, align: "right", width: 140 }),
     text(formatCurrency(amount), { ...amountStyle, align: "right", width: 90 })
@@ -158,7 +160,7 @@ const totalsRow = (label: string, amount: number, emphasize = false): Node => {
 const totals: Node = vstack(
   {
     width: PAGE_INNER,
-    padding: { top: theme.spacing.md, right: theme.spacing.lg, bottom: theme.spacing.md, left: theme.spacing.lg },
+    padding: { top: theme.spacing.md, right: CARD_PAD, bottom: theme.spacing.md, left: CARD_PAD },
     margin: { top: theme.spacing.md }
   },
   totalsRow("Subtotal", subtotal),
