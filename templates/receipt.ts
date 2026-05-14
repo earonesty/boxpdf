@@ -3,7 +3,7 @@
 // totals — column widths, dividers, and totals row stay in one place.
 
 import { writeFileSync } from "node:fs";
-import { PDFDocument, StandardFonts } from "pdf-lib";
+import { PDFDocument } from "pdf-lib";
 import {
   cleanTheme,
   formatCurrency,
@@ -14,6 +14,7 @@ import {
   vstack,
   type Node
 } from "../src/index.js";
+import { embedInter } from "../src/inter.js";
 
 interface LineItem {
   name: string;
@@ -37,8 +38,12 @@ const tax = subtotal * 0.0875;
 const total = subtotal + tax;
 
 const doc = await PDFDocument.create();
-const font = await doc.embedFont(StandardFonts.Helvetica);
-const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+// Inter with `tabularFigures: true` returns extra tabularFont / tabularBold
+// variants whose digits all have the same advance width — money column
+// alignment becomes mechanical.
+const { font, bold, tabularFont, tabularBold } = await embedInter(doc, {
+  tabularFigures: true
+});
 const theme = cleanTheme(font, bold);
 
 const TABLE_WIDTH = 515;
@@ -60,13 +65,14 @@ const itemsTable: Node = table({
     text(it.name, theme.type.body),
     text(`${it.qty} × ${formatCurrency(it.unit)}`, {
       ...theme.type.bodySmall,
+      font: tabularFont,
       color: theme.colors.muted,
       align: "right",
       width: 90
     }),
     text(formatCurrency(it.qty * it.unit), {
       ...theme.type.body,
-      font: bold,
+      font: tabularBold,
       align: "right",
       width: 90
     })
@@ -91,7 +97,12 @@ const totalsTable: Node = table({
         align: "right",
         width: 100
       }),
-      text(formatCurrency(subtotal), { ...theme.type.body, align: "right", width: 90 })
+      text(formatCurrency(subtotal), {
+        ...theme.type.body,
+        font: tabularFont,
+        align: "right",
+        width: 90
+      })
     ],
     [
       text("", theme.type.body),
@@ -101,13 +112,23 @@ const totalsTable: Node = table({
         align: "right",
         width: 100
       }),
-      text(formatCurrency(tax), { ...theme.type.body, align: "right", width: 90 })
+      text(formatCurrency(tax), {
+        ...theme.type.body,
+        font: tabularFont,
+        align: "right",
+        width: 90
+      })
     ]
   ],
   footer: [
     text("", theme.type.body),
     text("Total", { ...theme.type.h2, align: "right", width: 100 }),
-    text(formatCurrency(total), { ...theme.type.h2, align: "right", width: 90 })
+    text(formatCurrency(total), {
+      ...theme.type.h2,
+      font: tabularBold,
+      align: "right",
+      width: 90
+    })
   ],
   cellPadding: { top: 3, bottom: 3 },
   footerDivider: { ...theme.hr, thickness: 1 },

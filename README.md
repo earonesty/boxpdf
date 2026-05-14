@@ -175,6 +175,22 @@ const theme = cleanTheme(font, bold);
 bytes plus `@pdf-lib/fontkit`; if you don't import it, neither hits your
 bundle.
 
+Pass `{ tabularFigures: true }` to also get tabular-numeral variants. Use
+them for money columns and number-heavy tables — every digit gets the
+same advance width so totals line up to a fixed grid:
+
+```ts
+const { font, bold, tabularFont, tabularBold } = await embedInter(pdf, {
+  tabularFigures: true
+});
+
+text(formatCurrency(amount), { size: 12, font: tabularBold, align: "right" });
+```
+
+The proportional `font` / `bold` are still preferred for body text — Inter's
+proportional `1` is narrower than `0`, which reads better in prose. Use the
+tabular pair only where you need the alignment.
+
 ## Cloudflare Workers
 
 Both the core and the `boxpdf/inter` subpath are verified to run on

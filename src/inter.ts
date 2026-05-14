@@ -26,16 +26,35 @@ import type { PDFDocument, PDFFont } from "pdf-lib";
  */
 export async function embedInter(
   pdf: PDFDocument,
-  options: { italic?: boolean } = {}
-): Promise<{ font: PDFFont; bold: PDFFont; italic?: PDFFont }> {
+  options: { italic?: boolean; tabularFigures?: boolean } = {}
+): Promise<{
+  font: PDFFont;
+  bold: PDFFont;
+  italic?: PDFFont;
+  /** Inter Regular with the OpenType `tnum` feature on — every digit has
+   *  the same advance width so money columns and tables align perfectly.
+   *  Only returned when `tabularFigures: true`. */
+  tabularFont?: PDFFont;
+  /** Same as `tabularFont` but bold. Use for emphasized amounts. */
+  tabularBold?: PDFFont;
+}> {
   await ensureFontkit(pdf);
   const mod = await import("./fonts/inter-bytes.js");
-  const font = await pdf.embedFont(decodeBase64(mod.interRegularBase64), { subset: true });
-  const bold = await pdf.embedFont(decodeBase64(mod.interBoldBase64), { subset: true });
+  const regularBytes = decodeBase64(mod.interRegularBase64);
+  const boldBytes = decodeBase64(mod.interBoldBase64);
+
+  const font = await pdf.embedFont(regularBytes, { subset: true });
+  const bold = await pdf.embedFont(boldBytes, { subset: true });
   const italic = options.italic
     ? await pdf.embedFont(decodeBase64(mod.interItalicBase64), { subset: true })
     : undefined;
-  return { font, bold, italic };
+  const tabularFont = options.tabularFigures
+    ? await pdf.embedFont(regularBytes, { subset: true, features: { tnum: true } })
+    : undefined;
+  const tabularBold = options.tabularFigures
+    ? await pdf.embedFont(boldBytes, { subset: true, features: { tnum: true } })
+    : undefined;
+  return { font, bold, italic, tabularFont, tabularBold };
 }
 
 async function ensureFontkit(pdf: PDFDocument): Promise<void> {
