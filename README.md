@@ -1,13 +1,8 @@
 # boxpdf
 
-Tiny box-layout DSL over [pdf-lib](https://pdf-lib.js.org/). Flexbox-lite for
-server-side PDFs in any JS runtime — Node, Cloudflare Workers, Deno, the
-browser. No native deps, no WASM, no headless browser.
+A box-layout DSL over [pdf-lib](https://pdf-lib.js.org/). Runs in Node 18+, Cloudflare Workers, Deno, and browsers. No native dependencies, no WASM, no headless browser.
 
-**[Live gallery, themes, and template browser →](https://earonesty.github.io/boxpdf/)**
-
-If you've ever written `page.drawText(x, height - 246 - lineHeight)`, this is
-for you.
+Live gallery: <https://earonesty.github.io/boxpdf/>
 
 ```ts
 import { PDFDocument, StandardFonts } from "pdf-lib";
@@ -30,88 +25,65 @@ await renderFlow(pdf, [
   )
 ]);
 
-const bytes = await pdf.save();  // Uint8Array — write to disk, R2, a Response, etc.
+const bytes = await pdf.save();
 ```
-
-## Why?
-
-`pdf-lib` is the right primitive for edge runtimes (no WASM, no fontkit, no
-headless Chromium) but its API is coordinate-based. `@react-pdf/renderer` is
-declarative but doesn't run on Cloudflare Workers because fontkit needs
-runtime WASM, which Workers disallow.
-
-`boxpdf` is the middle layer: declarative boxes, flex-ish layout, real word
-wrapping — built on top of `pdf-lib` and nothing else by default.
-
-- **~7 KB minified core.** Pure TypeScript. Custom fonts pull in
-  `@pdf-lib/fontkit` as dev-dep only when you call `embedFont` / `embedInter`.
-- **Works everywhere `pdf-lib` works.** Node 18+, Cloudflare Workers (verified
-  end-to-end, no `nodejs_compat`), Deno, browsers.
-- **Predictable.** No virtual DOM, no scheduler, no reconciliation. Build a
-  tree of plain objects with `vstack`/`hstack`/`text`, then `render` it.
 
 ## Install
 
 ```sh
 npm install boxpdf pdf-lib
-# pdf-lib is a peer dependency.
 ```
+
+`pdf-lib` is a peer dependency.
+
+## What it does
+
+- Declarative layout primitives: `vstack`, `hstack`, `text`, `image`, `hline`, `vline`, `spacer`, `flex`, `keepTogether`, `link`, `svgPath`, `table`.
+- Padding, margin, background, border, borderRadius, flex-grow, flex-shrink, justify, align.
+- Word wrapping with `maxLines` truncation and optional `breakWords`.
+- Themes: `cleanTheme`, `stripeTheme`, `editorialTheme`, `brutalistTheme`.
+- Multi-page flow with per-page headers and footers.
+- Streaming generation for memory-bounded output.
+- PDF link annotations, text decorations, document metadata.
+- ~7 KB minified core. Custom fonts pull in `@pdf-lib/fontkit` only when you call `loadFont` or `embedInter`.
 
 ## Templates
 
-Copy-paste files in [`templates/`](./templates) — receipt, boarding pass,
-resume, order confirmation, certificate. Each one is a single file that
-renders to a polished PDF.
+Files in [`templates/`](./templates) cover receipts, boarding passes, resumes, order confirmations, and certificates. Each is a single file.
 
-Or scaffold one into your app with the CLI:
+Scaffold one into your app with the CLI:
 
 ```sh
 npx boxpdf init receipt --out src/pdf/receipt.ts
 npx boxpdf list
 ```
 
-`boxpdf` also ships a tiny resource-only MCP server so agents can load the
-README, usage guide, and template sources without you pasting docs into chat:
+The CLI also ships a resource-only MCP server for agents:
 
 ```sh
 claude mcp add boxpdf -- npx -y boxpdf mcp
 ```
 
-```sh
-pnpm install
-pnpm run gallery   # renders all templates + every showcase example
-```
-
-See the [live gallery](https://earonesty.github.io/boxpdf/#templates) for
-thumbnails and source links.
-
 ## Themes
-
-Same identical layout code, four named themes:
 
 ```ts
 import { cleanTheme, stripeTheme, editorialTheme, brutalistTheme } from "boxpdf";
 
-const theme =
-  cleanTheme(font, bold)    // modern SaaS default — soft borders, 8pt rounded
-  // stripeTheme(font, bold)         // square corners, thin borders, monochrome SaaS
-  // editorialTheme(font, bold, italic)  // Times serif, warm cream, italic captions
-  // brutalistTheme(courier, courierBold) // monospace, 2pt black borders, lemon accent
-;
+const theme = cleanTheme(font, bold);
+// stripeTheme(font, bold)
+// editorialTheme(font, bold, italic)
+// brutalistTheme(courier, courierBold)
 ```
 
-Every theme exposes the same shape: `colors`, `spacing`, `radii`, `type`,
-`card`, `hr`. Templates compose from these tokens instead of hex/size
-literals.
+Every theme exposes the same shape: `colors`, `spacing`, `radii`, `type`, `card`, `hr`.
 
-## API at a glance
+## API
 
 ### Containers
 
-- `vstack(style, ...children)` — vertical layout.
-- `hstack(style, ...children)` — horizontal layout.
-- `keepTogether({ gap?, margin? }, ...children)` — paginates atomically
-  (won't split across pages).
+- `vstack(style, ...children)`. Vertical layout.
+- `hstack(style, ...children)`. Horizontal layout.
+- `keepTogether({ gap?, margin? }, ...children)`. Paginates atomically.
 
 Container `style`:
 
@@ -121,74 +93,53 @@ Container `style`:
 | `padding` / `margin` | number \| `{ top, right, bottom, left }` | Shorthand or per-side. |
 | `background` | RGB | Solid fill. |
 | `border` | `{ color, width }` | 1pt+ stroke around the box. |
-| `borderRadius` | number | Corner radius. Applied to background fill and border. |
+| `borderRadius` | number | Corner radius. |
 | `grow` | number | Flex grow weight along the parent's main axis. |
-| `shrink` | number | Flex shrink weight — overflowing children give up `shrink × baseSize` shares of the overflow. |
+| `shrink` | number | Flex shrink weight. |
 | `gap` | number | Spacing between children. |
 | `justify` | `"start"` \| `"center"` \| `"end"` \| `"between"` \| `"around"` \| `"evenly"` | Main-axis distribution. |
 | `align` | `"start"` \| `"center"` \| `"end"` \| `"stretch"` | Cross-axis alignment. |
 
 ### Leaves
 
-- `text(content, { size, font, color?, align?, width?, lineHeight?, maxLines?, underline?, strikethrough?, margin? })`
-  — text node. Word-wraps when `width` is set; truncates with ellipsis when
-  `maxLines` is.
-- `image(pdfImage, { width, height, margin? })` — already-embedded `PDFImage`.
-- `spacer(size, { grow? })` / `flex(weight = 1)` — fixed or growing gap.
-- `hline({ color, thickness?, width?, margin? })` — horizontal rule.
-- `vline({ color, thickness?, height?, margin? })` — vertical rule.
-- `link({ href }, child)` — wraps a child and registers a PDF Link
-  annotation over its rendered bounding box.
+- `text(content, { size, font, color?, align?, width?, lineHeight?, maxLines?, underline?, strikethrough?, margin? })`. Word-wraps when `width` is set. Truncates with ellipsis when `maxLines` is set.
+- `image(pdfImage, { width, height, margin? })`. Takes an already-embedded `PDFImage`.
+- `spacer(size, { grow? })` / `flex(weight = 1)`. Fixed or growing gap.
+- `hline({ color, thickness?, width?, margin? })`.
+- `vline({ color, thickness?, height?, margin? })`.
+- `link({ href }, child)`. Wraps a child and registers a PDF Link annotation over its rendered bounding box.
 
 ### Rendering
 
-- `streamFlow(pdf, writable, asyncIterable, options)` — incremental
-  page-by-page rendering. Memory stays bounded regardless of page count
-  (peak heap grows ~0 vs `renderFlow`'s ~150 MB per 1000 pages). Writes
-  PDF bytes to a `WritableStream<Uint8Array>` as each page closes. See
-  `## Streaming output` below for the contract.
-- `renderToPdf(node, options)` — one-page convenience.
-- `renderFlow(pdf, nodes[], options)` — paginate a sequence of top-level
-  children. Options: `size`, `margin`, `header?`, `footer?`, `reserveBottom?`,
-  `title?`, `author?`, `subject?`, `keywords?`, `creator?`, `producer?`,
-  `debug?`, `warnings?`. Headers/footers receive `{ pageNumber, totalPages }`.
-  Both default to **LETTER** (612×792) — matches pdf-lib. Pass
-  `{ size: PageSizes.A4 }` for A4. When a top-level child's measured width
-  exceeds the page content area, boxpdf emits a one-line `console.warn`
-  pointing at the math; suppress with `warnings: false`.
-- `pageInner(size, margin)` / `pageContent(size, margin)` — compute the
-  inner content width / rectangle of a page. Prefer these over hardcoded
-  arithmetic so your layout follows the page when you change `size`.
-- `render(node, page, x, yTop, parentWidth)` — escape hatch for drawing a
-  subtree at a known position on an existing `PDFPage`.
-- `measure(node, parentWidth)` — intrinsic size without drawing.
+- `renderFlow(pdf, nodes[], options)`. Paginates a sequence of top-level children. Options: `size`, `margin`, `header?`, `footer?`, `reserveBottom?`, `title?`, `author?`, `subject?`, `keywords?`, `creator?`, `producer?`, `debug?`, `warnings?`. Headers and footers receive `{ pageNumber, totalPages }`. Defaults to LETTER (612×792). Pass `{ size: PageSizes.A4 }` for A4. When a top-level child's measured width exceeds the page content area, boxpdf emits a `console.warn`. Suppress with `warnings: false`.
+- `streamFlow(pdf, writable, asyncIterable, options)`. Incremental page-by-page rendering. Memory stays bounded regardless of page count. Writes PDF bytes to a `WritableStream<Uint8Array>` as each page closes. See the Streaming section below for the contract.
+- `renderToPdf(node, options)`. One-page convenience.
+- `pageInner(size, margin)` / `pageContent(size, margin)`. Compute the inner content width or rectangle of a page.
+- `render(node, page, x, yTop, parentWidth)`. Draws a subtree at a known position on an existing `PDFPage`.
+- `measure(node, parentWidth)`. Intrinsic size without drawing.
 
-Pass `{ debug: true }` to render-with-overlay (red content boxes, orange
-margin boxes).
+Pass `{ debug: true }` to outline content boxes in red and margin boxes in orange.
 
 ### Helpers
 
-- `embedFont(pdf, { source })` — embed a TTF from URL / bytes / data URL.
-- `loadImage(pdf, source)` — embed a PNG or JPEG (auto-detected) from
-  URL / bytes / data URL.
-- `formatCurrency(n, { currency, locale })` — `Intl.NumberFormat` wrapper.
-- `defineStyles({ ... })` — typed identity for reusable style bundles.
-- `hex("#1f8a4d")` / `rgb255(31, 138, 77)` — color builders.
+- `loadFont(pdf, source, options?)`. Embed a TTF from URL, bytes, base64, or data URL.
+- `loadImage(pdf, source)`. Embed a PNG or JPEG (auto-detected).
+- `formatCurrency(n, { currency, locale })`. `Intl.NumberFormat` wrapper.
+- `defineStyles({ ... })`. Typed identity for reusable style bundles.
+- `hex("#1f8a4d")` / `rgb255(31, 138, 77)`. Color builders.
 
-### Three ways to load a font
+## Loading fonts
 
-For any custom font (not the built-in `StandardFonts.Helvetica` / etc.), use
-`loadFont(pdf, source, options?)`. The source can be:
+Three options.
 
-**1) Bundled bytes via the CLI — recommended for production.**
+**Bundled bytes via the CLI.** Recommended for production.
 
 ```sh
 npx boxpdf font add ./Acme-Regular.ttf=regular ./Acme-Bold.ttf=bold \
   --out src/fonts/acme.ts
 ```
 
-Generates `src/fonts/acme.ts` with two `export const` base64 strings.
-Then in your code:
+Generates `src/fonts/acme.ts` with `export const` base64 strings. Then:
 
 ```ts
 import { loadFont } from "boxpdf";
@@ -198,10 +149,9 @@ const font = await loadFont(pdf, regular);
 const acmeBold = await loadFont(pdf, bold);
 ```
 
-Bytes ship inside your bundle — no network round-trip, predictable cold-start
-cost, works in every runtime.
+Bytes ship inside your bundle. No network round-trip.
 
-**2) The built-in Inter weights.**
+**The built-in Inter weights.**
 
 ```ts
 import { loadFont } from "boxpdf";
@@ -211,40 +161,18 @@ const font = await loadFont(pdf, inter);
 const bold = await loadFont(pdf, interBold);
 ```
 
-`boxpdf/inter` re-exports the same Inter subset both as raw base64 strings
-(`inter`, `interBold`, `interItalic`) and as the convenience helper
-`embedInter(pdf, { italic?, tabularFigures? })` that loads several at once.
+`boxpdf/inter` re-exports the same Inter subset as raw base64 strings (`inter`, `interBold`, `interItalic`) and as `embedInter(pdf, { italic?, tabularFigures? })`.
 
-**3) Fetch from a URL — good for edge runtimes where the asset is cache-friendly.**
-
-```ts
-const brand = await loadFont(pdf, "https://example.com/Acme-Regular.ttf");
-```
-
-The full TTF gets fetched and subsetted at embed time. On Cloudflare Workers
-with a warm cache this is fast (~5–15 ms); on a cold cache or in Node
-you pay the full fetch each time. For production prefer option (1).
-
-`loadFont` accepts the same `{ subset?: boolean; features?: { tnum: true } }`
-options regardless of the source. Use `features: { tnum: true }` to enable
-tabular numerals for money columns.
-
-### Inter font (optional)
+Importing `boxpdf/inter` loads ~325 KB of font bytes plus `@pdf-lib/fontkit`. The subpath isn't loaded otherwise.
 
 ```ts
 import { embedInter } from "boxpdf/inter";
 
-const { font, bold } = await embedInter(pdf);  // ~82 KB / weight, subsetted
+const { font, bold } = await embedInter(pdf);
 const theme = cleanTheme(font, bold);
 ```
 
-`boxpdf/inter` is a separate subpath. Importing it loads ~325 KB of font
-bytes plus `@pdf-lib/fontkit`; if you don't import it, neither hits your
-bundle.
-
-Pass `{ tabularFigures: true }` to also get tabular-numeral variants. Use
-them for money columns and number-heavy tables — every digit gets the
-same advance width so totals line up to a fixed grid:
+Pass `{ tabularFigures: true }` to also get tabular-numeral variants for money columns:
 
 ```ts
 const { font, bold, tabularFont, tabularBold } = await embedInter(pdf, {
@@ -254,17 +182,19 @@ const { font, bold, tabularFont, tabularBold } = await embedInter(pdf, {
 text(formatCurrency(amount), { size: 12, font: tabularBold, align: "right" });
 ```
 
-The proportional `font` / `bold` are still preferred for body text — Inter's
-proportional `1` is narrower than `0`, which reads better in prose. Use the
-tabular pair only where you need the alignment.
+**Fetch from a URL.**
+
+```ts
+const brand = await loadFont(pdf, "https://example.com/Acme-Regular.ttf");
+```
+
+The full TTF gets fetched and subsetted at embed time. On Cloudflare Workers with a warm cache this is fast (~5-15 ms). On a cold cache or in Node you pay the full fetch each time.
+
+`loadFont` accepts the same `{ subset?: boolean; features?: { tnum: true } }` options regardless of the source. Use `features: { tnum: true }` to enable tabular numerals.
 
 ## Streaming output
 
-For long-running document generation (1000+ pages, large reports,
-generated tickets/receipts in bulk), use `streamFlow` instead of
-`renderFlow`. It emits PDF bytes to a `WritableStream<Uint8Array>` as
-each page closes, keeping peak heap bounded at `O(shared resources +
-one page in flight)` regardless of total page count.
+For long-running document generation, use `streamFlow` instead of `renderFlow`. It emits PDF bytes to a `WritableStream<Uint8Array>` as each page closes. Peak heap is bounded at `O(shared resources + one page in flight)` regardless of total page count.
 
 ```ts
 import { PDFDocument, StandardFonts } from "pdf-lib";
@@ -274,7 +204,6 @@ const pdf = await PDFDocument.create();
 const font = await pdf.embedFont(StandardFonts.Helvetica);
 const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
 
-// Workers / edge: stream into the Response body.
 const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
 streamFlow(pdf, writable, generate(font, bold)).catch(console.error);
 
@@ -283,9 +212,8 @@ return new Response(readable, {
 });
 
 async function* generate(font, bold) {
-  for await (const order of fetchOrders()) {  // could be 10,000 of them
+  for await (const order of fetchOrders()) {
     yield buildOrderRow(font, bold, order);
-    // last Node is GC-able as soon as this yield is consumed
   }
 }
 ```
@@ -302,50 +230,33 @@ await streamFlow(pdf, out, nodes);
 
 ### Contract
 
-1. **Embed before streaming.** All `embedFont` / `embedJpg` / `embedPng`
-   calls must complete BEFORE `streamFlow`. Embedding mid-stream
-   throws.
-2. **Lazy input.** The iterable is consumed one node at a time. Pass a
-   generator, not a materialized array — otherwise you defeat the
-   point.
-3. **Exclusive writable.** `streamFlow` writes to and closes the
-   writable on success; aborts on failure. Don't write to it
-   concurrently.
-4. **No `totalPages` in headers/footers.** `ctx.totalPages` access
-   throws — the count isn't known without buffering the entire
-   document. Use `renderFlow` if you need "Page X of Y".
-5. **~5% size overhead.** Output is 0-5% larger than `renderFlow`'s
-   default `save()` (per-batch ObjStm compression is slightly less
-   efficient than whole-doc compression).
+1. All `embedFont` / `embedJpg` / `embedPng` calls must complete before `streamFlow`. Embedding mid-stream throws.
+2. The iterable is consumed one node at a time. Pass a generator.
+3. `streamFlow` closes the writable on success and aborts it on failure. Don't write to it concurrently.
+4. `ctx.totalPages` is not available in headers and footers. Accessing it throws. Use `renderFlow` if you need "Page X of Y".
+5. Output is 0-5% larger than `renderFlow`'s default `save()`.
 
 ### Memory bench
 
-Absolute peak heap during render (50 lines per page):
+Absolute peak heap during render. 50 lines per page.
 
-| pages | renderFlow peak | streamFlow peak | ratio | output |
+| Pages | renderFlow peak | streamFlow peak | Ratio | Output |
 | ---:  | ---:            | ---:            | ---:  | ---:   |
 |    50 |     27.6 MB     |     14.9 MB     |  1.8× |  70 KB |
 |   250 |     52.6 MB     |     19.8 MB     |  2.6× | 347 KB |
 |   500 |     82.8 MB     |     24.1 MB     |  3.4× | 693 KB |
 |  1000 |    184.8 MB     |     35.5 MB     |  5.2× | 1.4 MB |
 
-renderFlow's peak grows roughly linearly — pdf-lib accumulates content
-streams + `pdf.save()` materializes the entire output buffer.
-streamFlow stays close to baseline: content streams are
-`ctx.delete()`'d after writing, so only page dicts accumulate (tiny —
-~200 B each). For 1000 pages, the streaming win is **~150 MB less peak
-memory** for the same byte output (within 0.2%). See
-`docs/design/streaming.md` for the full design + chart.
+At 1000 pages, the streaming path uses ~150 MB less peak memory for byte-equivalent output (sizes within 0.2%). See `docs/design/streaming.md` for the design.
 
 ## Cloudflare Workers
 
-Both the core and the `boxpdf/inter` subpath are verified to run on
-Cloudflare Workers without `nodejs_compat`. Drop into a handler:
+Both the core and the `boxpdf/inter` subpath run on Workers without `nodejs_compat`.
 
 ```ts
 import { Hono } from "hono";
 import { PDFDocument, StandardFonts } from "pdf-lib";
-import { cleanTheme, renderFlow, text, vstack } from "boxpdf";
+import { cleanTheme, renderFlow, text } from "boxpdf";
 
 const app = new Hono();
 
@@ -367,66 +278,48 @@ export default app;
 
 ## Examples
 
-See [`examples/`](./examples) for runnable scripts.
+Runnable scripts in [`examples/`](./examples):
 
-- `examples/receipt.ts` — single-page receipt with totals.
-- `examples/itinerary.ts` — two-band travel itinerary.
-- `examples/invoice.ts` — multi-page invoice with running header / footer
-  and `keepTogether`.
-- `examples/debug.ts` — layout with `{ debug: true }`.
-- `examples/themes-showcase.ts` — same receipt rendered in all four themes.
-- `examples/inter-showcase.ts` — clean theme rendered with Inter font.
+- `receipt.ts`. Single-page receipt with totals.
+- `itinerary.ts`. Two-band travel itinerary.
+- `invoice.ts`. Multi-page invoice with running header and footer plus `keepTogether`.
+- `debug.ts`. Layout with `{ debug: true }`.
+- `themes-showcase.ts`. The same receipt rendered in all four themes.
+- `inter-showcase.ts`. Clean theme rendered with Inter.
+- `flex-shrink.ts`. Three URL-overflow behaviors side by side.
 
 ## Flex-shrink
 
-Opt-in via `shrink: number` on any child of an `hstack` or `vstack`. When the
-sum of children's intrinsic main-axis sizes exceeds the parent's available
-space, items with `shrink > 0` give up shares proportional to
-`shrink × baseSize`. Items with `shrink = 0` (the default) are frozen.
+Opt-in via `shrink: number` on any child of an `hstack` or `vstack`. When the sum of children's intrinsic main-axis sizes exceeds the parent's available space, items with `shrink > 0` give up shares proportional to `shrink × baseSize`. Items with `shrink = 0` (the default) are frozen.
 
 ```ts
 hstack(
   { width: 360, gap: 16 },
-  text("Customer:", { size: 11, font: bold }),                       // shrink: 0 — keeps its intrinsic width
-  text("Mr. Algernon Hephaestus Constantine Pemberton-Smythe III", { // shrink: 1 — re-wraps to the leftover slot
+  text("Customer:", { size: 11, font: bold }),
+  text("Mr. Algernon Hephaestus Constantine Pemberton-Smythe III", {
     size: 11, font, shrink: 1
   })
 )
 ```
 
-- **Text floor (CSS-idiomatic).** A text child won't shrink below the width
-  of its widest single whitespace-separated word — wrapping breaks on
-  whitespace, never mid-word. A single-token string with no whitespace
-  (URL, hash, slug) therefore won't shrink at all and overflows its slot
-  visibly. Two opt-ins lower the floor:
-  - `maxLines: N` — engine ellipsizes overflow, so the floor drops to 0 and
-    the text shrinks to its slot and trims with `…`. Use this for clean
-    truncation of long URLs / names in tight columns.
-  - `breakWords: true` — CSS `overflow-wrap: break-word`; the engine
-    hard-breaks at character boundaries. Use this for monospace tables,
-    hashes, long identifiers where wrapping is preferred to truncation.
-- **Cross-axis recomputes.** When shrunk text rewraps to more lines, the
-  container's intrinsic height grows accordingly.
-- **Iterative.** When one item hits its min-word floor, its remaining
-  shrink weight redistributes to siblings — same model as CSS flexbox.
-- **Vertical too.** Works on `vstack` when the parent has a fixed `height`
-  smaller than the sum of children.
-- **Through `link`.** A `link` wrapper forwards its child's shrink weight,
-  so linked text shrinks and re-wraps just like bare text.
+Behavior:
 
-See `examples/flex-shrink.ts` for a runnable showcase.
+- A text child won't shrink below the width of its widest whitespace-separated word. Wrapping breaks on whitespace, not mid-word.
+- A single-token string (URL, hash, slug) won't shrink at all and overflows its slot visibly. Two opt-ins lower the floor:
+  - `maxLines: N`. The engine ellipsizes overflow. The text shrinks to its slot and trims with `…`.
+  - `breakWords: true`. CSS `overflow-wrap: break-word`. Hard-breaks at character boundaries.
+- When shrunk text rewraps to more lines, the container's intrinsic height grows accordingly.
+- When one item hits its min-word floor, its remaining shrink weight redistributes to siblings.
+- Works on `vstack` too when the parent has a fixed `height` smaller than the sum of children.
+- `link` forwards its child's shrink weight, so linked text shrinks and re-wraps like bare text.
 
-## Known limits
+See `examples/flex-shrink.ts`.
 
-- **No `position: absolute`** — by design. Drop to `render()` with explicit
-  coordinates if you must.
-- **Font shaping** is whatever pdf-lib / fontkit support. Complex Indic /
-  Arabic / Thai shaping isn't here. If you need full HarfBuzz, you need a
-  different stack — none of which run on Cloudflare Workers today.
-- **PDF linearization** (a.k.a. web-optimization — reordering bytes so
-  byte 1 is page 1) isn't done. Streaming generation (page-at-a-time
-  output to a writable) is supported via `streamFlow`; linearization
-  is a separate post-process and out of scope.
+## Limitations
+
+- No `position: absolute`. Drop to `render()` with explicit coordinates if you need it.
+- Font shaping is whatever pdf-lib and fontkit support. Complex Indic, Arabic, and Thai shaping isn't here. Full HarfBuzz requires a different stack, none of which run on Cloudflare Workers today.
+- PDF linearization (reordering the byte stream so byte 1 is page 1) is not done. Streaming generation is supported via `streamFlow`. Linearization is a separate post-process and out of scope.
 
 ## License
 
