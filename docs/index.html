@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>boxpdf — declarative PDF layout for any JS runtime</title>
+<meta name="description" content="Tiny box-layout DSL over pdf-lib. Flexbox-lite for server-side PDF generation in Node, Cloudflare Workers, Deno, and browsers." />
+<link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+<header class="site">
+  <a class="brand" href="./">boxpdf</a>
+  <nav>
+    <a href="#features">Features</a>
+    <a href="#themes">Themes</a>
+    <a href="#templates">Templates</a>
+    <a href="#install">Install</a>
+    <a href="https://github.com/earonesty/boxpdf" target="_blank" rel="noopener">GitHub</a>
+  </nav>
+</header>
+
+<main>
+  <section class="hero">
+    <h1>Declarative PDFs<br /><span class="muted">that run anywhere.</span></h1>
+    <p class="lede">
+      A tiny box-layout DSL over <a href="https://pdf-lib.js.org/" target="_blank" rel="noopener">pdf-lib</a>.
+      Flexbox-lite for server-side PDF generation in
+      <strong>Node</strong>, <strong>Cloudflare Workers</strong>, <strong>Deno</strong>,
+      and the <strong>browser</strong>. No WASM. No headless browser. No React tax.
+    </p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="#install">Install</a>
+      <a class="btn btn-secondary" href="#templates">See templates</a>
+      <a class="btn btn-ghost" href="https://github.com/earonesty/boxpdf" target="_blank" rel="noopener">GitHub →</a>
+    </div>
+    <pre class="hero-code"><code>import &#123; cleanTheme, hline, hstack, renderFlow, text, vstack &#125; from "boxpdf";
+import &#123; PDFDocument, StandardFonts &#125; from "pdf-lib";
+
+const pdf = await PDFDocument.create();
+const font = await pdf.embedFont(StandardFonts.Helvetica);
+const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+const theme = cleanTheme(font, bold);
+
+await renderFlow(pdf, [
+  vstack(&#123; gap: 8 &#125;,
+    text("Receipt #18472", theme.type.h1),
+    text("May 14, 2026",     theme.type.caption)
+  ),
+  hline(theme.hr),
+  hstack(&#123; gap: 16 &#125;,
+    text("Wool socks",   theme.type.body),
+    text("$28.00",        &#123; ...theme.type.body, font: bold, align: "right", width: 80 &#125;)
+  )
+]);
+
+const bytes = await pdf.save(); // -&gt; Uint8Array</code></pre>
+  </section>
+
+  <section id="features" class="block">
+    <h2>What's in the box</h2>
+    <div class="feature-grid">
+      <div class="feature">
+        <h3>Runs at the edge</h3>
+        <p>The only declarative PDF lib that works on Cloudflare Workers today. No WASM, no fontkit-trapped-in-browser, no &nbsp;<code>nodejs_compat</code>.</p>
+      </div>
+      <div class="feature">
+        <h3>Flex-ish layout, no coordinates</h3>
+        <p><code>vstack</code> / <code>hstack</code> with <code>padding</code>, <code>margin</code>, <code>gap</code>, <code>justify</code>, <code>align</code>, <code>grow</code>, real word-wrapping, ellipsis. No <code>page.drawText(x, height − 246)</code>.</p>
+      </div>
+      <div class="feature">
+        <h3>Themes you can recognize</h3>
+        <p>Drop-in <code>cleanTheme</code>, <code>stripeTheme</code>, <code>editorialTheme</code>, <code>brutalistTheme</code>. Same code, totally different aesthetic.</p>
+      </div>
+      <div class="feature">
+        <h3>Multi-page primitive</h3>
+        <p><code>renderFlow</code> paginates with atomic children. <code>keepTogether</code> bundles widows. Page headers / footers with <code>&#123; pageNumber, totalPages &#125;</code> built in.</p>
+      </div>
+      <div class="feature">
+        <h3>Pull in any font</h3>
+        <p>Optional <code>boxpdf/inter</code> ships subsetted Inter (82 KB / weight). Or <code>embedFont(pdf, &#123; source &#125;)</code> for any TTF you own.</p>
+      </div>
+      <div class="feature">
+        <h3>Hyperlinks, decorations, metadata</h3>
+        <p><code>link(&#123; href &#125;, ...)</code>, underline / strikethrough, <code>title</code> / <code>author</code> / <code>subject</code> as renderFlow options.</p>
+      </div>
+      <div class="feature">
+        <h3>Debug overlay</h3>
+        <p><code>renderFlow(pdf, nodes, &#123; debug: true &#125;)</code> outlines every content + margin box in red and orange. Trace layouts visually.</p>
+      </div>
+      <div class="feature">
+        <h3>Tiny, treeshakable</h3>
+        <p>Core is &lt;7 KB minified. <code>boxpdf/inter</code> and <code>@pdf-lib/fontkit</code> only load when you use them. Real bundle hygiene.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="themes" class="block">
+    <h2>Four named themes</h2>
+    <p class="block-lede">Same identical layout code. Drop in a different theme; the document transforms.</p>
+    <div class="theme-grid">
+      <figure class="theme-card">
+        <a href="./gallery/pdf/receipt-clean.pdf" target="_blank" rel="noopener">
+          <img src="./gallery/png/receipt-clean-1.png" alt="Clean theme — modern SaaS, soft borders, 8pt rounded corners" />
+        </a>
+        <figcaption>
+          <strong>cleanTheme</strong> <span class="muted">— modern SaaS default</span>
+        </figcaption>
+      </figure>
+      <figure class="theme-card">
+        <a href="./gallery/pdf/receipt-stripe.pdf" target="_blank" rel="noopener">
+          <img src="./gallery/png/receipt-stripe-1.png" alt="Stripe theme — square corners, thin borders, monochrome with accent" />
+        </a>
+        <figcaption>
+          <strong>stripeTheme</strong> <span class="muted">— square corners, thin borders, classic SaaS receipt</span>
+        </figcaption>
+      </figure>
+      <figure class="theme-card">
+        <a href="./gallery/pdf/receipt-editorial.pdf" target="_blank" rel="noopener">
+          <img src="./gallery/png/receipt-editorial-1.png" alt="Editorial theme — Times serif, warm cream, italic captions" />
+        </a>
+        <figcaption>
+          <strong>editorialTheme</strong> <span class="muted">— Times serif, generous leading, classic editorial</span>
+        </figcaption>
+      </figure>
+      <figure class="theme-card">
+        <a href="./gallery/pdf/receipt-brutalist.pdf" target="_blank" rel="noopener">
+          <img src="./gallery/png/receipt-brutalist-1.png" alt="Brutalist theme — Courier monospace, 2pt solid black borders" />
+        </a>
+        <figcaption>
+          <strong>brutalistTheme</strong> <span class="muted">— Courier monospace, 2pt black borders, indie / dev</span>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section id="templates" class="block">
+    <h2>Template gallery</h2>
+    <p class="block-lede">Production-ready documents in <code>templates/</code>. Copy a file, edit it for your data, ship it.</p>
+
+    <div class="template-grid">
+      <figure class="template-card">
+        <a href="./gallery/pdf/receipt.pdf" target="_blank" rel="noopener">
+          <img src="./gallery/png/receipt-1.png" alt="Receipt template" />
+        </a>
+        <figcaption>
+          <strong>Receipt</strong>
+          <span class="muted">cleanTheme · 1 page</span>
+          <a class="source" href="https://github.com/earonesty/boxpdf/blob/main/templates/receipt.ts" target="_blank" rel="noopener">templates/receipt.ts</a>
+        </figcaption>
+      </figure>
+      <figure class="template-card">
+        <a href="./gallery/pdf/boarding-pass.pdf" target="_blank" rel="noopener">
+          <img src="./gallery/png/boarding-pass-1.png" alt="Boarding pass template" />
+        </a>
+        <figcaption>
+          <strong>Boarding pass</strong>
+          <span class="muted">cleanTheme · 1 page</span>
+          <a class="source" href="https://github.com/earonesty/boxpdf/blob/main/templates/boarding-pass.ts" target="_blank" rel="noopener">templates/boarding-pass.ts</a>
+        </figcaption>
+      </figure>
+      <figure class="template-card">
+        <a href="./gallery/pdf/resume.pdf" target="_blank" rel="noopener">
+          <img src="./gallery/png/resume-1.png" alt="Resume template" />
+        </a>
+        <figcaption>
+          <strong>Resume</strong>
+          <span class="muted">editorialTheme · 2 pages</span>
+          <a class="source" href="https://github.com/earonesty/boxpdf/blob/main/templates/resume.ts" target="_blank" rel="noopener">templates/resume.ts</a>
+        </figcaption>
+      </figure>
+      <figure class="template-card">
+        <a href="./gallery/pdf/order-confirmation.pdf" target="_blank" rel="noopener">
+          <img src="./gallery/png/order-confirmation-1.png" alt="Order confirmation template" />
+        </a>
+        <figcaption>
+          <strong>Order confirmation</strong>
+          <span class="muted">cleanTheme · 1 page</span>
+          <a class="source" href="https://github.com/earonesty/boxpdf/blob/main/templates/order-confirmation.ts" target="_blank" rel="noopener">templates/order-confirmation.ts</a>
+        </figcaption>
+      </figure>
+      <figure class="template-card">
+        <a href="./gallery/pdf/certificate.pdf" target="_blank" rel="noopener">
+          <img src="./gallery/png/certificate-1.png" alt="Certificate template" />
+        </a>
+        <figcaption>
+          <strong>Certificate</strong>
+          <span class="muted">editorialTheme · landscape</span>
+          <a class="source" href="https://github.com/earonesty/boxpdf/blob/main/templates/certificate.ts" target="_blank" rel="noopener">templates/certificate.ts</a>
+        </figcaption>
+      </figure>
+      <figure class="template-card">
+        <a href="./gallery/pdf/invoice.pdf" target="_blank" rel="noopener">
+          <img src="./gallery/png/invoice-1.png" alt="Multi-page invoice with page headers and footers" />
+        </a>
+        <figcaption>
+          <strong>Invoice</strong>
+          <span class="muted">cleanTheme · 2 pages, header/footer, keepTogether</span>
+          <a class="source" href="https://github.com/earonesty/boxpdf/blob/main/examples/invoice.ts" target="_blank" rel="noopener">examples/invoice.ts</a>
+        </figcaption>
+      </figure>
+      <figure class="template-card">
+        <a href="./gallery/pdf/itinerary.pdf" target="_blank" rel="noopener">
+          <img src="./gallery/png/itinerary-1.png" alt="Travel itinerary with two flight bands" />
+        </a>
+        <figcaption>
+          <strong>Itinerary</strong>
+          <span class="muted">cleanTheme · two-band layout</span>
+          <a class="source" href="https://github.com/earonesty/boxpdf/blob/main/examples/itinerary.ts" target="_blank" rel="noopener">examples/itinerary.ts</a>
+        </figcaption>
+      </figure>
+      <figure class="template-card">
+        <a href="./gallery/pdf/debug.pdf" target="_blank" rel="noopener">
+          <img src="./gallery/png/debug-1.png" alt="Debug overlay with red content boxes and orange margin boxes" />
+        </a>
+        <figcaption>
+          <strong>Debug overlay demo</strong>
+          <span class="muted">cleanTheme · &#123; debug: true &#125;</span>
+          <a class="source" href="https://github.com/earonesty/boxpdf/blob/main/examples/debug.ts" target="_blank" rel="noopener">examples/debug.ts</a>
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section id="install" class="block">
+    <h2>Install</h2>
+    <pre><code>npm install boxpdf pdf-lib</code></pre>
+    <p class="block-lede">
+      <code>pdf-lib</code> is a peer dependency. If you want custom-font embedding (incl. <code>boxpdf/inter</code>), <code>@pdf-lib/fontkit</code> comes along for the ride and is lazy-loaded only when you embed a non-standard font.
+    </p>
+    <h3>Cloudflare Workers</h3>
+    <p>Both the core and the <code>boxpdf/inter</code> subpath are verified to run on Cloudflare Workers without <code>nodejs_compat</code> or any WASM flag. Drop it into a worker handler:</p>
+    <pre><code>import &#123; Hono &#125; from "hono";
+import &#123; PDFDocument, StandardFonts &#125; from "pdf-lib";
+import &#123; cleanTheme, renderFlow, text, vstack &#125; from "boxpdf";
+
+const app = new Hono();
+
+app.get("/receipt.pdf", async (c) =&gt; &#123;
+  const pdf  = await PDFDocument.create();
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const t    = cleanTheme(font, bold);
+  await renderFlow(pdf, [
+    text("Thanks!", t.type.h1),
+    text("This PDF was generated at the edge.", t.type.body)
+  ]);
+  const bytes = await pdf.save();
+  return new Response(bytes, &#123; headers: &#123; "content-type": "application/pdf" &#125; &#125;);
+&#125;);
+
+export default app;</code></pre>
+  </section>
+
+  <section id="why" class="block">
+    <h2>Why not …</h2>
+    <table class="compare">
+      <thead>
+        <tr><th></th><th>boxpdf</th><th>pdf-lib</th><th>@react-pdf/renderer</th><th>jsPDF</th></tr>
+      </thead>
+      <tbody>
+        <tr><th>Declarative layout</th><td>✓</td><td>—</td><td>✓ (JSX)</td><td>—</td></tr>
+        <tr><th>Cloudflare Workers</th><td>✓</td><td>✓</td><td>✗ (fontkit WASM)</td><td>partial</td></tr>
+        <tr><th>Streaming output</th><td>v2 roadmap</td><td>—</td><td>Node only</td><td>—</td></tr>
+        <tr><th>Custom fonts</th><td>✓ via fontkit (lazy)</td><td>✓ via fontkit</td><td>✓</td><td>limited</td></tr>
+        <tr><th>Core bundle</th><td>~7 KB gz</td><td>~250 KB gz</td><td>~250 KB gz</td><td>~80 KB gz</td></tr>
+        <tr><th>JSX runtime conflict</th><td>none</td><td>n/a</td><td>requires React</td><td>n/a</td></tr>
+      </tbody>
+    </table>
+    <p class="footnote">
+      Sizes are rough; measure yourself before believing any table. <strong>boxpdf is the right pick when you want declarative layout AND your runtime is anything other than long-lived Node.</strong>
+      pdf-lib is still the right pick if you want raw coordinate control and don't care about layout primitives. <code>@react-pdf/renderer</code> is the right pick if you're already deep in React on Node and don't need Workers.
+    </p>
+  </section>
+
+  <section id="roadmap" class="block">
+    <h2>1.0 status and what's next</h2>
+    <ul class="roadmap">
+      <li class="done">✓ Box layout DSL: vstack, hstack, text, image, hline, vline, spacer, flex, keepTogether</li>
+      <li class="done">✓ Padding, margin, background, border, borderRadius, flex-grow, justify, align</li>
+      <li class="done">✓ Word-wrap, ellipsis, multi-line text with maxLines</li>
+      <li class="done">✓ Themes: clean, stripe, editorial, brutalist</li>
+      <li class="done">✓ Multi-page flow with header/footer and PageContext</li>
+      <li class="done">✓ Links (PDF annotations), text decorations, document metadata</li>
+      <li class="done">✓ embedInter / embedFont / loadImage helpers</li>
+      <li class="done">✓ Debug overlay, formatCurrency, defineStyles</li>
+      <li class="done">✓ Verified end-to-end on Cloudflare Workers (core + Inter path)</li>
+      <li>○ flex-shrink (v2)</li>
+      <li>○ Streaming page-at-a-time output (v2 — requires our own serializer)</li>
+      <li>○ <code>boxpdf font add</code> CLI for one-off custom font generation</li>
+      <li>○ Tabular numerals on Inter for money columns</li>
+    </ul>
+  </section>
+
+  <footer class="site-footer">
+    <p>
+      boxpdf is MIT-licensed and built by <a href="https://github.com/earonesty" target="_blank" rel="noopener">Erik Aronesty</a>.
+      Source: <a href="https://github.com/earonesty/boxpdf" target="_blank" rel="noopener">github.com/earonesty/boxpdf</a>.
+      Issues, PRs, and named-theme ideas welcome.
+    </p>
+  </footer>
+</main>
+</body>
+</html>
