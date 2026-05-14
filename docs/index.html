@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>boxpdf — declarative PDF layout for any JS runtime</title>
+<title>boxpdf · declarative PDF layout for any JS runtime</title>
 <meta name="description" content="Tiny box-layout DSL over pdf-lib. Flexbox-lite for server-side PDF generation in Node, Cloudflare Workers, Deno, and browsers." />
 <link rel="stylesheet" href="./style.css" />
 </head>
@@ -26,7 +26,7 @@
       A tiny box-layout DSL over <a href="https://pdf-lib.js.org/" target="_blank" rel="noopener">pdf-lib</a>.
       Flexbox-lite for server-side PDF generation in
       <strong>Node</strong>, <strong>Cloudflare Workers</strong>, <strong>Deno</strong>,
-      and the <strong>browser</strong>. No WASM. No headless browser. No React tax.
+      and the <strong>browser</strong>. No WASM. No headless browser. No React.
     </p>
     <div class="cta-row">
       <a class="btn btn-primary" href="#install">Install</a>
@@ -61,73 +61,77 @@ const bytes = await pdf.save(); // -&gt; Uint8Array</code></pre>
     <div class="feature-grid">
       <div class="feature">
         <h3>Runs at the edge</h3>
-        <p>The only declarative PDF lib that works on Cloudflare Workers today. No WASM, no fontkit-trapped-in-browser, no &nbsp;<code>nodejs_compat</code>.</p>
+        <p>Works on Cloudflare Workers without <code>nodejs_compat</code> or any WASM flag. Verified end-to-end with embedded Inter.</p>
       </div>
       <div class="feature">
         <h3>Flex-ish layout, no coordinates</h3>
-        <p><code>vstack</code> / <code>hstack</code> with <code>padding</code>, <code>margin</code>, <code>gap</code>, <code>justify</code>, <code>align</code>, <code>grow</code>, real word-wrapping, ellipsis. No <code>page.drawText(x, height − 246)</code>.</p>
+        <p><code>vstack</code> / <code>hstack</code> with <code>padding</code>, <code>margin</code>, <code>gap</code>, <code>justify</code>, <code>align</code>, <code>grow</code>, <code>shrink</code>. Real word-wrapping and ellipsis.</p>
       </div>
       <div class="feature">
-        <h3>Themes you can recognize</h3>
-        <p>Drop-in <code>cleanTheme</code>, <code>stripeTheme</code>, <code>editorialTheme</code>, <code>brutalistTheme</code>. Same code, totally different aesthetic.</p>
+        <h3>Streaming output</h3>
+        <p><code>streamFlow</code> emits bytes to a <code>WritableStream</code> as each page closes. Peak heap stays flat at any page count. A 1000-page report uses 5× less memory than <code>renderFlow + pdf.save()</code>.</p>
       </div>
       <div class="feature">
-        <h3>Multi-page primitive</h3>
-        <p><code>renderFlow</code> paginates with atomic children. <code>keepTogether</code> bundles widows. Page headers / footers with <code>&#123; pageNumber, totalPages &#125;</code> built in.</p>
+        <h3>Four named themes</h3>
+        <p>Drop-in <code>cleanTheme</code>, <code>stripeTheme</code>, <code>editorialTheme</code>, <code>brutalistTheme</code>. Same code restyles every template.</p>
       </div>
       <div class="feature">
-        <h3>Pull in any font</h3>
-        <p>Optional <code>boxpdf/inter</code> ships subsetted Inter (82 KB / weight). Or <code>loadFont(pdf, source)</code> + <code>boxpdf font add</code> to bundle any TTF you own.</p>
+        <h3>Multi-page flow</h3>
+        <p><code>renderFlow</code> paginates with atomic children. <code>keepTogether</code> bundles widows. Page headers and footers with <code>&#123; pageNumber, totalPages &#125;</code> built in.</p>
+      </div>
+      <div class="feature">
+        <h3>Bring your own fonts</h3>
+        <p>Optional <code>boxpdf/inter</code> ships subsetted Inter (82 KB / weight). <code>loadFont(pdf, source)</code> and the <code>boxpdf font add</code> CLI bundle any TTF as base64.</p>
       </div>
       <div class="feature">
         <h3>Hyperlinks, decorations, metadata</h3>
-        <p><code>link(&#123; href &#125;, ...)</code>, underline / strikethrough, <code>title</code> / <code>author</code> / <code>subject</code> as renderFlow options.</p>
+        <p><code>link(&#123; href &#125;, ...)</code>, underline, strikethrough, <code>title</code> / <code>author</code> / <code>subject</code> as renderFlow options.</p>
       </div>
       <div class="feature">
         <h3>Debug overlay</h3>
-        <p><code>renderFlow(pdf, nodes, &#123; debug: true &#125;)</code> outlines every content + margin box in red and orange. Trace layouts visually.</p>
+        <p><code>renderFlow(pdf, nodes, &#123; debug: true &#125;)</code> outlines every content and margin box in red and orange. Trace layouts visually.</p>
       </div>
       <div class="feature">
-        <h3>Tiny, treeshakable</h3>
-        <p>Core is &lt;7 KB minified. <code>boxpdf/inter</code> and <code>@pdf-lib/fontkit</code> only load when you use them. Real bundle hygiene.</p>
+        <h3>Tiny, tree-shakable</h3>
+        <p>Core is &lt;7 KB minified. <code>boxpdf/inter</code> and <code>@pdf-lib/fontkit</code> only load when you use them.</p>
       </div>
     </div>
   </section>
 
   <section id="themes" class="block">
     <h2>Four named themes</h2>
-    <p class="block-lede">Same identical layout code. Drop in a different theme; the document transforms.</p>
+    <p class="block-lede">Same layout code, four aesthetics. Swap the theme and every template restyles.</p>
     <div class="theme-grid">
       <figure class="theme-card">
         <a href="./gallery/pdf/receipt-clean.pdf" target="_blank" rel="noopener">
-          <img src="./gallery/png/receipt-clean-1.png" alt="Clean theme — modern SaaS, soft borders, 8pt rounded corners" />
+          <img src="./gallery/png/receipt-clean-1.png" alt="Clean theme. Modern SaaS, soft borders, 8pt rounded corners" />
         </a>
         <figcaption>
-          <strong>cleanTheme</strong> <span class="muted">— modern SaaS default</span>
+          <strong>cleanTheme</strong> <span class="muted">modern SaaS default</span>
         </figcaption>
       </figure>
       <figure class="theme-card">
         <a href="./gallery/pdf/receipt-stripe.pdf" target="_blank" rel="noopener">
-          <img src="./gallery/png/receipt-stripe-1.png" alt="Stripe theme — square corners, thin borders, monochrome with accent" />
+          <img src="./gallery/png/receipt-stripe-1.png" alt="Stripe theme. Square corners, thin borders, monochrome with accent" />
         </a>
         <figcaption>
-          <strong>stripeTheme</strong> <span class="muted">— square corners, thin borders, classic SaaS receipt</span>
+          <strong>stripeTheme</strong> <span class="muted">square corners, thin borders, monochrome</span>
         </figcaption>
       </figure>
       <figure class="theme-card">
         <a href="./gallery/pdf/receipt-editorial.pdf" target="_blank" rel="noopener">
-          <img src="./gallery/png/receipt-editorial-1.png" alt="Editorial theme — Times serif, warm cream, italic captions" />
+          <img src="./gallery/png/receipt-editorial-1.png" alt="Editorial theme. Times serif, warm cream, italic captions" />
         </a>
         <figcaption>
-          <strong>editorialTheme</strong> <span class="muted">— Times serif, generous leading, classic editorial</span>
+          <strong>editorialTheme</strong> <span class="muted">Times serif, generous leading</span>
         </figcaption>
       </figure>
       <figure class="theme-card">
         <a href="./gallery/pdf/receipt-brutalist.pdf" target="_blank" rel="noopener">
-          <img src="./gallery/png/receipt-brutalist-1.png" alt="Brutalist theme — Courier monospace, 2pt solid black borders" />
+          <img src="./gallery/png/receipt-brutalist-1.png" alt="Brutalist theme. Courier monospace, 2pt solid black borders" />
         </a>
         <figcaption>
-          <strong>brutalistTheme</strong> <span class="muted">— Courier monospace, 2pt black borders, indie / dev</span>
+          <strong>brutalistTheme</strong> <span class="muted">Courier monospace, 2pt black borders</span>
         </figcaption>
       </figure>
     </div>
@@ -252,43 +256,40 @@ export default app;</code></pre>
   </section>
 
   <section id="why" class="block">
-    <h2>Why not …</h2>
+    <h2>How it compares</h2>
     <table class="compare">
       <thead>
         <tr><th></th><th>boxpdf</th><th>pdf-lib</th><th>@react-pdf/renderer</th><th>jsPDF</th></tr>
       </thead>
       <tbody>
-        <tr><th>Declarative layout</th><td>✓</td><td>—</td><td>✓ (JSX)</td><td>—</td></tr>
+        <tr><th>Declarative layout</th><td>✓</td><td>✗</td><td>✓ (JSX)</td><td>✗</td></tr>
         <tr><th>Cloudflare Workers</th><td>✓</td><td>✓</td><td>✗ (fontkit WASM)</td><td>partial</td></tr>
-        <tr><th>Streaming output</th><td>✓ <code>streamFlow</code> (Web Writable, bounded memory)</td><td>—</td><td>Node only</td><td>—</td></tr>
+        <tr><th>Streaming output</th><td>✓ <code>streamFlow</code> (Web Writable, bounded memory)</td><td>✗</td><td>Node only</td><td>✗</td></tr>
         <tr><th>Custom fonts</th><td>✓ via fontkit (lazy)</td><td>✓ via fontkit</td><td>✓</td><td>limited</td></tr>
         <tr><th>Core bundle</th><td>~7 KB gz</td><td>~250 KB gz</td><td>~250 KB gz</td><td>~80 KB gz</td></tr>
         <tr><th>JSX runtime conflict</th><td>none</td><td>n/a</td><td>requires React</td><td>n/a</td></tr>
       </tbody>
     </table>
-    <p class="footnote">
-      Sizes are rough; measure yourself before believing any table. <strong>boxpdf is the right pick when you want declarative layout AND your runtime is anything other than long-lived Node.</strong>
-      pdf-lib is still the right pick if you want raw coordinate control and don't care about layout primitives. <code>@react-pdf/renderer</code> is the right pick if you're already deep in React on Node and don't need Workers.
-    </p>
+    <p class="footnote">Sizes are approximate. Measure yourself.</p>
   </section>
 
   <section id="roadmap" class="block">
-    <h2>1.4 status and what's next</h2>
+    <h2>Shipped in 1.4</h2>
     <ul class="roadmap">
       <li class="done">✓ Box layout DSL: vstack, hstack, text, image, hline, vline, spacer, flex, keepTogether</li>
       <li class="done">✓ Padding, margin, background, border, borderRadius, flex-grow, justify, align</li>
-      <li class="done">✓ Flex-shrink — text re-wraps to the leftover slot, never breaks mid-word</li>
+      <li class="done">✓ Flex-shrink with whitespace-only wrapping (opt in to mid-word break or ellipsis)</li>
       <li class="done">✓ Word-wrap, ellipsis, multi-line text with maxLines</li>
       <li class="done">✓ Themes: clean, stripe, editorial, brutalist</li>
-      <li class="done">✓ Multi-page flow with header/footer and PageContext</li>
+      <li class="done">✓ Multi-page flow with header, footer, PageContext</li>
       <li class="done">✓ Links (PDF annotations), text decorations, document metadata</li>
-      <li class="done">✓ <code>loadFont</code> (URL / bytes / base64 / data URL) + <code>embedInter</code> + <code>loadImage</code> helpers</li>
+      <li class="done">✓ <code>loadFont</code> (URL, bytes, base64, data URL), <code>embedInter</code>, <code>loadImage</code> helpers</li>
       <li class="done">✓ <code>boxpdf font add</code> CLI bundles any TTF as base64 bytes for <code>loadFont</code></li>
       <li class="done">✓ Tabular numerals on Inter for money columns (<code>embedInter(pdf, &#123; tabularFigures: true &#125;)</code>)</li>
       <li class="done">✓ First-class <code>table()</code> primitive and <code>svgPath()</code> node</li>
       <li class="done">✓ Debug overlay, formatCurrency, defineStyles</li>
-      <li class="done">✓ Verified end-to-end on Cloudflare Workers (core + Inter path)</li>
-      <li class="done">✓ Streaming page-at-a-time output via <code>streamFlow</code> — peak heap stays flat regardless of page count</li>
+      <li class="done">✓ Verified end-to-end on Cloudflare Workers (core and Inter path)</li>
+      <li class="done">✓ Streaming page-at-a-time output via <code>streamFlow</code>. Peak heap stays flat at any page count.</li>
     </ul>
   </section>
 
