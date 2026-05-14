@@ -8,4 +8,5 @@ coverage
 fixtures/*.pdf
 fixtures/png
 !fixtures/.gitkeep
+examples/*.pdf
 boxpdf-*.tgz

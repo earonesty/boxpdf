@@ -25,7 +25,8 @@ export { table } from "./table.js";
 export type { ColumnSpec, ColumnWidth, TableDivider, TableOptions } from "./table.js";
 export type { TextOptions } from "./nodes.js";
 
-export { measure, measureContent } from "./measure.js";
+export { measure, measureContent, resolveMainAxis } from "./measure.js";
+export type { MainAxis, MainAxisLayout } from "./measure.js";
 export { render, type RenderOptions } from "./render.js";
 export { renderFlow, renderToPdf, PageSizes } from "./document.js";
 export type {

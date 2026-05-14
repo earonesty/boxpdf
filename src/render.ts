@@ -1,7 +1,14 @@
 import { PDFArray, PDFName, PDFString, rgb, type PDFPage } from "pdf-lib";
 import { edges, type Justify, type Node, type RGB } from "./types.js";
 import { fontAscent, measureText } from "./text.js";
-import { layoutText, measure, measureContent, nodeGrow, nodeMargin } from "./measure.js";
+import {
+  layoutText,
+  measure,
+  measureContent,
+  nodeGrow,
+  nodeMargin,
+  resolveMainAxis
+} from "./measure.js";
 
 export interface RenderOptions {
   /** When true, overlay every node's bounding box in red for layout debugging. */
@@ -69,14 +76,19 @@ function strokeDebugRect(
   height: number,
   color: RGB
 ): void {
+  // Draw the stroke OUTSIDE the content box: stroke's inner edge IS the
+  // content edge, so glyphs that reach the box right edge never visually
+  // overlap the stroke. PDF strokes are centered on the path by default;
+  // we offset by half a stroke width to get inner-edge alignment.
+  const stroke = 0.5;
   if (width <= 0 || height <= 0) return;
   page.drawRectangle({
-    x,
-    y: yTop - height,
-    width,
-    height,
+    x: x - stroke / 2,
+    y: yTop - height - stroke / 2,
+    width: width + stroke,
+    height: height + stroke,
     borderColor: toRgb(color),
-    borderWidth: 0.5,
+    borderWidth: stroke,
     borderOpacity: 0.9,
     opacity: 0,
     color: undefined
@@ -237,15 +249,21 @@ function renderVStack(
   const innerYTop = yTop - inset.top;
   const innerHeight = boxHeight - inset.top - inset.bottom;
 
-  // Resolve grow weights along the vertical (main) axis.
-  const childSizes = node.children.map((c) => measure(c, innerWidth));
-  const totalGap = node.gap * Math.max(0, node.children.length - 1);
+  // Resolve shrink first so children that overflow the main axis get
+  // re-sized before grow/justify positioning runs. When the vstack has no
+  // fixed height, no overflow is possible so shrink is a no-op.
+  const availableMain = node.style.height === undefined ? Infinity : innerHeight;
+  const layout = resolveMainAxis(node.children, "vertical", availableMain, innerWidth, node.gap);
+  const children = layout.children;
+  const childSizes = layout.sizes;
+
+  const totalGap = node.gap * Math.max(0, children.length - 1);
   const totalChildHeight = childSizes.reduce((sum, s) => sum + s.height, 0);
-  const totalGrow = node.children.reduce((sum, c) => sum + nodeGrow(c), 0);
+  const totalGrow = children.reduce((sum, c) => sum + nodeGrow(c), 0);
   let extra = innerHeight - totalChildHeight - totalGap;
   if (extra < 0) extra = 0;
 
-  const extraPerChild = node.children.map((c) => (totalGrow > 0 ? (nodeGrow(c) / totalGrow) * extra : 0));
+  const extraPerChild = children.map((c) => (totalGrow > 0 ? (nodeGrow(c) / totalGrow) * extra : 0));
 
   let cursorY = innerYTop;
   if (totalGrow === 0) {
@@ -256,16 +274,16 @@ function renderVStack(
       node.gap
     );
     cursorY = innerYTop - offsets.start;
-    node.children.forEach((child, i) => {
+    children.forEach((child, i) => {
       const slotHeight = childSizes[i]?.height ?? 0;
       const widthForChild = resolveCrossAxisWidth(child, childSizes[i]?.width ?? 0, innerWidth);
       const childX = resolveCrossAxisX(node.align, innerX, innerWidth, widthForChild);
       renderWithFixedHeight(child, page, childX, cursorY, widthForChild, slotHeight);
       cursorY -= slotHeight;
-      if (i < node.children.length - 1) cursorY -= offsets.between;
+      if (i < children.length - 1) cursorY -= offsets.between;
     });
   } else {
-    node.children.forEach((child, i) => {
+    children.forEach((child, i) => {
       if (i > 0) cursorY -= node.gap;
       const baseHeight = childSizes[i]?.height ?? 0;
       const slotHeight = baseHeight + (extraPerChild[i] ?? 0);
@@ -299,10 +317,15 @@ function renderHStack(
   const innerYTop = yTop - inset.top;
   const innerHeight = boxHeight - inset.top - inset.bottom;
 
-  const childSizes = node.children.map((c) => measure(c, innerWidth));
-  const totalGap = node.gap * Math.max(0, node.children.length - 1);
+  // Resolve shrink before allocating slots — keeps grow/shrink independent
+  // (shrink fires when intrinsic > inner, grow fires when intrinsic < inner).
+  const layout = resolveMainAxis(node.children, "horizontal", innerWidth, innerWidth, node.gap);
+  const children = layout.children;
+  const childSizes = layout.sizes;
+
+  const totalGap = node.gap * Math.max(0, children.length - 1);
   const totalChildWidth = childSizes.reduce((sum, s) => sum + s.width, 0);
-  const totalGrow = node.children.reduce((sum, c) => sum + nodeGrow(c), 0);
+  const totalGrow = children.reduce((sum, c) => sum + nodeGrow(c), 0);
   let extra = innerWidth - totalChildWidth - totalGap;
   if (extra < 0) extra = 0;
 
@@ -315,19 +338,19 @@ function renderHStack(
       node.gap
     );
     cursorX = innerX + offsets.start;
-    node.children.forEach((child, i) => {
+    children.forEach((child, i) => {
       const slotWidth = childSizes[i]?.width ?? 0;
       const heightForChild = resolveCrossAxisHeight(child, childSizes[i]?.height ?? 0, innerHeight);
       const childY = resolveCrossAxisY(node.align, innerYTop, innerHeight, heightForChild);
       renderWithFixedWidth(child, page, cursorX, childY, slotWidth);
       cursorX += slotWidth;
-      if (i < node.children.length - 1) cursorX += offsets.between;
+      if (i < children.length - 1) cursorX += offsets.between;
     });
   } else {
-    const extraPerChild = node.children.map((c) =>
+    const extraPerChild = children.map((c) =>
       totalGrow > 0 ? (nodeGrow(c) / totalGrow) * extra : 0
     );
-    node.children.forEach((child, i) => {
+    children.forEach((child, i) => {
       if (i > 0) cursorX += node.gap;
       const baseWidth = childSizes[i]?.width ?? 0;
       const slotWidth = baseWidth + (extraPerChild[i] ?? 0);

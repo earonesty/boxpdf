@@ -273,10 +273,11 @@ export default app;</code></pre>
   </section>
 
   <section id="roadmap" class="block">
-    <h2>1.1 status and what's next</h2>
+    <h2>1.2 status and what's next</h2>
     <ul class="roadmap">
       <li class="done">✓ Box layout DSL: vstack, hstack, text, image, hline, vline, spacer, flex, keepTogether</li>
       <li class="done">✓ Padding, margin, background, border, borderRadius, flex-grow, justify, align</li>
+      <li class="done">✓ Flex-shrink — text re-wraps to the leftover slot, never breaks mid-word</li>
       <li class="done">✓ Word-wrap, ellipsis, multi-line text with maxLines</li>
       <li class="done">✓ Themes: clean, stripe, editorial, brutalist</li>
       <li class="done">✓ Multi-page flow with header/footer and PageContext</li>
@@ -287,7 +288,6 @@ export default app;</code></pre>
       <li class="done">✓ First-class <code>table()</code> primitive and <code>svgPath()</code> node</li>
       <li class="done">✓ Debug overlay, formatCurrency, defineStyles</li>
       <li class="done">✓ Verified end-to-end on Cloudflare Workers (core + Inter path)</li>
-      <li>○ flex-shrink (v2)</li>
       <li>○ Streaming page-at-a-time output (v2 — requires our own serializer)</li>
     </ul>
   </section>

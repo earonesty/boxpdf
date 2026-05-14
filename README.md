@@ -123,6 +123,7 @@ Container `style`:
 | `border` | `{ color, width }` | 1pt+ stroke around the box. |
 | `borderRadius` | number | Corner radius. Applied to background fill and border. |
 | `grow` | number | Flex grow weight along the parent's main axis. |
+| `shrink` | number | Flex shrink weight — overflowing children give up `shrink × baseSize` shares of the overflow. |
 | `gap` | number | Spacing between children. |
 | `justify` | `"start"` \| `"center"` \| `"end"` \| `"between"` \| `"around"` \| `"evenly"` | Main-axis distribution. |
 | `align` | `"start"` \| `"center"` \| `"end"` \| `"stretch"` | Cross-axis alignment. |
@@ -285,11 +286,47 @@ See [`examples/`](./examples) for runnable scripts.
 - `examples/themes-showcase.ts` — same receipt rendered in all four themes.
 - `examples/inter-showcase.ts` — clean theme rendered with Inter font.
 
+## Flex-shrink
+
+Opt-in via `shrink: number` on any child of an `hstack` or `vstack`. When the
+sum of children's intrinsic main-axis sizes exceeds the parent's available
+space, items with `shrink > 0` give up shares proportional to
+`shrink × baseSize`. Items with `shrink = 0` (the default) are frozen.
+
+```ts
+hstack(
+  { width: 360, gap: 16 },
+  text("Customer:", { size: 11, font: bold }),                       // shrink: 0 — keeps its intrinsic width
+  text("Mr. Algernon Hephaestus Constantine Pemberton-Smythe III", { // shrink: 1 — re-wraps to the leftover slot
+    size: 11, font, shrink: 1
+  })
+)
+```
+
+- **Text floor (CSS-idiomatic).** A text child won't shrink below the width
+  of its widest single whitespace-separated word — wrapping breaks on
+  whitespace, never mid-word. A single-token string with no whitespace
+  (URL, hash, slug) therefore won't shrink at all and overflows its slot
+  visibly. Two opt-ins lower the floor:
+  - `maxLines: N` — engine ellipsizes overflow, so the floor drops to 0 and
+    the text shrinks to its slot and trims with `…`. Use this for clean
+    truncation of long URLs / names in tight columns.
+  - `breakWords: true` — CSS `overflow-wrap: break-word`; the engine
+    hard-breaks at character boundaries. Use this for monospace tables,
+    hashes, long identifiers where wrapping is preferred to truncation.
+- **Cross-axis recomputes.** When shrunk text rewraps to more lines, the
+  container's intrinsic height grows accordingly.
+- **Iterative.** When one item hits its min-word floor, its remaining
+  shrink weight redistributes to siblings — same model as CSS flexbox.
+- **Vertical too.** Works on `vstack` when the parent has a fixed `height`
+  smaller than the sum of children.
+- **Through `link`.** A `link` wrapper forwards its child's shrink weight,
+  so linked text shrinks and re-wraps just like bare text.
+
+See `examples/flex-shrink.ts` for a runnable showcase.
+
 ## Known limits
 
-- **No flex-shrink yet.** Children that exceed their parent's main-axis
-  dimension overflow rather than shrinking. Give wrapping text an explicit
-  `width`, or size containers explicitly. Planned for v2.
 - **No `position: absolute`** — by design. Drop to `render()` with explicit
   coordinates if you must.
 - **Font shaping** is whatever pdf-lib / fontkit support. Complex Indic /

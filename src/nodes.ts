@@ -55,6 +55,8 @@ export interface TextOptions {
   margin?: EdgesInput;
   underline?: boolean;
   strikethrough?: boolean;
+  shrink?: number;
+  breakWords?: boolean;
 }
 
 export function text(content: string, options: TextOptions): Node {
@@ -68,7 +70,9 @@ export function text(content: string, options: TextOptions): Node {
     maxLines: options.maxLines,
     margin: options.margin,
     underline: options.underline,
-    strikethrough: options.strikethrough
+    strikethrough: options.strikethrough,
+    shrink: options.shrink,
+    breakWords: options.breakWords
   };
   return { kind: "text", text: content, props };
 }
@@ -86,8 +90,8 @@ export function image(
   };
 }
 
-export function spacer(size: number, options?: { grow?: number }): Node {
-  return { kind: "spacer", size, grow: options?.grow };
+export function spacer(size: number, options?: { grow?: number; shrink?: number }): Node {
+  return { kind: "spacer", size, grow: options?.grow, shrink: options?.shrink };
 }
 
 /** A flexible spacer that absorbs leftover space along the main axis. */

@@ -26,6 +26,14 @@ export interface BoxStyle {
   borderRadius?: number;
   /** Flex grow weight (siblings divide remaining main-axis space proportionally). */
   grow?: number;
+  /**
+   * Flex shrink weight. When the children of an hstack/vstack overflow their
+   * container along the main axis, items with `shrink > 0` give up
+   * proportional shares (`shrink * baseSize`) of the overflow. Shrink only
+   * kicks in when intrinsic size exceeds the available space; otherwise it
+   * has no effect. Default `0` (no shrink).
+   */
+  shrink?: number;
 }
 
 export interface TextProps {
@@ -46,6 +54,21 @@ export interface TextProps {
   underline?: boolean;
   /** Strike a line through each rendered line. */
   strikethrough?: boolean;
+  /**
+   * Flex shrink weight along the parent's main axis. When set and the
+   * parent hstack/vstack overflows, the text's slot width is reduced
+   * proportionally and the text re-wraps. By default bounded below by the
+   * widest single whitespace-separated word — single-token strings (URLs,
+   * hashes) won't shrink unless `breakWords` or `maxLines` is also set.
+   */
+  shrink?: number;
+  /**
+   * When `true`, allows shrink to reduce the text below its longest-word
+   * width by hard-breaking at character boundaries (CSS
+   * `overflow-wrap: break-word`). Off by default — prefer `maxLines` for
+   * truncation, this for char-level wrap (monospace tables, hashes).
+   */
+  breakWords?: boolean;
 }
 
 export type Node =
@@ -81,6 +104,7 @@ export type Node =
       kind: "spacer";
       size: number;
       grow?: number;
+      shrink?: number;
     }
   | {
       kind: "hline";
