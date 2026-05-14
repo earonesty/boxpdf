@@ -4,48 +4,49 @@ Tiny box-layout DSL over [pdf-lib](https://pdf-lib.js.org/). Flexbox-lite for
 server-side PDFs in any JS runtime — Node, Cloudflare Workers, Deno, the
 browser. No native deps, no WASM, no headless browser.
 
+**[Live gallery, themes, and template browser →](https://earonesty.github.io/boxpdf/)**
+
 If you've ever written `page.drawText(x, height - 246 - lineHeight)`, this is
 for you.
 
 ```ts
 import { PDFDocument, StandardFonts } from "pdf-lib";
-import { hex, hline, hstack, renderToPdf, text, vstack } from "boxpdf";
+import { cleanTheme, hline, hstack, renderFlow, text, vstack } from "boxpdf";
 
-const doc = await PDFDocument.create();
-const font = await doc.embedFont(StandardFonts.Helvetica);
-const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+const pdf  = await PDFDocument.create();
+const font = await pdf.embedFont(StandardFonts.Helvetica);
+const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+const theme = cleanTheme(font, bold);
 
-const bytes = await renderToPdf(
-  vstack(
-    { padding: 32, gap: 12 },
-    text("Onward Travel", { size: 22, font: bold }),
-    text("Confirmation #F3PU74", { size: 12, font, color: hex("#6b7280") }),
-    hline({ color: hex("#e5e7eb") }),
-    hstack(
-      { gap: 24, justify: "between", width: 515 },
-      text("Cebu (CEB) → Ho Chi Minh City (SGN)", { size: 14, font: bold }),
-      text("Confirmed", { size: 12, font: bold, color: hex("#1f8a4d") })
-    )
+await renderFlow(pdf, [
+  vstack({ gap: 8 },
+    text("Receipt #18472", theme.type.h1),
+    text("May 14, 2026", theme.type.caption)
+  ),
+  hline(theme.hr),
+  hstack({ gap: 16, justify: "between", width: 515 },
+    text("Wool socks", theme.type.body),
+    text("$28.00", { ...theme.type.body, font: bold, align: "right", width: 80 })
   )
-);
+]);
 
-// `bytes` is a Uint8Array — write it to disk, R2, a Response, etc.
+const bytes = await pdf.save();  // Uint8Array — write to disk, R2, a Response, etc.
 ```
 
 ## Why?
 
 `pdf-lib` is the right primitive for edge runtimes (no WASM, no fontkit, no
 headless Chromium) but its API is coordinate-based. `@react-pdf/renderer` is
-declarative but [doesn't run on Cloudflare Workers](https://github.com/diegomura/react-pdf/issues/2497)
-because fontkit needs runtime WASM, which Workers disallow.
+declarative but doesn't run on Cloudflare Workers because fontkit needs
+runtime WASM, which Workers disallow.
 
 `boxpdf` is the middle layer: declarative boxes, flex-ish layout, real word
-wrapping — built on top of `pdf-lib` and nothing else.
+wrapping — built on top of `pdf-lib` and nothing else by default.
 
-- **~6kB minified.** Pure TypeScript, zero runtime deps beyond `pdf-lib`
-  (which is your peer dependency).
-- **Works everywhere `pdf-lib` works.** Node 18+, Cloudflare Workers, Deno,
-  browsers.
+- **~7 KB minified core.** Pure TypeScript. Custom fonts pull in
+  `@pdf-lib/fontkit` only when you call `embedFont` / `embedInter`.
+- **Works everywhere `pdf-lib` works.** Node 18+, Cloudflare Workers (verified
+  end-to-end, no `nodejs_compat`), Deno, browsers.
 - **Predictable.** No virtual DOM, no scheduler, no reconciliation. Build a
   tree of plain objects with `vstack`/`hstack`/`text`, then `render` it.
 
@@ -53,8 +54,41 @@ wrapping — built on top of `pdf-lib` and nothing else.
 
 ```sh
 npm install boxpdf pdf-lib
-# or pnpm add / yarn add — pdf-lib is a peer dependency
+# pdf-lib is a peer dependency.
 ```
+
+## Templates
+
+Copy-paste files in [`templates/`](./templates) — receipt, boarding pass,
+resume, order confirmation, certificate. Each one is a single file that
+renders to a polished PDF.
+
+```sh
+pnpm install
+pnpm run gallery   # renders all templates + every showcase example
+```
+
+See the [live gallery](https://earonesty.github.io/boxpdf/#templates) for
+thumbnails and source links.
+
+## Themes
+
+Same identical layout code, four named themes:
+
+```ts
+import { cleanTheme, stripeTheme, editorialTheme, brutalistTheme } from "boxpdf";
+
+const theme =
+  cleanTheme(font, bold)    // modern SaaS default — soft borders, 8pt rounded
+  // stripeTheme(font, bold)         // square corners, thin borders, monochrome SaaS
+  // editorialTheme(font, bold, italic)  // Times serif, warm cream, italic captions
+  // brutalistTheme(courier, courierBold) // monospace, 2pt black borders, lemon accent
+;
+```
+
+Every theme exposes the same shape: `colors`, `spacing`, `radii`, `type`,
+`card`, `hr`. Templates compose from these tokens instead of hex/size
+literals.
 
 ## API at a glance
 
@@ -62,6 +96,8 @@ npm install boxpdf pdf-lib
 
 - `vstack(style, ...children)` — vertical layout.
 - `hstack(style, ...children)` — horizontal layout.
+- `keepTogether({ gap?, margin? }, ...children)` — paginates atomically
+  (won't split across pages).
 
 Container `style`:
 
@@ -71,7 +107,7 @@ Container `style`:
 | `padding` / `margin` | number \| `{ top, right, bottom, left }` | Shorthand or per-side. |
 | `background` | RGB | Solid fill. |
 | `border` | `{ color, width }` | 1pt+ stroke around the box. |
-| `borderRadius` | number | Corner radius in points. Applied to background fill and border (rendered via `drawSvgPath`). |
+| `borderRadius` | number | Corner radius. Applied to background fill and border. |
 | `grow` | number | Flex grow weight along the parent's main axis. |
 | `gap` | number | Spacing between children. |
 | `justify` | `"start"` \| `"center"` \| `"end"` \| `"between"` \| `"around"` \| `"evenly"` | Main-axis distribution. |
@@ -79,95 +115,74 @@ Container `style`:
 
 ### Leaves
 
-- `text(content, { size, font, color?, align?, width?, lineHeight?, maxLines?, margin? })`
-  — text node. Supply `width` to enable word-wrapping. `maxLines` truncates
-  with an ellipsis.
+- `text(content, { size, font, color?, align?, width?, lineHeight?, maxLines?, underline?, strikethrough?, margin? })`
+  — text node. Word-wraps when `width` is set; truncates with ellipsis when
+  `maxLines` is.
 - `image(pdfImage, { width, height, margin? })` — already-embedded `PDFImage`.
-- `spacer(size, { grow? })` — fixed-size or growing gap.
-- `flex(weight = 1)` — shortcut for `spacer(0, { grow: weight })`.
+- `spacer(size, { grow? })` / `flex(weight = 1)` — fixed or growing gap.
 - `hline({ color, thickness?, width?, margin? })` — horizontal rule.
 - `vline({ color, thickness?, height?, margin? })` — vertical rule.
+- `link({ href }, child)` — wraps a child and registers a PDF Link
+  annotation over its rendered bounding box.
 
 ### Rendering
 
-- `renderToPdf(node, { size?, margin? })` — one-page convenience.
-- `renderFlow(pdf, nodes[], { size?, margin?, reserveBottom?, header?, footer? })` —
-  paginate a sequence of top-level children. Each child renders atomically;
-  if the next child doesn't fit, a new page is added. `header` and `footer`
-  are functions that receive `{ pageNumber, totalPages }` and return a node
-  to draw on every page — typical use is running invoice/document headers
-  and `Page X of Y` footers. Their height is reserved before pagination so
-  content never overlaps them.
-- `keepTogether({ gap?, margin? }, ...children)` — wrap children so they
-  paginate as one atomic unit (won't split mid-group). Useful for
-  Subtotal/Tax/Total triples, signature blocks, etc.
-- `render(node, page, x, yTop, parentWidth)` — low-level escape hatch when you
-  already have a `PDFPage` and want to draw a subtree at a known position.
-- `measure(node, parentWidth)` — compute intrinsic size without drawing
-  (useful for custom paginators).
+- `renderToPdf(node, options)` — one-page convenience.
+- `renderFlow(pdf, nodes[], options)` — paginate a sequence of top-level
+  children. Options: `size`, `margin`, `header?`, `footer?`, `reserveBottom?`,
+  `title?`, `author?`, `subject?`, `keywords?`, `creator?`, `producer?`,
+  `debug?`. Headers/footers receive `{ pageNumber, totalPages }`.
+- `render(node, page, x, yTop, parentWidth)` — escape hatch for drawing a
+  subtree at a known position on an existing `PDFPage`.
+- `measure(node, parentWidth)` — intrinsic size without drawing.
 
-Pass `{ debug: true }` to `renderToPdf` / `renderFlow` to overlay every
-node's content box (red) and margin box (orange). Handy when a layout
-isn't going where you expect.
+Pass `{ debug: true }` to render-with-overlay (red content boxes, orange
+margin boxes).
 
-### Colors
+### Helpers
 
-- `rgb255(r, g, b)` — 0–255 channels.
-- `hex("#1f8a4d")` — 3- or 6-digit hex.
-- `Colors.{black, white, ink, muted, border, surface}` — a small built-in palette.
+- `embedFont(pdf, { source })` — embed a TTF from URL / bytes / data URL.
+- `loadImage(pdf, source)` — embed a PNG or JPEG (auto-detected) from
+  URL / bytes / data URL.
+- `formatCurrency(n, { currency, locale })` — `Intl.NumberFormat` wrapper.
+- `defineStyles({ ... })` — typed identity for reusable style bundles.
+- `hex("#1f8a4d")` / `rgb255(31, 138, 77)` — color builders.
 
-## Layout model
-
-`boxpdf`'s layout is flex-like but simpler than real CSS flexbox:
-
-- A `vstack`'s main axis is vertical; an `hstack`'s is horizontal.
-- Children size to their content unless they declare an explicit `width` /
-  `height` or have `grow > 0`.
-- `grow` only applies along the parent's main axis. Cross-axis sizing is
-  governed by the child's intrinsic size, capped at the inner container width.
-- `justify` and `align` only kick in when there's slack (parent has fixed
-  dimensions larger than the content).
-- `padding` is inside the border; `margin` is outside.
-
-There's intentionally no `position: absolute`. If you need it, drop down to
-`render(node, page, x, y, width)` — that's the escape hatch.
-
-## Pagination
-
-`renderFlow` is the simplest way to fill multi-page documents:
+### Inter font (optional)
 
 ```ts
-import { PDFDocument } from "pdf-lib";
-import { renderFlow, text, vstack } from "boxpdf";
+import { embedInter } from "boxpdf/inter";
 
-const pdf = await PDFDocument.create();
-const headers = await ...; // build per-line nodes
-await renderFlow(pdf, headers, { margin: 48 });
-const bytes = await pdf.save();
+const { font, bold } = await embedInter(pdf);  // ~82 KB / weight, subsetted
+const theme = cleanTheme(font, bold);
 ```
 
-It never splits a child across pages — if the next node won't fit, a fresh
-page is added and rendering continues there.
+`boxpdf/inter` is a separate subpath. Importing it loads ~325 KB of font
+bytes plus `@pdf-lib/fontkit`; if you don't import it, neither hits your
+bundle.
 
-## Running in Cloudflare Workers
+## Cloudflare Workers
 
-`boxpdf` and `pdf-lib` both work in Workers without `nodejs_compat`. Build
-your PDF in the request handler, write it into an R2 bucket, and return the
-key — or stream the bytes back directly:
+Both the core and the `boxpdf/inter` subpath are verified to run on
+Cloudflare Workers without `nodejs_compat`. Drop into a handler:
 
 ```ts
 import { Hono } from "hono";
 import { PDFDocument, StandardFonts } from "pdf-lib";
-import { renderToPdf, text, vstack } from "boxpdf";
+import { cleanTheme, renderFlow, text, vstack } from "boxpdf";
 
 const app = new Hono();
 
 app.get("/receipt.pdf", async (c) => {
-  const doc = await PDFDocument.create();
-  const font = await doc.embedFont(StandardFonts.Helvetica);
-  const bytes = await renderToPdf(
-    vstack({ padding: 36 }, text("Thanks for your order!", { size: 18, font }))
-  );
+  const pdf  = await PDFDocument.create();
+  const font = await pdf.embedFont(StandardFonts.Helvetica);
+  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const t    = cleanTheme(font, bold);
+  await renderFlow(pdf, [
+    text("Thanks!", t.type.h1),
+    text("This PDF was generated at the edge.", t.type.body)
+  ]);
+  const bytes = await pdf.save();
   return new Response(bytes, { headers: { "content-type": "application/pdf" } });
 });
 
@@ -178,29 +193,26 @@ export default app;
 
 See [`examples/`](./examples) for runnable scripts.
 
-- `examples/receipt.ts` — single-page receipt with a header band and totals row.
-- `examples/itinerary.ts` — a two-band travel itinerary (the case this library
-  was extracted from).
-- `examples/invoice.ts` — multi-page invoice with line items and pagination.
-- `examples/debug.ts` — the same layout twice, once with `{ debug: true }`.
-
-```sh
-pnpm install
-pnpm run example   # writes example PDFs to ./fixtures/
-```
+- `examples/receipt.ts` — single-page receipt with totals.
+- `examples/itinerary.ts` — two-band travel itinerary.
+- `examples/invoice.ts` — multi-page invoice with running header / footer
+  and `keepTogether`.
+- `examples/debug.ts` — layout with `{ debug: true }`.
+- `examples/themes-showcase.ts` — same receipt rendered in all four themes.
+- `examples/inter-showcase.ts` — clean theme rendered with Inter font.
 
 ## Known limits
 
 - **No flex-shrink yet.** Children that exceed their parent's main-axis
-  dimension overflow rather than shrinking proportionally. Workaround:
-  give wrapping text an explicit `width`, or size containers explicitly.
-  Planned for v0.2.
+  dimension overflow rather than shrinking. Give wrapping text an explicit
+  `width`, or size containers explicitly. Planned for v2.
 - **No `position: absolute`** — by design. Drop to `render()` with explicit
   coordinates if you must.
-- **Font shaping** is whatever `pdf-lib` supports (Helvetica/Times/Courier
-  built-ins, plus any TTF you embed). If you need fancy script shaping
-  (Arabic, complex Indic, etc.), `boxpdf` won't help — you'd want a stack
-  with HarfBuzz/fontkit. None of those run in Cloudflare Workers today.
+- **Font shaping** is whatever pdf-lib / fontkit support. Complex Indic /
+  Arabic / Thai shaping isn't here. If you need full HarfBuzz, you need a
+  different stack — none of which run on Cloudflare Workers today.
+- **Streaming output** isn't real today. Page-at-a-time streaming requires
+  our own PDF serializer; tracked for v2.
 
 ## License
 
