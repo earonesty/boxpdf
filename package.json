@@ -1,6 +1,6 @@
 {
   "name": "boxpdf",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Tiny box-layout DSL over pdf-lib. Flexbox-lite for server-side PDF generation in any JS runtime (Node, Cloudflare Workers, Deno, browsers).",
   "keywords": [
     "pdf",
@@ -66,8 +66,10 @@
   "peerDependencies": {
     "pdf-lib": "^1.17.0"
   },
+  "dependencies": {
+    "@pdf-lib/fontkit": "^1.1.1"
+  },
   "devDependencies": {
-    "@pdf-lib/fontkit": "^1.1.1",
     "@types/node": "^22.19.19",
     "pdf-lib": "^1.17.1",
     "tsup": "^8.5.1",
