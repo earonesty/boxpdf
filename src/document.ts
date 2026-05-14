@@ -27,8 +27,83 @@ export interface DocumentMetadata {
 }
 
 export interface PageOptions extends RenderOptions, DocumentMetadata {
+  /** Page size; defaults to LETTER (612×792) to match pdf-lib. */
   size?: PageSize;
   margin?: EdgesInput;
+  /**
+   * When `true` (default), emit a `console.warn` if a top-level child's
+   * measured width exceeds the page's content area — a common footgun when
+   * hardcoded layout widths drift from the chosen page size. Set to `false`
+   * to silence (e.g. in tests that deliberately overflow).
+   */
+  warnings?: boolean;
+}
+
+/**
+ * Inner content width of `size` after subtracting `margin`. Use this
+ * instead of hardcoding `size.width - 72` so your layout follows the page
+ * even if the page size changes.
+ *
+ * @example
+ *   const WIDTH = pageInner(PageSizes.Letter, 36); // 540
+ */
+export function pageInner(size: PageSize, margin: EdgesInput = 0): number {
+  const m = edges(margin);
+  return size.width - m.left - m.right;
+}
+
+/**
+ * Inner content rectangle of `size` after subtracting `margin`. Same idea
+ * as `pageInner` but returns both dimensions for callers that need to know
+ * the printable height too (e.g. for keepTogether sizing).
+ */
+export function pageContent(size: PageSize, margin: EdgesInput = 0): { width: number; height: number } {
+  const m = edges(margin);
+  return {
+    width: size.width - m.left - m.right,
+    height: size.height - m.top - m.bottom
+  };
+}
+
+function describeSize(size: PageSize): string {
+  for (const [name, candidate] of Object.entries(PageSizes)) {
+    if (candidate.width === size.width && candidate.height === size.height) {
+      return name;
+    }
+  }
+  return `${size.width}×${size.height}`;
+}
+
+function describeMargin(m: { top: number; right: number; bottom: number; left: number }): string {
+  if (m.top === m.right && m.right === m.bottom && m.bottom === m.left) {
+    return `${m.top}pt`;
+  }
+  return `${m.top}/${m.right}/${m.bottom}/${m.left}pt`;
+}
+
+function warnIfOverflowing(
+  node: Node,
+  measuredWidth: number,
+  contentWidth: number,
+  size: PageSize,
+  m: { top: number; right: number; bottom: number; left: number }
+): void {
+  const epsilon = 0.5;
+  if (measuredWidth <= contentWidth + epsilon) return;
+  const sizeName = describeSize(size);
+  const fitName =
+    size === PageSizes.Letter
+      ? "A4"
+      : size === PageSizes.A4
+        ? "Letter"
+        : null;
+  const fitHint = fitName ? `Pass {size: PageSizes.${fitName}} if that matches your intent, ` : "";
+  console.warn(
+    `[boxpdf] top-level ${node.kind} measured ${measuredWidth.toFixed(1)}pt — ` +
+      `exceeds page content area ${contentWidth.toFixed(1)}pt ` +
+      `(${sizeName} with ${describeMargin(m)} margins). ` +
+      `${fitHint}reduce the child's width, or add shrink/wrapping so it fits.`
+  );
 }
 
 function applyMetadata(pdf: PDFDocument, options: DocumentMetadata): void {
@@ -81,10 +156,11 @@ export async function renderFlow(
   nodes: Node[],
   options: FlowOptions = {}
 ): Promise<{ pages: PDFPage[] }> {
-  const size = options.size ?? PageSizes.A4;
+  const size = options.size ?? PageSizes.Letter;
   const m = edges(options.margin);
   const reserveBottom = options.reserveBottom ?? 0;
   const contentWidth = size.width - m.left - m.right;
+  const warnings = options.warnings ?? true;
 
   applyMetadata(pdf, options);
 
@@ -108,6 +184,7 @@ export async function renderFlow(
 
   for (const node of nodes) {
     const nodeSize = measure(node, contentWidth);
+    if (warnings) warnIfOverflowing(node, nodeSize.width, contentWidth, size, m);
     if (cursorY - nodeSize.height < contentBottom && cursorY !== contentTop) {
       page = pdf.addPage([size.width, size.height]);
       pages.push(page);
@@ -156,12 +233,17 @@ export async function renderToPdf(
   node: Node,
   options: PageOptions = {}
 ): Promise<Uint8Array> {
-  const size = options.size ?? PageSizes.A4;
+  const size = options.size ?? PageSizes.Letter;
   const m = edges(options.margin);
   const contentWidth = size.width - m.left - m.right;
+  const warnings = options.warnings ?? true;
   const pdf = await PDFDocument.create({ updateMetadata: options.producer === undefined });
   applyMetadata(pdf, options);
   const page = pdf.addPage([size.width, size.height]);
+  if (warnings) {
+    const nodeSize = measure(node, contentWidth);
+    warnIfOverflowing(node, nodeSize.width, contentWidth, size, m);
+  }
   render(node, page, m.left, size.height - m.top, contentWidth, { debug: options.debug });
   return pdf.save();
 }

@@ -7,6 +7,7 @@ import {
   hline,
   hstack,
   link,
+  pageInner,
   renderFlow,
   text,
   vstack
@@ -17,7 +18,7 @@ const font = await doc.embedFont(StandardFonts.Helvetica);
 const bold = await doc.embedFont(StandardFonts.HelveticaBold);
 const theme = cleanTheme(font, bold);
 
-const PAGE_INNER = 612 - 72; // letter, 36pt margin
+const PAGE_INNER = pageInner(PageSizes.Letter, 36); // 540
 
 function row(label: string, value: string): import("../src/types.js").Node {
   return hstack(
@@ -130,7 +131,7 @@ await renderFlow(
       )
     )
   ],
-  { margin: 36, debug: true, size: PageSizes.Letter }
+  { margin: 36, debug: true }
 );
 
 const bytes = await doc.save();

@@ -146,7 +146,14 @@ Container `style`:
 - `renderFlow(pdf, nodes[], options)` — paginate a sequence of top-level
   children. Options: `size`, `margin`, `header?`, `footer?`, `reserveBottom?`,
   `title?`, `author?`, `subject?`, `keywords?`, `creator?`, `producer?`,
-  `debug?`. Headers/footers receive `{ pageNumber, totalPages }`.
+  `debug?`, `warnings?`. Headers/footers receive `{ pageNumber, totalPages }`.
+  Both default to **LETTER** (612×792) — matches pdf-lib. Pass
+  `{ size: PageSizes.A4 }` for A4. When a top-level child's measured width
+  exceeds the page content area, boxpdf emits a one-line `console.warn`
+  pointing at the math; suppress with `warnings: false`.
+- `pageInner(size, margin)` / `pageContent(size, margin)` — compute the
+  inner content width / rectangle of a page. Prefer these over hardcoded
+  arithmetic so your layout follows the page when you change `size`.
 - `render(node, page, x, yTop, parentWidth)` — escape hatch for drawing a
   subtree at a known position on an existing `PDFPage`.
 - `measure(node, parentWidth)` — intrinsic size without drawing.
