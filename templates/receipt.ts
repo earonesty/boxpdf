@@ -47,6 +47,7 @@ const { font, bold, tabularFont, tabularBold } = await embedInter(doc, {
 const theme = cleanTheme(font, bold);
 
 const TABLE_WIDTH = 515;
+const TABLE_PADDING = { left: theme.spacing.md, right: theme.spacing.md };
 
 const header: Node = vstack(
   { gap: theme.spacing.xs },
@@ -79,7 +80,7 @@ const itemsTable: Node = table({
   ]),
   rowDivider: theme.hr,
   cellPadding: { top: theme.spacing.sm, bottom: theme.spacing.sm },
-  padding: { left: theme.spacing.md, right: theme.spacing.md },
+  padding: TABLE_PADDING,
   border: { color: theme.colors.border, width: 1 },
   borderRadius: theme.radii.md,
   background: theme.colors.surface
@@ -131,6 +132,7 @@ const totalsTable: Node = table({
     })
   ],
   cellPadding: { top: 3, bottom: 3 },
+  padding: TABLE_PADDING,
   footerDivider: { ...theme.hr, thickness: 1 },
   margin: { top: theme.spacing.md }
 });
