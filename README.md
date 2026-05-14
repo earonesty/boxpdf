@@ -320,15 +320,22 @@ await streamFlow(pdf, out, nodes);
 
 ### Memory bench
 
-Peak heap above baseline during render, measured at 50 lines/page:
+Absolute peak heap during render (50 lines per page):
 
-| pages | renderFlow Δheap | streamFlow Δheap | output |
-| ---:  | ---:             | ---:             | ---:   |
-|    50 |          6.1 MB  |          0 MB    |  70 KB |
-|   250 |         35.2 MB  |          0 MB    | 347 KB |
-|  1000 |        157.4 MB  |          0 MB    | 1.4 MB |
+| pages | renderFlow peak | streamFlow peak | ratio | output |
+| ---:  | ---:            | ---:            | ---:  | ---:   |
+|    50 |     27.6 MB     |     14.9 MB     |  1.8× |  70 KB |
+|   250 |     52.6 MB     |     19.8 MB     |  2.6× | 347 KB |
+|   500 |     82.8 MB     |     24.1 MB     |  3.4× | 693 KB |
+|  1000 |    184.8 MB     |     35.5 MB     |  5.2× | 1.4 MB |
 
-See `docs/design/streaming.md` for the full design + chart.
+renderFlow's peak grows roughly linearly — pdf-lib accumulates content
+streams + `pdf.save()` materializes the entire output buffer.
+streamFlow stays close to baseline: content streams are
+`ctx.delete()`'d after writing, so only page dicts accumulate (tiny —
+~200 B each). For 1000 pages, the streaming win is **~150 MB less peak
+memory** for the same byte output (within 0.2%). See
+`docs/design/streaming.md` for the full design + chart.
 
 ## Cloudflare Workers
 
@@ -416,8 +423,10 @@ See `examples/flex-shrink.ts` for a runnable showcase.
 - **Font shaping** is whatever pdf-lib / fontkit support. Complex Indic /
   Arabic / Thai shaping isn't here. If you need full HarfBuzz, you need a
   different stack — none of which run on Cloudflare Workers today.
-- **Streaming output** isn't real today. Page-at-a-time streaming requires
-  our own PDF serializer; tracked for v2.
+- **PDF linearization** (a.k.a. web-optimization — reordering bytes so
+  byte 1 is page 1) isn't done. Streaming generation (page-at-a-time
+  output to a writable) is supported via `streamFlow`; linearization
+  is a separate post-process and out of scope.
 
 ## License
 

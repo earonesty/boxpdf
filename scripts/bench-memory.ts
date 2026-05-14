@@ -48,6 +48,8 @@ interface BenchResult {
   baselineKB: number;
   peakKB: number;
   deltaKB: number;
+  rssBaseKB: number;
+  rssPeakKB: number;
   outputKB: number;
   millis: number;
 }
@@ -59,11 +61,13 @@ async function measure(
   const { pdf, nodes } = await buildDoc(pages);
 
   if (global.gc) global.gc();
-  const baseline = process.memoryUsage().heapUsed;
-  let peak = baseline;
+  const baselineMem = process.memoryUsage();
+  let peakHeap = baselineMem.heapUsed;
+  let peakRss = baselineMem.rss;
   const sampler = setInterval(() => {
-    const u = process.memoryUsage().heapUsed;
-    if (u > peak) peak = u;
+    const u = process.memoryUsage();
+    if (u.heapUsed > peakHeap) peakHeap = u.heapUsed;
+    if (u.rss > peakRss) peakRss = u.rss;
   }, 1);
 
   const t0 = performance.now();
@@ -90,9 +94,11 @@ async function measure(
   return {
     pages,
     mode,
-    baselineKB: Math.round(baseline / 1024),
-    peakKB: Math.round(peak / 1024),
-    deltaKB: Math.round((peak - baseline) / 1024),
+    baselineKB: Math.round(baselineMem.heapUsed / 1024),
+    peakKB: Math.round(peakHeap / 1024),
+    deltaKB: Math.round((peakHeap - baselineMem.heapUsed) / 1024),
+    rssBaseKB: Math.round(baselineMem.rss / 1024),
+    rssPeakKB: Math.round(peakRss / 1024),
     outputKB: Math.round(outputBytes / 1024),
     millis: Math.round(millis)
   };
@@ -106,25 +112,27 @@ async function main() {
       process.stdout.write(`  ${mode.padEnd(11)} × ${String(pages).padStart(4)} pages... `);
       const r = await measure(pages, mode);
       results.push(r);
+      const mb = (kb: number): string => (kb / 1024).toFixed(1).padStart(6) + " MB";
       process.stdout.write(
-        `Δheap=${String(r.deltaKB).padStart(6)}KB  out=${String(r.outputKB).padStart(6)}KB  ${r.millis}ms\n`
+        `peak=${mb(r.peakKB)}  Δheap=${mb(r.deltaKB)}  out=${String(r.outputKB).padStart(6)} KB  ${r.millis}ms\n`
       );
     }
   }
 
-  console.log("\n" + "=".repeat(76));
-  console.log("Pages    renderFlow Δheap   streamFlow Δheap   ratio    output   savings");
-  console.log("-".repeat(76));
+  const mb = (kb: number): string => (kb / 1024).toFixed(1);
+  console.log("\n" + "=".repeat(82));
+  console.log("Pages    renderFlow peak    streamFlow peak    ratio    output    savings");
+  console.log("-".repeat(82));
   for (const pages of PAGE_COUNTS) {
     const rf = results.find((r) => r.pages === pages && r.mode === "renderFlow")!;
     const sf = results.find((r) => r.pages === pages && r.mode === "streamFlow")!;
-    const ratio = (rf.deltaKB / Math.max(sf.deltaKB, 1)).toFixed(0);
-    const savings = (((rf.deltaKB - sf.deltaKB) / Math.max(rf.deltaKB, 1)) * 100).toFixed(0);
+    const ratio = (rf.peakKB / Math.max(sf.peakKB, 1)).toFixed(1);
+    const saved = rf.peakKB - sf.peakKB;
     console.log(
-      `${String(pages).padStart(5)}    ${String(rf.deltaKB).padStart(7)} KB        ${String(sf.deltaKB).padStart(7)} KB     ${ratio.padStart(4)}×    ${String(rf.outputKB).padStart(5)} KB    ${savings}%`
+      `${String(pages).padStart(5)}    ${mb(rf.peakKB).padStart(6)} MB         ${mb(sf.peakKB).padStart(6)} MB     ${ratio.padStart(4)}×    ${String(rf.outputKB).padStart(6)} KB    -${mb(saved).padStart(5)} MB`
     );
   }
-  console.log("=".repeat(76));
+  console.log("=".repeat(82));
 
   writeFileSync(
     new URL("../out/bench-memory.json", import.meta.url),
@@ -141,7 +149,11 @@ async function main() {
 function renderChart(results: BenchResult[]): string {
   const rf = results.filter((r) => r.mode === "renderFlow");
   const sf = results.filter((r) => r.mode === "streamFlow");
-  const maxKB = Math.max(...rf.map((r) => r.deltaKB), 1);
+  // Plot ABSOLUTE peak heap (not Δ above baseline) so the
+  // "streamFlow @ 0 MB" doesn't look like a measurement error —
+  // streamFlow really does stay near baseline, but the absolute value
+  // tells the honest story.
+  const maxKB = Math.max(...rf.map((r) => r.peakKB), ...sf.map((r) => r.peakKB), 1);
 
   const W = 700;
   const H = 400;
@@ -162,7 +174,7 @@ function renderChart(results: BenchResult[]): string {
   );
 
   const polyline = (pts: BenchResult[], color: string): string => {
-    const ds = pts.map((p) => `${xAt(p.pages)},${yAt(p.deltaKB)}`).join(" ");
+    const ds = pts.map((p) => `${xAt(p.pages)},${yAt(p.peakKB)}`).join(" ");
     return `<polyline points="${ds}" fill="none" stroke="${color}" stroke-width="2.5" />`;
   };
 
@@ -170,16 +182,16 @@ function renderChart(results: BenchResult[]): string {
     pts
       .map(
         (p) =>
-          `<circle cx="${xAt(p.pages)}" cy="${yAt(p.deltaKB)}" r="4" fill="${color}" />`
+          `<circle cx="${xAt(p.pages)}" cy="${yAt(p.peakKB)}" r="4" fill="${color}" />`
       )
       .join("");
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="ui-sans-serif, system-ui, sans-serif">
   <title>Peak heap during render — renderFlow vs streamFlow</title>
   <rect x="0" y="0" width="${W}" height="${H}" fill="#fafafa"/>
-  <text x="${W / 2}" y="22" text-anchor="middle" font-size="15" font-weight="600" fill="#111">Peak heap above baseline during render</text>
+  <text x="${W / 2}" y="22" text-anchor="middle" font-size="15" font-weight="600" fill="#111">Peak heap during render (absolute)</text>
   <text x="${W / 2}" y="${H - 10}" text-anchor="middle" font-size="11" fill="#666">Document pages (50 lines of text each)</text>
-  <text x="22" y="${padT + plotH / 2}" text-anchor="middle" font-size="11" fill="#666" transform="rotate(-90 22 ${padT + plotH / 2})">Peak Δheap (MB)</text>
+  <text x="22" y="${padT + plotH / 2}" text-anchor="middle" font-size="11" fill="#666" transform="rotate(-90 22 ${padT + plotH / 2})">Peak heap used (MB)</text>
 
   <!-- y-axis grid + labels -->
   ${niceKBLabels
