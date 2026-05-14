@@ -1,0 +1,56 @@
+name: Release
+
+on:
+  # Push a tag like v1.0.0 to trigger a publish.
+  push:
+    tags:
+      - "v*"
+  # Or run manually from the Actions tab.
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # `id-token: write` is required for npm's OIDC-based trusted publishing
+    # (configured via `npm trust github boxpdf --repo earonesty/boxpdf
+    # --file release.yml`). With OIDC there's no NPM_TOKEN secret — the
+    # job mints a short-lived token by proving its identity to npm.
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+          run_install: false
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: pnpm
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Test
+        run: pnpm run test
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Publish to npm
+        # `--provenance` requires the `id-token: write` permission above and
+        # records the build's GitHub Actions origin in npm's provenance
+        # ledger so consumers can verify where the published bytes came from.
+        run: npm publish --provenance --access public
+        env:
+          NPM_CONFIG_PROVENANCE: "true"
