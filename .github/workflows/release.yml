@@ -23,9 +23,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up pnpm
+        # `version` is omitted on purpose — the action reads `packageManager`
+        # from package.json. Specifying both causes ERR_PNPM_BAD_PM_VERSION.
         uses: pnpm/action-setup@v4
         with:
-          version: 10
           run_install: false
 
       - name: Set up Node
