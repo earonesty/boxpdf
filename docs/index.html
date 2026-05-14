@@ -77,7 +77,7 @@ const bytes = await pdf.save(); // -&gt; Uint8Array</code></pre>
       </div>
       <div class="feature">
         <h3>Pull in any font</h3>
-        <p>Optional <code>boxpdf/inter</code> ships subsetted Inter (82 KB / weight). Or <code>embedFont(pdf, &#123; source &#125;)</code> for any TTF you own.</p>
+        <p>Optional <code>boxpdf/inter</code> ships subsetted Inter (82 KB / weight). Or <code>loadFont(pdf, source)</code> + <code>boxpdf font add</code> to bundle any TTF you own.</p>
       </div>
       <div class="feature">
         <h3>Hyperlinks, decorations, metadata</h3>
@@ -273,7 +273,7 @@ export default app;</code></pre>
   </section>
 
   <section id="roadmap" class="block">
-    <h2>1.0 status and what's next</h2>
+    <h2>1.1 status and what's next</h2>
     <ul class="roadmap">
       <li class="done">✓ Box layout DSL: vstack, hstack, text, image, hline, vline, spacer, flex, keepTogether</li>
       <li class="done">✓ Padding, margin, background, border, borderRadius, flex-grow, justify, align</li>
@@ -281,13 +281,14 @@ export default app;</code></pre>
       <li class="done">✓ Themes: clean, stripe, editorial, brutalist</li>
       <li class="done">✓ Multi-page flow with header/footer and PageContext</li>
       <li class="done">✓ Links (PDF annotations), text decorations, document metadata</li>
-      <li class="done">✓ embedInter / embedFont / loadImage helpers</li>
+      <li class="done">✓ <code>loadFont</code> (URL / bytes / base64 / data URL) + <code>embedInter</code> + <code>loadImage</code> helpers</li>
+      <li class="done">✓ <code>boxpdf font add</code> CLI bundles any TTF as base64 bytes for <code>loadFont</code></li>
+      <li class="done">✓ Tabular numerals on Inter for money columns (<code>embedInter(pdf, &#123; tabularFigures: true &#125;)</code>)</li>
+      <li class="done">✓ First-class <code>table()</code> primitive and <code>svgPath()</code> node</li>
       <li class="done">✓ Debug overlay, formatCurrency, defineStyles</li>
       <li class="done">✓ Verified end-to-end on Cloudflare Workers (core + Inter path)</li>
       <li>○ flex-shrink (v2)</li>
       <li>○ Streaming page-at-a-time output (v2 — requires our own serializer)</li>
-      <li>○ <code>boxpdf font add</code> CLI for one-off custom font generation</li>
-      <li>○ Tabular numerals on Inter for money columns</li>
     </ul>
   </section>
 
