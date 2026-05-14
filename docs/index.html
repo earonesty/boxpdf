@@ -14,6 +14,7 @@
     <a href="#features">Features</a>
     <a href="#themes">Themes</a>
     <a href="#templates">Templates</a>
+    <a href="#memory">Memory</a>
     <a href="#install">Install</a>
     <a href="https://github.com/earonesty/boxpdf" target="_blank" rel="noopener">GitHub</a>
   </nav>
@@ -271,6 +272,24 @@ export default app;</code></pre>
       </tbody>
     </table>
     <p class="footnote">Sizes are approximate. Measure yourself.</p>
+  </section>
+
+  <section id="memory" class="block">
+    <h2>Memory bench</h2>
+    <p class="block-lede">Peak heap during render. 50 lines of text per page. Each measurement runs in its own subprocess. <code>@react-pdf/renderer</code> uses Standard Helvetica (no font embedding) to match the boxpdf paths.</p>
+    <p><img src="./design/peak-heap.svg" alt="Peak heap during render across page counts for streamFlow, renderFlow, and @react-pdf/renderer" style="max-width: 100%; height: auto;" /></p>
+    <table class="compare">
+      <thead>
+        <tr><th>Pages</th><th>streamFlow</th><th>renderFlow</th><th>@react-pdf/renderer</th><th>Output</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>50</td><td>12.8 MB</td><td>31.7 MB</td><td>160.8 MB</td><td>70 KB</td></tr>
+        <tr><td>250</td><td>15.4 MB</td><td>91.1 MB</td><td>643.1 MB</td><td>347 KB</td></tr>
+        <tr><td>500</td><td>18.7 MB</td><td>120.8 MB</td><td>1,219.9 MB</td><td>693 KB</td></tr>
+        <tr><td>1000</td><td>25.4 MB</td><td>219.6 MB</td><td>2,292.6 MB</td><td>1.4 MB</td></tr>
+      </tbody>
+    </table>
+    <p class="footnote">Bench source: <a href="https://github.com/earonesty/boxpdf/blob/main/scripts/bench-memory.ts" target="_blank" rel="noopener">scripts/bench-memory.ts</a>. Design doc: <a href="https://github.com/earonesty/boxpdf/blob/main/docs/design/streaming.md" target="_blank" rel="noopener">docs/design/streaming.md</a>.</p>
   </section>
 
   <section id="roadmap" class="block">
