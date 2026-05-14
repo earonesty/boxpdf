@@ -44,7 +44,7 @@ runtime WASM, which Workers disallow.
 wrapping — built on top of `pdf-lib` and nothing else by default.
 
 - **~7 KB minified core.** Pure TypeScript. Custom fonts pull in
-  `@pdf-lib/fontkit` only when you call `embedFont` / `embedInter`.
+  `@pdf-lib/fontkit` as dev-dep only when you call `embedFont` / `embedInter`.
 - **Works everywhere `pdf-lib` works.** Node 18+, Cloudflare Workers (verified
   end-to-end, no `nodejs_compat`), Deno, browsers.
 - **Predictable.** No virtual DOM, no scheduler, no reconciliation. Build a
