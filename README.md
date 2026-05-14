@@ -142,6 +142,11 @@ Container `style`:
 
 ### Rendering
 
+- `streamFlow(pdf, writable, asyncIterable, options)` — incremental
+  page-by-page rendering. Memory stays bounded regardless of page count
+  (peak heap grows ~0 vs `renderFlow`'s ~150 MB per 1000 pages). Writes
+  PDF bytes to a `WritableStream<Uint8Array>` as each page closes. See
+  `## Streaming output` below for the contract.
 - `renderToPdf(node, options)` — one-page convenience.
 - `renderFlow(pdf, nodes[], options)` — paginate a sequence of top-level
   children. Options: `size`, `margin`, `header?`, `footer?`, `reserveBottom?`,
@@ -252,6 +257,78 @@ text(formatCurrency(amount), { size: 12, font: tabularBold, align: "right" });
 The proportional `font` / `bold` are still preferred for body text — Inter's
 proportional `1` is narrower than `0`, which reads better in prose. Use the
 tabular pair only where you need the alignment.
+
+## Streaming output
+
+For long-running document generation (1000+ pages, large reports,
+generated tickets/receipts in bulk), use `streamFlow` instead of
+`renderFlow`. It emits PDF bytes to a `WritableStream<Uint8Array>` as
+each page closes, keeping peak heap bounded at `O(shared resources +
+one page in flight)` regardless of total page count.
+
+```ts
+import { PDFDocument, StandardFonts } from "pdf-lib";
+import { streamFlow, text, cleanTheme } from "boxpdf";
+
+const pdf = await PDFDocument.create();
+const font = await pdf.embedFont(StandardFonts.Helvetica);
+const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+
+// Workers / edge: stream into the Response body.
+const { readable, writable } = new TransformStream<Uint8Array, Uint8Array>();
+streamFlow(pdf, writable, generate(font, bold)).catch(console.error);
+
+return new Response(readable, {
+  headers: { "content-type": "application/pdf" }
+});
+
+async function* generate(font, bold) {
+  for await (const order of fetchOrders()) {  // could be 10,000 of them
+    yield buildOrderRow(font, bold, order);
+    // last Node is GC-able as soon as this yield is consumed
+  }
+}
+```
+
+For Node, adapt a `stream.Writable`:
+
+```ts
+import { createWriteStream } from "node:fs";
+import { streamFlow, nodeAdapter } from "boxpdf";
+
+const out = nodeAdapter(createWriteStream("./report.pdf"));
+await streamFlow(pdf, out, nodes);
+```
+
+### Contract
+
+1. **Embed before streaming.** All `embedFont` / `embedJpg` / `embedPng`
+   calls must complete BEFORE `streamFlow`. Embedding mid-stream
+   throws.
+2. **Lazy input.** The iterable is consumed one node at a time. Pass a
+   generator, not a materialized array — otherwise you defeat the
+   point.
+3. **Exclusive writable.** `streamFlow` writes to and closes the
+   writable on success; aborts on failure. Don't write to it
+   concurrently.
+4. **No `totalPages` in headers/footers.** `ctx.totalPages` access
+   throws — the count isn't known without buffering the entire
+   document. Use `renderFlow` if you need "Page X of Y".
+5. **~5% size overhead.** Output is 0-5% larger than `renderFlow`'s
+   default `save()` (per-batch ObjStm compression is slightly less
+   efficient than whole-doc compression).
+
+### Memory bench
+
+Peak heap above baseline during render, measured at 50 lines/page:
+
+| pages | renderFlow Δheap | streamFlow Δheap | output |
+| ---:  | ---:             | ---:             | ---:   |
+|    50 |          6.1 MB  |          0 MB    |  70 KB |
+|   250 |         35.2 MB  |          0 MB    | 347 KB |
+|  1000 |        157.4 MB  |          0 MB    | 1.4 MB |
+
+See `docs/design/streaming.md` for the full design + chart.
 
 ## Cloudflare Workers
 

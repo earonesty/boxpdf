@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 400" width="700" height="400" font-family="ui-sans-serif, system-ui, sans-serif">
+  <title>Peak heap during render — renderFlow vs streamFlow</title>
+  <rect x="0" y="0" width="700" height="400" fill="#fafafa"/>
+  <text x="350" y="22" text-anchor="middle" font-size="15" font-weight="600" fill="#111">Peak heap above baseline during render</text>
+  <text x="350" y="390" text-anchor="middle" font-size="11" fill="#666">Document pages (50 lines of text each)</text>
+  <text x="22" y="190" text-anchor="middle" font-size="11" fill="#666" transform="rotate(-90 22 190)">Peak Δheap (MB)</text>
+
+  <!-- y-axis grid + labels -->
+  <line x1="70" y1="340" x2="670" y2="340" stroke="#e5e5e5" stroke-width="1"/>
+  <text x="62" y="344" text-anchor="end" font-size="10" fill="#555">0 MB</text>
+  <line x1="70" y1="265" x2="670" y2="265" stroke="#e5e5e5" stroke-width="1"/>
+  <text x="62" y="269" text-anchor="end" font-size="10" fill="#555">38 MB</text>
+  <line x1="70" y1="190" x2="670" y2="190" stroke="#e5e5e5" stroke-width="1"/>
+  <text x="62" y="194" text-anchor="end" font-size="10" fill="#555">77 MB</text>
+  <line x1="70" y1="115" x2="670" y2="115" stroke="#e5e5e5" stroke-width="1"/>
+  <text x="62" y="119" text-anchor="end" font-size="10" fill="#555">115 MB</text>
+  <line x1="70" y1="40" x2="670" y2="40" stroke="#e5e5e5" stroke-width="1"/>
+  <text x="62" y="44" text-anchor="end" font-size="10" fill="#555">154 MB</text>
+
+  <!-- x-axis labels -->
+  <line x1="76" y1="340" x2="76" y2="344" stroke="#666"/>
+  <text x="76" y="358" text-anchor="middle" font-size="10" fill="#555">10</text>
+  <line x1="100" y1="340" x2="100" y2="344" stroke="#666"/>
+  <text x="100" y="358" text-anchor="middle" font-size="10" fill="#555">50</text>
+  <line x1="130" y1="340" x2="130" y2="344" stroke="#666"/>
+  <text x="130" y="358" text-anchor="middle" font-size="10" fill="#555">100</text>
+  <line x1="220" y1="340" x2="220" y2="344" stroke="#666"/>
+  <text x="220" y="358" text-anchor="middle" font-size="10" fill="#555">250</text>
+  <line x1="370" y1="340" x2="370" y2="344" stroke="#666"/>
+  <text x="370" y="358" text-anchor="middle" font-size="10" fill="#555">500</text>
+  <line x1="670" y1="340" x2="670" y2="344" stroke="#666"/>
+  <text x="670" y="358" text-anchor="middle" font-size="10" fill="#555">1000</text>
+
+  <!-- axes -->
+  <line x1="70" y1="340" x2="670" y2="340" stroke="#333" stroke-width="1"/>
+  <line x1="70" y1="40" x2="70" y2="340" stroke="#333" stroke-width="1"/>
+
+  <!-- lines -->
+  <polyline points="76,340 100,328.24755236758006 130,313.96583162322025 220,272.8456069683666 370,223.5390763483421 670,40" fill="none" stroke="#c1272d" stroke-width="2.5" />
+  <circle cx="76" cy="340" r="4" fill="#c1272d" /><circle cx="100" cy="328.24755236758006" r="4" fill="#c1272d" /><circle cx="130" cy="313.96583162322025" r="4" fill="#c1272d" /><circle cx="220" cy="272.8456069683666" r="4" fill="#c1272d" /><circle cx="370" cy="223.5390763483421" r="4" fill="#c1272d" /><circle cx="670" cy="40" r="4" fill="#c1272d" />
+  <polyline points="76,340 100,340 130,340 220,340 370,340 670,340" fill="none" stroke="#1f7a4d" stroke-width="2.5" />
+  <circle cx="76" cy="340" r="4" fill="#1f7a4d" /><circle cx="100" cy="340" r="4" fill="#1f7a4d" /><circle cx="130" cy="340" r="4" fill="#1f7a4d" /><circle cx="220" cy="340" r="4" fill="#1f7a4d" /><circle cx="370" cy="340" r="4" fill="#1f7a4d" /><circle cx="670" cy="340" r="4" fill="#1f7a4d" />
+
+  <!-- legend -->
+  <g transform="translate(90, 50)">
+    <rect x="0" y="0" width="160" height="48" fill="white" stroke="#ccc" rx="4"/>
+    <circle cx="14" cy="16" r="5" fill="#c1272d"/>
+    <text x="26" y="20" font-size="11" fill="#333">renderFlow</text>
+    <circle cx="14" cy="36" r="5" fill="#1f7a4d"/>
+    <text x="26" y="40" font-size="11" fill="#333">streamFlow</text>
+  </g>
+</svg>

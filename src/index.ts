@@ -29,6 +29,8 @@ export { measure, measureContent, resolveMainAxis } from "./measure.js";
 export type { MainAxis, MainAxisLayout } from "./measure.js";
 export { render, type RenderOptions } from "./render.js";
 export { renderFlow, renderToPdf, PageSizes, pageInner, pageContent } from "./document.js";
+export { streamFlow, nodeAdapter } from "./stream.js";
+export type { StreamFlowOptions, StreamPageContext } from "./stream.js";
 export type {
   PageOptions,
   FlowOptions,
