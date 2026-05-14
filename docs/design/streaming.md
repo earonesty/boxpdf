@@ -374,34 +374,46 @@ Out of scope:
 
 ## Memory bench (real data)
 
-Reproducible via `node --expose-gc --import tsx scripts/bench-memory.ts`.
-Each test builds N pages with 50 lines of text per page, then measures
-absolute peak heap during `renderFlow + pdf.save()` vs
-`streamFlow + WritableStream`.
+Reproducible via `node --import tsx scripts/bench-memory.ts`. The
+parent process spawns one subprocess per measurement so V8 heap state
+from one test cannot bleed into another. The worker
+(`scripts/bench-worker.ts`) builds the input `Node[]` first, then
+runs `global.gc()` to set a clean baseline, then renders. Both modes
+consume the same pre-built `Node[]`, so the input cost is in baseline
+for both. What's plotted is what each rendering layer ADDS on top.
 
 ![Peak heap during render](./peak-heap.svg)
 
 | pages | renderFlow peak | streamFlow peak | ratio | output |
 | ---:  | ---:            | ---:            | ---:  | ---:   |
-|    10 |     12.3 MB     |     13.3 MB     |  0.9× |  15 KB |
-|    50 |     27.6 MB     |     14.9 MB     |  1.8× |  70 KB |
-|   100 |     28.9 MB     |     16.5 MB     |  1.8× | 139 KB |
-|   250 |     52.6 MB     |     19.8 MB     |  2.6× | 347 KB |
-|   500 |     82.8 MB     |     24.1 MB     |  3.4× | 693 KB |
-|  1000 |    184.8 MB     |     35.5 MB     |  5.2× | 1.4 MB |
+|    10 |     12.3 MB     |     12.2 MB     |  1.0× |  15 KB |
+|    50 |     31.6 MB     |     12.8 MB     |  2.5× |  70 KB |
+|   100 |     30.8 MB     |     13.4 MB     |  2.3× | 139 KB |
+|   250 |     66.4 MB     |     15.4 MB     |  4.3× | 347 KB |
+|   500 |    134.9 MB     |     18.7 MB     |  7.2× | 693 KB |
+|  1000 |    169.0 MB     |     25.4 MB     |  6.6× | 1.4 MB |
 
-`renderFlow` grows roughly linearly with page count — pdf-lib
-accumulates content streams + `pdf.save()` materializes the entire
-output as a single `Uint8Array`. `streamFlow` grows slowly because
-page-local content streams (the heavyweight per-page bytes) are
-`ctx.delete()`'d as soon as they're written to the writable; only page
-dicts (~200 B each) accumulate in pdf-lib's context.
+renderFlow grows roughly linearly with page count. pdf-lib accumulates
+content streams and `pdf.save()` materializes the entire output as a
+single `Uint8Array`. streamFlow grows much more slowly because
+page-local content streams are `ctx.delete()`'d as soon as they're
+written to the writable. Only page dicts (~200 B each) plus the xref
+table accumulate in pdf-lib's context.
 
-Net win at 1000 pages: **~150 MB less peak memory** for byte-equivalent
-output (sizes match within 0.2%). At 10 pages the two are within noise
-of each other — streaming has a constant overhead (pdf-lib's
-`flush()` step + the ObjStm buffer) that only pays off once the
-document is large enough.
+Net win at 1000 pages: **~140 MB less peak memory** for byte-equivalent
+output (within 0.2%). At 10 pages the two are within noise of each
+other. Streaming has a small constant overhead (pdf-lib's `flush()`
+plus the ObjStm buffer) that pays off once the document is large
+enough.
+
+### A note on benchmarking
+
+An earlier version of this bench ran every measurement in one
+long-lived process. V8 doesn't shrink its heap aggressively, so
+later tests inherited heap pages from earlier ones and the "peak"
+captured carryover state rather than the algorithm's own footprint.
+The 500-page streamFlow test inflated to 72 MB; in isolation it's
+18.7 MB. Running each measurement in its own subprocess fixes that.
 
 ## Tests we'll need
 

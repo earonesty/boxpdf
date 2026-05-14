@@ -238,16 +238,16 @@ await streamFlow(pdf, out, nodes);
 
 ### Memory bench
 
-Absolute peak heap during render. 50 lines per page.
+Peak heap during render. Each measurement runs in its own subprocess. Both modes consume the same pre-built `Node[]` so input cost is in baseline for both. 50 lines of text per page.
 
 | Pages | renderFlow peak | streamFlow peak | Ratio | Output |
 | ---:  | ---:            | ---:            | ---:  | ---:   |
-|    50 |     27.6 MB     |     14.9 MB     |  1.8× |  70 KB |
-|   250 |     52.6 MB     |     19.8 MB     |  2.6× | 347 KB |
-|   500 |     82.8 MB     |     24.1 MB     |  3.4× | 693 KB |
-|  1000 |    184.8 MB     |     35.5 MB     |  5.2× | 1.4 MB |
+|    50 |     31.6 MB     |     12.8 MB     |  2.5× |  70 KB |
+|   250 |     66.4 MB     |     15.4 MB     |  4.3× | 347 KB |
+|   500 |    134.9 MB     |     18.7 MB     |  7.2× | 693 KB |
+|  1000 |    169.0 MB     |     25.4 MB     |  6.6× | 1.4 MB |
 
-At 1000 pages, the streaming path uses ~150 MB less peak memory for byte-equivalent output (sizes within 0.2%). See `docs/design/streaming.md` for the design.
+At 1000 pages, the streaming path uses ~140 MB less peak memory for byte-equivalent output (sizes within 0.2%). See `docs/design/streaming.md` for the design.
 
 ## Cloudflare Workers
 

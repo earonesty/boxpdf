@@ -1,46 +1,19 @@
 /**
- * Memory bench: peak heap during renderFlow vs streamFlow across a range
- * of page counts. Each scenario runs in isolation with a forced GC
- * baseline. Sampling at 5ms intervals catches peaks during pdf-lib's
- * `objectsPerTick` yields and during stream flushes.
+ * Memory bench. Each measurement runs in its own subprocess so V8 heap
+ * state from one test cannot bleed into another. The worker script
+ * (bench-worker.ts) does the actual rendering and reports peak heap
+ * as a JSON line; this parent process orchestrates and collates.
  *
- * Run with:  pnpm exec tsx --expose-gc scripts/bench-memory.ts
- * (the --expose-gc flag is needed for accurate baselines)
+ * Both modes start from a pre-built Node[] inside the worker, so the
+ * input cost is in baseline for both. What's measured is what each
+ * rendering layer ADDS on top of holding the input.
+ *
+ * Run with:  node --import tsx scripts/bench-memory.ts
  */
 import { writeFileSync } from "node:fs";
-import { PDFDocument, StandardFonts } from "pdf-lib";
-import {
-  PageSizes,
-  renderFlow,
-  streamFlow,
-  text,
-  pageInner,
-  type Node
-} from "../src/index.js";
+import { spawn } from "node:child_process";
 
 const PAGE_COUNTS = [10, 50, 100, 250, 500, 1000];
-
-async function buildDoc(pageCount: number): Promise<{ pdf: PDFDocument; nodes: Node[] }> {
-  const pdf = await PDFDocument.create({ updateMetadata: false });
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const INNER = pageInner(PageSizes.Letter, 36);
-  const nodes: Node[] = [];
-  for (let i = 1; i <= pageCount; i++) {
-    nodes.push(text(`Section ${i}`, { size: 16, font: bold, width: INNER }));
-    // 50 lines per "section". Mix of short/medium/long to vary content stream size.
-    for (let line = 0; line < 50; line++) {
-      nodes.push(
-        text(
-          `Line ${line.toString().padStart(2, "0")}: Lorem ipsum dolor sit amet, ` +
-            `consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore.`,
-          { size: 10, font, width: INNER, margin: { top: 1, bottom: 1 } }
-        )
-      );
-    }
-  }
-  return { pdf, nodes };
-}
 
 interface BenchResult {
   pages: number;
@@ -48,60 +21,30 @@ interface BenchResult {
   baselineKB: number;
   peakKB: number;
   deltaKB: number;
-  rssBaseKB: number;
-  rssPeakKB: number;
   outputKB: number;
   millis: number;
 }
 
-async function measure(
-  pages: number,
-  mode: "renderFlow" | "streamFlow"
-): Promise<BenchResult> {
-  const { pdf, nodes } = await buildDoc(pages);
-
-  if (global.gc) global.gc();
-  const baselineMem = process.memoryUsage();
-  let peakHeap = baselineMem.heapUsed;
-  let peakRss = baselineMem.rss;
-  const sampler = setInterval(() => {
-    const u = process.memoryUsage();
-    if (u.heapUsed > peakHeap) peakHeap = u.heapUsed;
-    if (u.rss > peakRss) peakRss = u.rss;
-  }, 1);
-
-  const t0 = performance.now();
-  let outputBytes = 0;
-
-  try {
-    if (mode === "renderFlow") {
-      await renderFlow(pdf, nodes, { size: PageSizes.Letter, margin: 36 });
-      const out = await pdf.save();
-      outputBytes = out.byteLength;
-    } else {
-      const sink = new WritableStream<Uint8Array>({
-        write(chunk) {
-          outputBytes += chunk.length;
-        }
-      });
-      await streamFlow(pdf, sink, nodes, { size: PageSizes.Letter, margin: 36 });
-    }
-  } finally {
-    clearInterval(sampler);
-  }
-  const millis = performance.now() - t0;
-
-  return {
-    pages,
-    mode,
-    baselineKB: Math.round(baselineMem.heapUsed / 1024),
-    peakKB: Math.round(peakHeap / 1024),
-    deltaKB: Math.round((peakHeap - baselineMem.heapUsed) / 1024),
-    rssBaseKB: Math.round(baselineMem.rss / 1024),
-    rssPeakKB: Math.round(peakRss / 1024),
-    outputKB: Math.round(outputBytes / 1024),
-    millis: Math.round(millis)
-  };
+function runWorker(mode: "renderFlow" | "streamFlow", pages: number): Promise<BenchResult> {
+  return new Promise((resolve, reject) => {
+    const worker = spawn(
+      "node",
+      ["--expose-gc", "--import", "tsx", "scripts/bench-worker.ts", mode, String(pages)],
+      { stdio: ["ignore", "pipe", "inherit"] }
+    );
+    let stdout = "";
+    worker.stdout.on("data", (c) => (stdout += c.toString()));
+    worker.on("close", (code) => {
+      if (code !== 0) return reject(new Error(`worker exited ${code}`));
+      const line = stdout.trim().split("\n").filter((l) => l.startsWith("{")).pop();
+      if (!line) return reject(new Error(`no JSON output from worker (got: ${stdout})`));
+      try {
+        resolve(JSON.parse(line) as BenchResult);
+      } catch (e) {
+        reject(e);
+      }
+    });
+  });
 }
 
 async function main() {
@@ -110,7 +53,7 @@ async function main() {
   for (const pages of PAGE_COUNTS) {
     for (const mode of ["renderFlow", "streamFlow"] as const) {
       process.stdout.write(`  ${mode.padEnd(11)} × ${String(pages).padStart(4)} pages... `);
-      const r = await measure(pages, mode);
+      const r = await runWorker(mode, pages);
       results.push(r);
       const mb = (kb: number): string => (kb / 1024).toFixed(1).padStart(6) + " MB";
       process.stdout.write(
@@ -149,10 +92,6 @@ async function main() {
 function renderChart(results: BenchResult[]): string {
   const rf = results.filter((r) => r.mode === "renderFlow");
   const sf = results.filter((r) => r.mode === "streamFlow");
-  // Plot ABSOLUTE peak heap (not Δ above baseline) so the
-  // "streamFlow @ 0 MB" doesn't look like a measurement error —
-  // streamFlow really does stay near baseline, but the absolute value
-  // tells the honest story.
   const maxKB = Math.max(...rf.map((r) => r.peakKB), ...sf.map((r) => r.peakKB), 1);
 
   const W = 700;
@@ -187,13 +126,12 @@ function renderChart(results: BenchResult[]): string {
       .join("");
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" font-family="ui-sans-serif, system-ui, sans-serif">
-  <title>Peak heap during render — renderFlow vs streamFlow</title>
+  <title>Peak heap during render</title>
   <rect x="0" y="0" width="${W}" height="${H}" fill="#fafafa"/>
-  <text x="${W / 2}" y="22" text-anchor="middle" font-size="15" font-weight="600" fill="#111">Peak heap during render (absolute)</text>
+  <text x="${W / 2}" y="22" text-anchor="middle" font-size="15" font-weight="600" fill="#111">Peak heap during render (per-test subprocess)</text>
   <text x="${W / 2}" y="${H - 10}" text-anchor="middle" font-size="11" fill="#666">Document pages (50 lines of text each)</text>
   <text x="22" y="${padT + plotH / 2}" text-anchor="middle" font-size="11" fill="#666" transform="rotate(-90 22 ${padT + plotH / 2})">Peak heap used (MB)</text>
 
-  <!-- y-axis grid + labels -->
   ${niceKBLabels
     .map((mb, i) => {
       const y = padT + plotH - (i / 4) * plotH;
@@ -202,7 +140,6 @@ function renderChart(results: BenchResult[]): string {
     })
     .join("\n  ")}
 
-  <!-- x-axis labels -->
   ${xs
     .map((pages) => {
       const x = xAt(pages);
@@ -211,19 +148,16 @@ function renderChart(results: BenchResult[]): string {
     })
     .join("\n  ")}
 
-  <!-- axes -->
   <line x1="${padL}" y1="${padT + plotH}" x2="${W - padR}" y2="${padT + plotH}" stroke="#333" stroke-width="1"/>
   <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + plotH}" stroke="#333" stroke-width="1"/>
 
-  <!-- lines -->
   ${polyline(rf, "#c1272d")}
   ${dots(rf, "#c1272d")}
   ${polyline(sf, "#1f7a4d")}
   ${dots(sf, "#1f7a4d")}
 
-  <!-- legend -->
   <g transform="translate(${padL + 20}, ${padT + 10})">
-    <rect x="0" y="0" width="160" height="48" fill="white" stroke="#ccc" rx="4"/>
+    <rect x="0" y="0" width="170" height="48" fill="white" stroke="#ccc" rx="4"/>
     <circle cx="14" cy="16" r="5" fill="#c1272d"/>
     <text x="26" y="20" font-size="11" fill="#333">renderFlow</text>
     <circle cx="14" cy="36" r="5" fill="#1f7a4d"/>
