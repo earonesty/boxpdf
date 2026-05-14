@@ -39,7 +39,7 @@ export type {
 export { Colors, hex, rgb255 } from "./colors.js";
 export { formatCurrency } from "./format.js";
 export { defineStyles } from "./styles.js";
-export { embedFont, loadImage, type AssetSource } from "./assets.js";
+export { embedFont, loadFont, loadImage, type AssetSource, type LoadFontOptions } from "./assets.js";
 export type {
   Theme,
   ThemeColors,

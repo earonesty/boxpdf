@@ -162,6 +162,60 @@ margin boxes).
 - `defineStyles({ ... })` — typed identity for reusable style bundles.
 - `hex("#1f8a4d")` / `rgb255(31, 138, 77)` — color builders.
 
+### Three ways to load a font
+
+For any custom font (not the built-in `StandardFonts.Helvetica` / etc.), use
+`loadFont(pdf, source, options?)`. The source can be:
+
+**1) Bundled bytes via the CLI — recommended for production.**
+
+```sh
+npx boxpdf font add ./Acme-Regular.ttf=regular ./Acme-Bold.ttf=bold \
+  --out src/fonts/acme.ts
+```
+
+Generates `src/fonts/acme.ts` with two `export const` base64 strings.
+Then in your code:
+
+```ts
+import { loadFont } from "boxpdf";
+import { regular, bold } from "./fonts/acme.js";
+
+const font = await loadFont(pdf, regular);
+const acmeBold = await loadFont(pdf, bold);
+```
+
+Bytes ship inside your bundle — no network round-trip, predictable cold-start
+cost, works in every runtime.
+
+**2) The built-in Inter weights.**
+
+```ts
+import { loadFont } from "boxpdf";
+import { inter, interBold } from "boxpdf/inter";
+
+const font = await loadFont(pdf, inter);
+const bold = await loadFont(pdf, interBold);
+```
+
+`boxpdf/inter` re-exports the same Inter subset both as raw base64 strings
+(`inter`, `interBold`, `interItalic`) and as the convenience helper
+`embedInter(pdf, { italic?, tabularFigures? })` that loads several at once.
+
+**3) Fetch from a URL — good for edge runtimes where the asset is cache-friendly.**
+
+```ts
+const brand = await loadFont(pdf, "https://example.com/Acme-Regular.ttf");
+```
+
+The full TTF gets fetched and subsetted at embed time. On Cloudflare Workers
+with a warm cache this is fast (~5–15 ms); on a cold cache or in Node
+you pay the full fetch each time. For production prefer option (1).
+
+`loadFont` accepts the same `{ subset?: boolean; features?: { tnum: true } }`
+options regardless of the source. Use `features: { tnum: true }` to enable
+tabular numerals for money columns.
+
 ### Inter font (optional)
 
 ```ts
