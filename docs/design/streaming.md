@@ -384,27 +384,38 @@ for both. What's plotted is what each rendering layer ADDS on top.
 
 ![Peak heap during render](./peak-heap.svg)
 
-| pages | renderFlow peak | streamFlow peak | ratio | output |
-| ---:  | ---:            | ---:            | ---:  | ---:   |
-|    10 |     12.3 MB     |     12.2 MB     |  1.0× |  15 KB |
-|    50 |     31.6 MB     |     12.8 MB     |  2.5× |  70 KB |
-|   100 |     30.8 MB     |     13.4 MB     |  2.3× | 139 KB |
-|   250 |     66.4 MB     |     15.4 MB     |  4.3× | 347 KB |
-|   500 |    134.9 MB     |     18.7 MB     |  7.2× | 693 KB |
-|  1000 |    169.0 MB     |     25.4 MB     |  6.6× | 1.4 MB |
+Each measurement is one subprocess. `@react-pdf/renderer` is included
+for shape comparison (it's the most popular declarative PDF lib).
+
+| pages | streamFlow peak | renderFlow peak | @react-pdf peak | output |
+| ---:  | ---:            | ---:            | ---:            | ---:   |
+|    10 |     12.2 MB     |     12.3 MB     |     66.6 MB     |  15 KB |
+|    50 |     12.8 MB     |     31.7 MB     |    160.8 MB     |  70 KB |
+|   100 |     13.4 MB     |     30.7 MB     |    299.9 MB     | 139 KB |
+|   250 |     15.4 MB     |     91.1 MB     |    643.1 MB     | 347 KB |
+|   500 |     18.7 MB     |    120.8 MB     |  1,219.9 MB     | 693 KB |
+|  1000 |     25.4 MB     |    219.6 MB     |  2,292.6 MB     | 1.4 MB |
+
+streamFlow grows from 12 → 25 MB across a 100× workload increase.
+Page-local content streams are `ctx.delete()`'d as soon as they're
+written to the writable. Only page dicts (~200 B each) plus the xref
+table accumulate.
 
 renderFlow grows roughly linearly with page count. pdf-lib accumulates
 content streams and `pdf.save()` materializes the entire output as a
-single `Uint8Array`. streamFlow grows much more slowly because
-page-local content streams are `ctx.delete()`'d as soon as they're
-written to the writable. Only page dicts (~200 B each) plus the xref
-table accumulate in pdf-lib's context.
+single `Uint8Array`. At 1000 pages it's ~220 MB peak.
 
-Net win at 1000 pages: **~140 MB less peak memory** for byte-equivalent
-output (within 0.2%). At 10 pages the two are within noise of each
-other. Streaming has a small constant overhead (pdf-lib's `flush()`
-plus the ObjStm buffer) that pays off once the document is large
-enough.
+`@react-pdf/renderer` scales roughly linearly at ~2.3 MB per page
+in this workload. The React virtual DOM, Yoga layout state, and a
+PDFKit-based serializer all sit in memory together. At 1000 pages
+the process peaks at 2.3 GB. At 500 it's 1.2 GB. Anyone running this
+on a memory-bounded environment (Workers, AWS Lambda, small
+containers) will hit the ceiling well before 1000 pages.
+
+Both boxpdf paths produce byte-equivalent output (within 0.2%).
+react-pdf's output uses different content stream encoding so it isn't
+directly comparable byte-for-byte, but the rendered PDFs are visually
+equivalent.
 
 ### A note on benchmarking
 

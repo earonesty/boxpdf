@@ -8,13 +8,13 @@
   <line x1="70" y1="340" x2="670" y2="340" stroke="#e5e5e5" stroke-width="1"/>
   <text x="62" y="344" text-anchor="end" font-size="10" fill="#555">0 MB</text>
   <line x1="70" y1="265" x2="670" y2="265" stroke="#e5e5e5" stroke-width="1"/>
-  <text x="62" y="269" text-anchor="end" font-size="10" fill="#555">42 MB</text>
+  <text x="62" y="269" text-anchor="end" font-size="10" fill="#555">573 MB</text>
   <line x1="70" y1="190" x2="670" y2="190" stroke="#e5e5e5" stroke-width="1"/>
-  <text x="62" y="194" text-anchor="end" font-size="10" fill="#555">84 MB</text>
+  <text x="62" y="194" text-anchor="end" font-size="10" fill="#555">1146 MB</text>
   <line x1="70" y1="115" x2="670" y2="115" stroke="#e5e5e5" stroke-width="1"/>
-  <text x="62" y="119" text-anchor="end" font-size="10" fill="#555">127 MB</text>
+  <text x="62" y="119" text-anchor="end" font-size="10" fill="#555">1719 MB</text>
   <line x1="70" y1="40" x2="670" y2="40" stroke="#e5e5e5" stroke-width="1"/>
-  <text x="62" y="44" text-anchor="end" font-size="10" fill="#555">169 MB</text>
+  <text x="62" y="44" text-anchor="end" font-size="10" fill="#555">2293 MB</text>
 
   <line x1="76" y1="340" x2="76" y2="344" stroke="#666"/>
   <text x="76" y="358" text-anchor="middle" font-size="10" fill="#555">10</text>
@@ -32,16 +32,20 @@
   <line x1="70" y1="340" x2="670" y2="340" stroke="#333" stroke-width="1"/>
   <line x1="70" y1="40" x2="70" y2="340" stroke="#333" stroke-width="1"/>
 
-  <polyline points="76,318.248959778086 100,283.84361997226074 130,285.3571428571429 220,222.08044382801666 370,100.4264909847434 670,40" fill="none" stroke="#c1272d" stroke-width="2.5" />
-  <circle cx="76" cy="318.248959778086" r="4" fill="#c1272d" /><circle cx="100" cy="283.84361997226074" r="4" fill="#c1272d" /><circle cx="130" cy="285.3571428571429" r="4" fill="#c1272d" /><circle cx="220" cy="222.08044382801666" r="4" fill="#c1272d" /><circle cx="370" cy="100.4264909847434" r="4" fill="#c1272d" /><circle cx="670" cy="40" r="4" fill="#c1272d" />
-  <polyline points="76,318.2697642163662 100,317.28502080443826 130,316.18411927877946 220,312.6716366158114 370,306.74063800277395 670,294.85783633841885" fill="none" stroke="#1f7a4d" stroke-width="2.5" />
-  <circle cx="76" cy="318.2697642163662" r="4" fill="#1f7a4d" /><circle cx="100" cy="317.28502080443826" r="4" fill="#1f7a4d" /><circle cx="130" cy="316.18411927877946" r="4" fill="#1f7a4d" /><circle cx="220" cy="312.6716366158114" r="4" fill="#1f7a4d" /><circle cx="370" cy="306.74063800277395" r="4" fill="#1f7a4d" /><circle cx="670" cy="294.85783633841885" r="4" fill="#1f7a4d" />
+  <polyline points="76,331.290405849674 100,318.96284659599644 130,300.76133340262345 220,255.8401409428621 370,180.36572389545486 670,40" fill="none" stroke="#8b5cf6" stroke-width="2.5" />
+  <circle cx="76" cy="331.290405849674" r="4" fill="#8b5cf6" /><circle cx="100" cy="318.96284659599644" r="4" fill="#8b5cf6" /><circle cx="130" cy="300.76133340262345" r="4" fill="#8b5cf6" /><circle cx="220" cy="255.8401409428621" r="4" fill="#8b5cf6" /><circle cx="370" cy="180.36572389545486" r="4" fill="#8b5cf6" /><circle cx="670" cy="40" r="4" fill="#8b5cf6" />
+  <polyline points="76,338.39560780331385 100,335.85809957156573 130,335.9861442534518 220,328.08047135436857 370,324.19338239866966 670,311.25869711341454" fill="none" stroke="#c1272d" stroke-width="2.5" />
+  <circle cx="76" cy="338.39560780331385" r="4" fill="#c1272d" /><circle cx="100" cy="335.85809957156573" r="4" fill="#c1272d" /><circle cx="130" cy="335.9861442534518" r="4" fill="#c1272d" /><circle cx="220" cy="328.08047135436857" r="4" fill="#c1272d" /><circle cx="370" cy="324.19338239866966" r="4" fill="#c1272d" /><circle cx="670" cy="311.25869711341454" r="4" fill="#c1272d" />
+  <polyline points="76,338.4004637892536 100,338.32800736746776 130,338.24328319172884 220,337.9878327734751 370,337.5490049914424 670,336.670582692755" fill="none" stroke="#1f7a4d" stroke-width="2.5" />
+  <circle cx="76" cy="338.4004637892536" r="4" fill="#1f7a4d" /><circle cx="100" cy="338.32800736746776" r="4" fill="#1f7a4d" /><circle cx="130" cy="338.24328319172884" r="4" fill="#1f7a4d" /><circle cx="220" cy="337.9878327734751" r="4" fill="#1f7a4d" /><circle cx="370" cy="337.5490049914424" r="4" fill="#1f7a4d" /><circle cx="670" cy="336.670582692755" r="4" fill="#1f7a4d" />
 
   <g transform="translate(90, 50)">
-    <rect x="0" y="0" width="170" height="48" fill="white" stroke="#ccc" rx="4"/>
-    <circle cx="14" cy="16" r="5" fill="#c1272d"/>
-    <text x="26" y="20" font-size="11" fill="#333">renderFlow</text>
-    <circle cx="14" cy="36" r="5" fill="#1f7a4d"/>
-    <text x="26" y="40" font-size="11" fill="#333">streamFlow</text>
+    <rect x="0" y="0" width="220" height="64" fill="white" stroke="#ccc" rx="4"/>
+    <circle cx="14" cy="16" r="5" fill="#8b5cf6"/>
+    <text x="26" y="20" font-size="11" fill="#333">@react-pdf/renderer</text>
+    <circle cx="14" cy="36" r="5" fill="#c1272d"/>
+    <text x="26" y="40" font-size="11" fill="#333">renderFlow (boxpdf)</text>
+    <circle cx="14" cy="56" r="5" fill="#1f7a4d"/>
+    <text x="26" y="60" font-size="11" fill="#333">streamFlow (boxpdf)</text>
   </g>
 </svg>

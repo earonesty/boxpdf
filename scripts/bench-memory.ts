@@ -15,9 +15,11 @@ import { spawn } from "node:child_process";
 
 const PAGE_COUNTS = [10, 50, 100, 250, 500, 1000];
 
+type Mode = "renderFlow" | "streamFlow" | "react-pdf";
+
 interface BenchResult {
   pages: number;
-  mode: "renderFlow" | "streamFlow";
+  mode: Mode;
   baselineKB: number;
   peakKB: number;
   deltaKB: number;
@@ -25,13 +27,13 @@ interface BenchResult {
   millis: number;
 }
 
-function runWorker(mode: "renderFlow" | "streamFlow", pages: number): Promise<BenchResult> {
+function runWorker(mode: Mode, pages: number): Promise<BenchResult> {
   return new Promise((resolve, reject) => {
-    const worker = spawn(
-      "node",
-      ["--expose-gc", "--import", "tsx", "scripts/bench-worker.ts", mode, String(pages)],
-      { stdio: ["ignore", "pipe", "inherit"] }
-    );
+    const args =
+      mode === "react-pdf"
+        ? ["--expose-gc", "--import", "tsx", "scripts/bench-worker-rpdf.tsx", String(pages)]
+        : ["--expose-gc", "--import", "tsx", "scripts/bench-worker.ts", mode, String(pages)];
+    const worker = spawn("node", args, { stdio: ["ignore", "pipe", "inherit"] });
     let stdout = "";
     worker.stdout.on("data", (c) => (stdout += c.toString()));
     worker.on("close", (code) => {
@@ -51,31 +53,35 @@ async function main() {
   const results: BenchResult[] = [];
 
   for (const pages of PAGE_COUNTS) {
-    for (const mode of ["renderFlow", "streamFlow"] as const) {
+    for (const mode of ["renderFlow", "streamFlow", "react-pdf"] as const) {
       process.stdout.write(`  ${mode.padEnd(11)} × ${String(pages).padStart(4)} pages... `);
-      const r = await runWorker(mode, pages);
-      results.push(r);
-      const mb = (kb: number): string => (kb / 1024).toFixed(1).padStart(6) + " MB";
-      process.stdout.write(
-        `peak=${mb(r.peakKB)}  Δheap=${mb(r.deltaKB)}  out=${String(r.outputKB).padStart(6)} KB  ${r.millis}ms\n`
-      );
+      try {
+        const r = await runWorker(mode, pages);
+        results.push(r);
+        const mb = (kb: number): string => (kb / 1024).toFixed(1).padStart(6) + " MB";
+        process.stdout.write(
+          `peak=${mb(r.peakKB)}  Δheap=${mb(r.deltaKB)}  out=${String(r.outputKB).padStart(6)} KB  ${r.millis}ms\n`
+        );
+      } catch (e) {
+        process.stdout.write(`FAILED: ${(e as Error).message}\n`);
+      }
     }
   }
 
   const mb = (kb: number): string => (kb / 1024).toFixed(1);
-  console.log("\n" + "=".repeat(82));
-  console.log("Pages    renderFlow peak    streamFlow peak    ratio    output    savings");
-  console.log("-".repeat(82));
+  console.log("\n" + "=".repeat(96));
+  console.log("Pages    renderFlow peak    streamFlow peak    react-pdf peak    output");
+  console.log("-".repeat(96));
   for (const pages of PAGE_COUNTS) {
-    const rf = results.find((r) => r.pages === pages && r.mode === "renderFlow")!;
-    const sf = results.find((r) => r.pages === pages && r.mode === "streamFlow")!;
-    const ratio = (rf.peakKB / Math.max(sf.peakKB, 1)).toFixed(1);
-    const saved = rf.peakKB - sf.peakKB;
+    const rf = results.find((r) => r.pages === pages && r.mode === "renderFlow");
+    const sf = results.find((r) => r.pages === pages && r.mode === "streamFlow");
+    const rp = results.find((r) => r.pages === pages && r.mode === "react-pdf");
+    const fmt = (r: BenchResult | undefined): string => (r ? `${mb(r.peakKB).padStart(6)} MB` : "       FAIL");
     console.log(
-      `${String(pages).padStart(5)}    ${mb(rf.peakKB).padStart(6)} MB         ${mb(sf.peakKB).padStart(6)} MB     ${ratio.padStart(4)}×    ${String(rf.outputKB).padStart(6)} KB    -${mb(saved).padStart(5)} MB`
+      `${String(pages).padStart(5)}    ${fmt(rf).padEnd(15)}    ${fmt(sf).padEnd(15)}    ${fmt(rp).padEnd(15)}    ${String((rf ?? sf ?? rp)?.outputKB).padStart(6)} KB`
     );
   }
-  console.log("=".repeat(82));
+  console.log("=".repeat(96));
 
   writeFileSync(
     new URL("../out/bench-memory.json", import.meta.url),
@@ -92,7 +98,13 @@ async function main() {
 function renderChart(results: BenchResult[]): string {
   const rf = results.filter((r) => r.mode === "renderFlow");
   const sf = results.filter((r) => r.mode === "streamFlow");
-  const maxKB = Math.max(...rf.map((r) => r.peakKB), ...sf.map((r) => r.peakKB), 1);
+  const rp = results.filter((r) => r.mode === "react-pdf");
+  const maxKB = Math.max(
+    ...rf.map((r) => r.peakKB),
+    ...sf.map((r) => r.peakKB),
+    ...rp.map((r) => r.peakKB),
+    1
+  );
 
   const W = 700;
   const H = 400;
@@ -151,17 +163,21 @@ function renderChart(results: BenchResult[]): string {
   <line x1="${padL}" y1="${padT + plotH}" x2="${W - padR}" y2="${padT + plotH}" stroke="#333" stroke-width="1"/>
   <line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT + plotH}" stroke="#333" stroke-width="1"/>
 
+  ${polyline(rp, "#8b5cf6")}
+  ${dots(rp, "#8b5cf6")}
   ${polyline(rf, "#c1272d")}
   ${dots(rf, "#c1272d")}
   ${polyline(sf, "#1f7a4d")}
   ${dots(sf, "#1f7a4d")}
 
   <g transform="translate(${padL + 20}, ${padT + 10})">
-    <rect x="0" y="0" width="170" height="48" fill="white" stroke="#ccc" rx="4"/>
-    <circle cx="14" cy="16" r="5" fill="#c1272d"/>
-    <text x="26" y="20" font-size="11" fill="#333">renderFlow</text>
-    <circle cx="14" cy="36" r="5" fill="#1f7a4d"/>
-    <text x="26" y="40" font-size="11" fill="#333">streamFlow</text>
+    <rect x="0" y="0" width="220" height="64" fill="white" stroke="#ccc" rx="4"/>
+    <circle cx="14" cy="16" r="5" fill="#8b5cf6"/>
+    <text x="26" y="20" font-size="11" fill="#333">@react-pdf/renderer</text>
+    <circle cx="14" cy="36" r="5" fill="#c1272d"/>
+    <text x="26" y="40" font-size="11" fill="#333">renderFlow (boxpdf)</text>
+    <circle cx="14" cy="56" r="5" fill="#1f7a4d"/>
+    <text x="26" y="60" font-size="11" fill="#333">streamFlow (boxpdf)</text>
   </g>
 </svg>
 `;

@@ -238,16 +238,16 @@ await streamFlow(pdf, out, nodes);
 
 ### Memory bench
 
-Peak heap during render. Each measurement runs in its own subprocess. Both modes consume the same pre-built `Node[]` so input cost is in baseline for both. 50 lines of text per page.
+Peak heap during render. Each measurement runs in its own subprocess. 50 lines of text per page. `@react-pdf/renderer` included for shape comparison.
 
-| Pages | renderFlow peak | streamFlow peak | Ratio | Output |
-| ---:  | ---:            | ---:            | ---:  | ---:   |
-|    50 |     31.6 MB     |     12.8 MB     |  2.5× |  70 KB |
-|   250 |     66.4 MB     |     15.4 MB     |  4.3× | 347 KB |
-|   500 |    134.9 MB     |     18.7 MB     |  7.2× | 693 KB |
-|  1000 |    169.0 MB     |     25.4 MB     |  6.6× | 1.4 MB |
+| Pages | streamFlow peak | renderFlow peak | @react-pdf peak | Output |
+| ---:  | ---:            | ---:            | ---:            | ---:   |
+|    50 |     12.8 MB     |     31.7 MB     |    160.8 MB     |  70 KB |
+|   250 |     15.4 MB     |     91.1 MB     |    643.1 MB     | 347 KB |
+|   500 |     18.7 MB     |    120.8 MB     |  1,219.9 MB     | 693 KB |
+|  1000 |     25.4 MB     |    219.6 MB     |  2,292.6 MB     | 1.4 MB |
 
-At 1000 pages, the streaming path uses ~140 MB less peak memory for byte-equivalent output (sizes within 0.2%). See `docs/design/streaming.md` for the design.
+streamFlow holds peak heap roughly flat (12 → 25 MB across a 100× workload increase). renderFlow scales roughly linearly with page count. `@react-pdf/renderer` adds ~2.3 MB per page in this workload and peaks at 2.3 GB by 1000 pages. See `docs/design/streaming.md` for the design and the chart.
 
 ## Cloudflare Workers
 
