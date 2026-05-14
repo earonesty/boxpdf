@@ -1,0 +1,9 @@
+node_modules
+dist
+coverage
+*.log
+.DS_Store
+.idea
+.vscode
+fixtures/*.pdf
+!fixtures/.gitkeep
