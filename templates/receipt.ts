@@ -1,18 +1,15 @@
-// Copy-paste template: a professional-looking receipt.
-//
-// Adjust the seller, line items, and totals — everything else is driven by
-// the `clean` theme. To get a different look, swap `cleanTheme` for another
-// theme from `boxpdf/themes` or pass your own theme object.
+// Copy-paste template: a professional-looking receipt built on the
+// first-class `table()` primitive. Adjust the seller, line items, and
+// totals — column widths, dividers, and totals row stay in one place.
 
 import { writeFileSync } from "node:fs";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import {
   cleanTheme,
-  flex,
   formatCurrency,
   hline,
-  hstack,
   renderFlow,
+  table,
   text,
   vstack,
   type Node
@@ -44,15 +41,7 @@ const font = await doc.embedFont(StandardFonts.Helvetica);
 const bold = await doc.embedFont(StandardFonts.HelveticaBold);
 const theme = cleanTheme(font, bold);
 
-// Column layout — shared by item rows and totals rows so every dollar
-// amount lands in the same right-aligned column.
-const PAGE_INNER = 515;
-const TABLE_PAD = 16;
-const INNER_WIDTH = PAGE_INNER - TABLE_PAD * 2;
-const COL_GAP = theme.spacing.md;
-const LABEL_COL = 110;
-const AMOUNT_COL = 80;
-const DESC_COL = INNER_WIDTH - LABEL_COL - AMOUNT_COL - COL_GAP * 2;
+const TABLE_WIDTH = 515;
 
 const header: Node = vstack(
   { gap: theme.spacing.xs },
@@ -60,60 +49,82 @@ const header: Node = vstack(
   text(seller.caption, theme.type.caption)
 );
 
-const itemRow = (it: LineItem): Node =>
-  hstack(
-    { width: INNER_WIDTH, gap: COL_GAP, padding: { top: 6, bottom: 6 } },
-    text(it.name, { ...theme.type.body, width: DESC_COL }),
+const itemsTable: Node = table({
+  width: TABLE_WIDTH,
+  columns: [
+    { width: "1fr" },
+    { width: 90 },
+    { width: 90 }
+  ],
+  rows: items.map((it) => [
+    text(it.name, theme.type.body),
     text(`${it.qty} × ${formatCurrency(it.unit)}`, {
       ...theme.type.bodySmall,
       color: theme.colors.muted,
       align: "right",
-      width: LABEL_COL
+      width: 90
     }),
     text(formatCurrency(it.qty * it.unit), {
       ...theme.type.body,
-      font: theme.bold,
+      font: bold,
       align: "right",
-      width: AMOUNT_COL
+      width: 90
     })
-  );
+  ]),
+  rowDivider: theme.hr,
+  cellPadding: { top: theme.spacing.sm, bottom: theme.spacing.sm },
+  padding: { left: theme.spacing.md, right: theme.spacing.md },
+  border: { color: theme.colors.border, width: 1 },
+  borderRadius: theme.radii.md,
+  background: theme.colors.surface
+});
 
-const itemsCard: Node = vstack(
-  { ...theme.card, width: PAGE_INNER, padding: TABLE_PAD },
-  ...items.flatMap((it, i) => (i === 0 ? [itemRow(it)] : [hline(theme.hr), itemRow(it)]))
-);
-
-const totalsRow = (label: string, amount: number, emphasize = false): Node => {
-  const labelStyle = emphasize ? { ...theme.type.h2 } : { ...theme.type.bodySmall, color: theme.colors.muted };
-  const amountStyle = emphasize ? { ...theme.type.h2 } : { ...theme.type.body };
-  return hstack(
-    { width: INNER_WIDTH, gap: COL_GAP, padding: { top: 3, bottom: 3 } },
-    flex(),
-    text(label, { ...labelStyle, align: "right", width: LABEL_COL }),
-    text(formatCurrency(amount), { ...amountStyle, align: "right", width: AMOUNT_COL })
-  );
-};
-
-const totals: Node = vstack(
-  {
-    width: PAGE_INNER,
-    padding: { top: theme.spacing.sm, right: TABLE_PAD, bottom: theme.spacing.sm, left: TABLE_PAD },
-    margin: { top: theme.spacing.md }
-  },
-  totalsRow("Subtotal", subtotal),
-  totalsRow("Tax (8.75%)", tax),
-  hline({ ...theme.hr, margin: { top: theme.spacing.sm, bottom: theme.spacing.sm } }),
-  totalsRow("Total", total, true)
-);
+const totalsTable: Node = table({
+  width: TABLE_WIDTH,
+  columns: [{ width: "1fr" }, { width: 100 }, { width: 90 }],
+  rows: [
+    [
+      text("", theme.type.body),
+      text("Subtotal", {
+        ...theme.type.bodySmall,
+        color: theme.colors.muted,
+        align: "right",
+        width: 100
+      }),
+      text(formatCurrency(subtotal), { ...theme.type.body, align: "right", width: 90 })
+    ],
+    [
+      text("", theme.type.body),
+      text("Tax (8.75%)", {
+        ...theme.type.bodySmall,
+        color: theme.colors.muted,
+        align: "right",
+        width: 100
+      }),
+      text(formatCurrency(tax), { ...theme.type.body, align: "right", width: 90 })
+    ]
+  ],
+  footer: [
+    text("", theme.type.body),
+    text("Total", { ...theme.type.h2, align: "right", width: 100 }),
+    text(formatCurrency(total), { ...theme.type.h2, align: "right", width: 90 })
+  ],
+  cellPadding: { top: 3, bottom: 3 },
+  footerDivider: { ...theme.hr, thickness: 1 },
+  margin: { top: theme.spacing.md }
+});
 
 await renderFlow(
   doc,
   [
     header,
     hline({ ...theme.hr, margin: { top: theme.spacing.lg, bottom: theme.spacing.lg } }),
-    itemsCard,
-    totals,
-    text("Thanks for your business.", { ...theme.type.caption, margin: { top: theme.spacing.xl } })
+    itemsTable,
+    totalsTable,
+    text("Thanks for your business.", {
+      ...theme.type.caption,
+      margin: { top: theme.spacing.xl }
+    })
   ],
   {
     margin: theme.spacing.xxl,

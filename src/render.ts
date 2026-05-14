@@ -167,6 +167,20 @@ function renderContent(node: Node, page: PDFPage, x: number, yTop: number, paren
       attachLinkAnnotation(page, x, yTop - childSize.height, childSize.width, childSize.height, node.href);
       return consumed;
     }
+    case "svgPath": {
+      // drawSvgPath uses (x, y) as the path's origin point. SVG `y` grows
+      // downward inside the path data, so we anchor at yTop and let the
+      // path draw "down" into the bounding box.
+      page.drawSvgPath(node.d, {
+        x,
+        y: yTop,
+        scale: node.scale,
+        color: toRgb(node.color),
+        borderColor: toRgb(node.borderColor),
+        borderWidth: node.borderWidth
+      });
+      return node.height;
+    }
     case "vstack":
       return renderVStack(node, page, x, yTop, parentWidth);
     case "hstack":

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.earonesty/boxpdf",
+  "title": "boxpdf",
+  "description": "Resource-only MCP server with docs and templates for the boxpdf TypeScript PDF layout library.",
+  "websiteUrl": "https://earonesty.github.io/boxpdf/",
+  "repository": {
+    "url": "https://github.com/earonesty/boxpdf",
+    "source": "github"
+  },
+  "version": "1.0.2",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "boxpdf",
+      "version": "1.0.2",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp"
+        }
+      ]
+    }
+  ]
+}

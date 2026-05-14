@@ -101,6 +101,24 @@ export type Node =
       href: string;
       child: Node;
       margin?: EdgesInput;
+    }
+  | {
+      kind: "svgPath";
+      /** SVG path data (the `d` attribute) — `M`, `L`, `C`, `A`, `Z`, etc. */
+      d: string;
+      /** Bounding-box width the path occupies in the layout. */
+      width: number;
+      /** Bounding-box height the path occupies in the layout. */
+      height: number;
+      /** Uniform scale applied to the path before drawing (default 1). */
+      scale?: number;
+      /** Fill color. Omit for no fill. */
+      color?: RGB;
+      /** Border / stroke color. Omit for no stroke. */
+      borderColor?: RGB;
+      /** Border / stroke width. */
+      borderWidth?: number;
+      margin?: EdgesInput;
     };
 
 export interface Size {

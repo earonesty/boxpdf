@@ -16,10 +16,13 @@ export {
   keepTogether,
   link,
   spacer,
+  svgPath,
   text,
   vline,
   vstack
 } from "./nodes.js";
+export { table } from "./table.js";
+export type { ColumnSpec, ColumnWidth, TableDivider, TableOptions } from "./table.js";
 export type { TextOptions } from "./nodes.js";
 
 export { measure, measureContent } from "./measure.js";

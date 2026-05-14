@@ -1,6 +1,7 @@
 {
   "name": "boxpdf",
-  "version": "1.0.2",
+  "version": "1.0.3",
+  "mcpName": "io.github.earonesty/boxpdf",
   "description": "Tiny box-layout DSL over pdf-lib. Flexbox-lite for server-side PDF generation in any JS runtime (Node, Cloudflare Workers, Deno, browsers).",
   "keywords": [
     "pdf",

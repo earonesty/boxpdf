@@ -120,6 +120,46 @@ export function vline(
 }
 
 /**
+ * Render a single SVG path via pdf-lib's `drawSvgPath`. Useful for logos,
+ * monoline icons, decorative shapes — anything you can express as a single
+ * `<path d="…">` string.
+ *
+ * Note this is **not** a full SVG renderer — `<rect>`, `<circle>`, `<g>`,
+ * gradients, and CSS styles aren't supported. Convert your SVG to a single
+ * compound path (e.g. with `svgo --pretty --multipass` and `--inline-paths`,
+ * or any "flatten paths" tool) before passing the `d` string here.
+ *
+ * @example
+ *   svgPath({
+ *     d: "M2 12 L7 17 L22 2",
+ *     width: 24, height: 24,
+ *     borderColor: hex("#16a34a"), borderWidth: 2
+ *   })
+ */
+export function svgPath(options: {
+  d: string;
+  width: number;
+  height: number;
+  scale?: number;
+  color?: RGB;
+  borderColor?: RGB;
+  borderWidth?: number;
+  margin?: EdgesInput;
+}): Node {
+  return {
+    kind: "svgPath",
+    d: options.d,
+    width: options.width,
+    height: options.height,
+    scale: options.scale,
+    color: options.color,
+    borderColor: options.borderColor,
+    borderWidth: options.borderWidth,
+    margin: options.margin
+  };
+}
+
+/**
  * Wraps a child node and registers a clickable hyperlink annotation over its
  * rendered bounding box. The annotation is added at render time via pdf-lib's
  * page annotation array, so any href works (https, mailto, tel, etc.).
