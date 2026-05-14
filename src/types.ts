@@ -42,6 +42,10 @@ export interface TextProps {
   maxLines?: number;
   /** Margin around the text. */
   margin?: EdgesInput;
+  /** Underline each rendered line. */
+  underline?: boolean;
+  /** Strike a line through each rendered line. */
+  strikethrough?: boolean;
 }
 
 export type Node =
@@ -90,6 +94,12 @@ export type Node =
       color: RGB;
       thickness: number;
       height?: number;
+      margin?: EdgesInput;
+    }
+  | {
+      kind: "link";
+      href: string;
+      child: Node;
       margin?: EdgesInput;
     };
 

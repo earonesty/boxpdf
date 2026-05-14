@@ -53,6 +53,8 @@ export interface TextOptions {
   lineHeight?: number;
   maxLines?: number;
   margin?: EdgesInput;
+  underline?: boolean;
+  strikethrough?: boolean;
 }
 
 export function text(content: string, options: TextOptions): Node {
@@ -64,7 +66,9 @@ export function text(content: string, options: TextOptions): Node {
     width: options.width,
     lineHeight: options.lineHeight,
     maxLines: options.maxLines,
-    margin: options.margin
+    margin: options.margin,
+    underline: options.underline,
+    strikethrough: options.strikethrough
   };
   return { kind: "text", text: content, props };
 }
@@ -113,4 +117,21 @@ export function vline(
     height: options.height,
     margin: options.margin
   };
+}
+
+/**
+ * Wraps a child node and registers a clickable hyperlink annotation over its
+ * rendered bounding box. The annotation is added at render time via pdf-lib's
+ * page annotation array, so any href works (https, mailto, tel, etc.).
+ *
+ * @example
+ *   link({ href: "https://example.com/manage" },
+ *     text("Manage booking", { size: 11, font, color: hex("#0066cc"), underline: true })
+ *   )
+ */
+export function link(
+  options: { href: string; margin?: EdgesInput },
+  child: Node
+): Node {
+  return { kind: "link", href: options.href, child, margin: options.margin };
 }

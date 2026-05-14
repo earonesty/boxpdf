@@ -59,6 +59,8 @@ export function measureContent(node: Node, parentWidth: number): Size {
         height: node.style.height ?? height + inset.top + inset.bottom
       };
     }
+    case "link":
+      return measureContent(node.child, parentWidth);
     case "hstack": {
       const inset = edges(node.style.padding);
       const fixedWidth = node.style.width;
@@ -89,6 +91,7 @@ export function nodeMargin(node: Node): { top: number; right: number; bottom: nu
     case "image":
     case "hline":
     case "vline":
+    case "link":
       return edges(node.margin);
     case "spacer":
       return edges(undefined);

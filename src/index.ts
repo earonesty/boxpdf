@@ -14,6 +14,7 @@ export {
   hstack,
   image,
   keepTogether,
+  link,
   spacer,
   text,
   vline,
@@ -24,10 +25,30 @@ export type { TextOptions } from "./nodes.js";
 export { measure, measureContent } from "./measure.js";
 export { render, type RenderOptions } from "./render.js";
 export { renderFlow, renderToPdf, PageSizes } from "./document.js";
-export type { PageOptions, FlowOptions, PageSize, PageContext } from "./document.js";
+export type {
+  PageOptions,
+  FlowOptions,
+  PageSize,
+  PageContext,
+  DocumentMetadata
+} from "./document.js";
 
 export { Colors, hex, rgb255 } from "./colors.js";
 export { formatCurrency } from "./format.js";
+export { defineStyles } from "./styles.js";
+export { embedFont, loadImage, type AssetSource } from "./assets.js";
+export type {
+  Theme,
+  ThemeColors,
+  ThemeSpacing,
+  ThemeRadii,
+  ThemeType,
+  ThemedTextStyle
+} from "./theme.js";
+export { cleanTheme } from "./themes/clean.js";
+export { stripeTheme } from "./themes/stripe.js";
+export { editorialTheme } from "./themes/editorial.js";
+export { brutalistTheme } from "./themes/brutalist.js";
 
 export type {
   Align,

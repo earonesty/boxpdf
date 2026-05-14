@@ -1,4 +1,4 @@
-import { rgb, type PDFPage } from "pdf-lib";
+import { PDFArray, PDFName, PDFString, rgb, type PDFPage } from "pdf-lib";
 import { edges, type Justify, type Node, type RGB } from "./types.js";
 import { fontAscent, measureText } from "./text.js";
 import { layoutText, measure, measureContent, nodeGrow, nodeMargin } from "./measure.js";
@@ -90,6 +90,8 @@ function renderContent(node: Node, page: PDFPage, x: number, yTop: number, paren
       const lines = layoutText(node, props.width ?? parentWidth);
       const lineHeight = props.lineHeight ?? fontAscent(props.font, props.size);
       const slotWidth = props.width ?? measureText(props.font, props.size, node.text);
+      const decorationThickness = Math.max(0.5, props.size * 0.06);
+      const decorationColor = toRgb(props.color);
       let cursorY = yTop;
       for (let i = 0; i < lines.length; i += 1) {
         const line = lines[i] ?? "";
@@ -97,13 +99,32 @@ function renderContent(node: Node, page: PDFPage, x: number, yTop: number, paren
         let drawX = x;
         if (props.align === "center") drawX = x + (slotWidth - lineWidth) / 2;
         else if (props.align === "right") drawX = x + (slotWidth - lineWidth);
+        const baseline = cursorY - fontAscent(props.font, props.size);
         page.drawText(line, {
           x: drawX,
-          y: cursorY - fontAscent(props.font, props.size),
+          y: baseline,
           size: props.size,
           font: props.font,
           color: toRgb(props.color)
         });
+        if (props.underline && line.length > 0) {
+          const underlineY = baseline - Math.max(1, props.size * 0.12);
+          page.drawLine({
+            start: { x: drawX, y: underlineY },
+            end: { x: drawX + lineWidth, y: underlineY },
+            thickness: decorationThickness,
+            color: decorationColor
+          });
+        }
+        if (props.strikethrough && line.length > 0) {
+          const midY = baseline + props.size * 0.28;
+          page.drawLine({
+            start: { x: drawX, y: midY },
+            end: { x: drawX + lineWidth, y: midY },
+            thickness: decorationThickness,
+            color: decorationColor
+          });
+        }
         cursorY -= lineHeight;
       }
       return lineHeight * Math.max(1, lines.length);
@@ -140,10 +161,45 @@ function renderContent(node: Node, page: PDFPage, x: number, yTop: number, paren
       });
       return h;
     }
+    case "link": {
+      const childSize = measure(node.child, parentWidth);
+      const consumed = renderWithCurrent(node.child, page, x, yTop, parentWidth);
+      attachLinkAnnotation(page, x, yTop - childSize.height, childSize.width, childSize.height, node.href);
+      return consumed;
+    }
     case "vstack":
       return renderVStack(node, page, x, yTop, parentWidth);
     case "hstack":
       return renderHStack(node, page, x, yTop, parentWidth);
+  }
+}
+
+function attachLinkAnnotation(
+  page: PDFPage,
+  x: number,
+  yBottom: number,
+  width: number,
+  height: number,
+  href: string
+): void {
+  const pdf = page.doc;
+  const annotation = pdf.context.obj({
+    Type: "Annot",
+    Subtype: "Link",
+    Rect: [x, yBottom, x + width, yBottom + height],
+    Border: [0, 0, 0],
+    A: {
+      Type: "Action",
+      S: "URI",
+      URI: PDFString.of(href)
+    }
+  });
+  const annotsKey = PDFName.of("Annots");
+  const existing = page.node.lookupMaybe(annotsKey, PDFArray);
+  if (existing) {
+    existing.push(annotation);
+  } else {
+    page.node.set(annotsKey, pdf.context.obj([annotation]));
   }
 }
 

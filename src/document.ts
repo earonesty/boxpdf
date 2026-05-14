@@ -17,9 +17,27 @@ export const PageSizes = {
   A6: { width: 297, height: 420 }
 } as const;
 
-export interface PageOptions extends RenderOptions {
+export interface DocumentMetadata {
+  title?: string;
+  author?: string;
+  subject?: string;
+  keywords?: string[];
+  creator?: string;
+  producer?: string;
+}
+
+export interface PageOptions extends RenderOptions, DocumentMetadata {
   size?: PageSize;
   margin?: EdgesInput;
+}
+
+function applyMetadata(pdf: PDFDocument, options: DocumentMetadata): void {
+  if (options.title !== undefined) pdf.setTitle(options.title);
+  if (options.author !== undefined) pdf.setAuthor(options.author);
+  if (options.subject !== undefined) pdf.setSubject(options.subject);
+  if (options.keywords !== undefined) pdf.setKeywords(options.keywords);
+  if (options.creator !== undefined) pdf.setCreator(options.creator);
+  if (options.producer !== undefined) pdf.setProducer(options.producer);
 }
 
 export interface PageContext {
@@ -67,6 +85,8 @@ export async function renderFlow(
   const m = edges(options.margin);
   const reserveBottom = options.reserveBottom ?? 0;
   const contentWidth = size.width - m.left - m.right;
+
+  applyMetadata(pdf, options);
 
   const probeCtx: PageContext = { pageNumber: 1, totalPages: 1 };
   const headerHeight = options.header
@@ -139,7 +159,8 @@ export async function renderToPdf(
   const size = options.size ?? PageSizes.A4;
   const m = edges(options.margin);
   const contentWidth = size.width - m.left - m.right;
-  const pdf = await PDFDocument.create();
+  const pdf = await PDFDocument.create({ updateMetadata: options.producer === undefined });
+  applyMetadata(pdf, options);
   const page = pdf.addPage([size.width, size.height]);
   render(node, page, m.left, size.height - m.top, contentWidth, { debug: options.debug });
   return pdf.save();
