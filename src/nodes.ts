@@ -30,6 +30,20 @@ export function group(...children: Node[]): Node {
   return vstack({}, ...children);
 }
 
+/**
+ * Wraps children so that, under `renderFlow`, they paginate as one atomic
+ * unit — if the combined height won't fit on the current page, the whole
+ * group is pushed to the next page intact. Use it to keep
+ * subtotal/tax/total triples together, table-row + its continuation, etc.
+ */
+export function keepTogether(
+  options: { gap?: number; margin?: import("./types.js").EdgesInput },
+  ...children: Node[]
+): Node {
+  const { gap = 0, margin } = options;
+  return vstack({ gap, margin }, ...children);
+}
+
 export interface TextOptions {
   size: number;
   font: PDFFont;

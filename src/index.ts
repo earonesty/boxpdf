@@ -13,6 +13,7 @@ export {
   hline,
   hstack,
   image,
+  keepTogether,
   spacer,
   text,
   vline,
@@ -23,9 +24,10 @@ export type { TextOptions } from "./nodes.js";
 export { measure, measureContent } from "./measure.js";
 export { render, type RenderOptions } from "./render.js";
 export { renderFlow, renderToPdf, PageSizes } from "./document.js";
-export type { PageOptions, FlowOptions, PageSize } from "./document.js";
+export type { PageOptions, FlowOptions, PageSize, PageContext } from "./document.js";
 
 export { Colors, hex, rgb255 } from "./colors.js";
+export { formatCurrency } from "./format.js";
 
 export type {
   Align,

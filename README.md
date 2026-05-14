@@ -91,9 +91,16 @@ Container `style`:
 ### Rendering
 
 - `renderToPdf(node, { size?, margin? })` — one-page convenience.
-- `renderFlow(pdf, nodes[], { size?, margin?, reserveBottom? })` — paginate a
-  sequence of top-level children. Each child renders atomically; if the next
-  child doesn't fit, a new page is added.
+- `renderFlow(pdf, nodes[], { size?, margin?, reserveBottom?, header?, footer? })` —
+  paginate a sequence of top-level children. Each child renders atomically;
+  if the next child doesn't fit, a new page is added. `header` and `footer`
+  are functions that receive `{ pageNumber, totalPages }` and return a node
+  to draw on every page — typical use is running invoice/document headers
+  and `Page X of Y` footers. Their height is reserved before pagination so
+  content never overlaps them.
+- `keepTogether({ gap?, margin? }, ...children)` — wrap children so they
+  paginate as one atomic unit (won't split mid-group). Useful for
+  Subtotal/Tax/Total triples, signature blocks, etc.
 - `render(node, page, x, yTop, parentWidth)` — low-level escape hatch when you
   already have a `PDFPage` and want to draw a subtree at a known position.
 - `measure(node, parentWidth)` — compute intrinsic size without drawing
