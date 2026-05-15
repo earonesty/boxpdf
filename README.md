@@ -94,6 +94,8 @@ Container `style`:
 | `background` | RGB | Solid fill. |
 | `border` | `{ color, width }` | 1pt+ stroke around the box. |
 | `borderRadius` | number | Corner radius. |
+| `position` | `"relative"` \| `"absolute"` | CSS-like positioning for boxes. |
+| `top` / `right` / `bottom` / `left` | number | Absolute offsets in points. |
 | `grow` | number | Flex grow weight along the parent's main axis. |
 | `shrink` | number | Flex shrink weight. |
 | `gap` | number | Spacing between children. |
@@ -102,7 +104,7 @@ Container `style`:
 
 ### Leaves
 
-- `text(content, { size, font, color?, align?, width?, lineHeight?, maxLines?, underline?, strikethrough?, margin? })`. Word-wraps when `width` is set. Truncates with ellipsis when `maxLines` is set.
+- `text(content, { size, font, color?, align?, width?, lineHeight?, maxLines?, underline?, strikethrough?, margin? })`. Word-wraps when `width` is set. Truncates with ellipsis when `maxLines` is set. Default `lineHeight` uses the font's full height, including descenders.
 - `image(pdfImage, { width, height, margin? })`. Takes an already-embedded `PDFImage`.
 - `spacer(size, { grow? })` / `flex(weight = 1)`. Fixed or growing gap.
 - `hline({ color, thickness?, width?, margin? })`.
@@ -315,9 +317,33 @@ Behavior:
 
 See `examples/flex-shrink.ts`.
 
+## Absolute positioning
+
+Boxes can use a small CSS-like positioning model:
+
+```ts
+vstack(
+  { width: 240, height: 120, position: "relative", padding: 16 },
+  text("Receipt", { size: 18, font: bold }),
+  hstack(
+    { position: "absolute", top: 12, right: 12, width: 70 },
+    text("PAID", { size: 14, font: bold, align: "center", width: 70 })
+  )
+)
+```
+
+Behavior:
+
+- Any positioned box establishes the containing block for absolute descendant boxes.
+- `position: "absolute"` removes a `vstack` or `hstack` from normal stack flow.
+- Absolute boxes render after normal children, so they can be used for stamps, badges, overlays, and watermarks.
+- `top`, `right`, `bottom`, and `left` are point offsets from the nearest positioned ancestor. If there is no positioned ancestor, they resolve against the current `render()` root.
+- If both `left` and `right` are set and `width` is omitted, the box stretches to the remaining width. `top` plus `bottom` does the same for height.
+- Absolute boxes do not affect parent measurement, gaps, flex grow/shrink, or pagination. Give the containing box a fixed `width` and `height` when you need stable placement.
+
 ## Limitations
 
-- No `position: absolute`. Drop to `render()` with explicit coordinates if you need it.
+- Positioning is intentionally smaller than browser CSS: no percentages, z-index, fixed/sticky positioning, transforms, clipping/overflow model, or automatic page anchoring.
 - Font shaping is whatever pdf-lib and fontkit support. Complex Indic, Arabic, and Thai shaping isn't here. Full HarfBuzz requires a different stack, none of which run on Cloudflare Workers today.
 - PDF linearization (reordering the byte stream so byte 1 is page 1) is not done. Streaming generation is supported via `streamFlow`. Linearization is a separate post-process and out of scope.
 

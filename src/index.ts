@@ -64,6 +64,7 @@ export type {
   EdgesInput,
   Justify,
   Node,
+  Position,
   RGB,
   Size,
   TextProps

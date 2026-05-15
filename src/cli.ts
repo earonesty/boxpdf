@@ -130,12 +130,13 @@ Important APIs:
 
 - vstack(style, ...children): vertical box layout.
 - hstack(style, ...children): horizontal box layout.
-- text(content, style): text with wrapping when width is set, alignment, maxLines, underline, and strikethrough.
+- text(content, style): text with wrapping when width is set, alignment, maxLines, underline, strikethrough, and full-height default line boxes.
 - image(pdfImage, style): embedded PNG/JPEG image node.
 - hline(style), vline(style): rules.
 - spacer(size), flex(weight): fixed or growing space.
 - link({ href }, child): PDF link annotation over a child node.
 - keepTogether(style, ...children): paginate a group atomically.
+- position: "relative" / "absolute" on vstack/hstack styles supports top/right/bottom/left overlays.
 - renderFlow(pdf, nodes, options): paginated rendering with margins, headers, footers, metadata, and debug overlays.
 - renderToPdf(node, options): convenience helper that returns Uint8Array.
 - measure(node, parentWidth): measure without drawing.
@@ -148,7 +149,7 @@ Known limits:
 
 - No flex-shrink yet.
 - No CSS or browser layout engine.
-- No absolute positioning helper; use render() for precise placement.
+- Positioning is CSS-like but intentionally small: no percentages, z-index, fixed/sticky positioning, transforms, or clipping/overflow model.
 - Complex text shaping is limited by pdf-lib/fontkit.
 - Output is Uint8Array, not streaming PDF generation.
 

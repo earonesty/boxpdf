@@ -1,5 +1,5 @@
 import { edges, type Node, type Size } from "./types.js";
-import { ellipsize, fontAscent, measureText, wrapText } from "./text.js";
+import { ellipsize, fontLineHeight, measureText, wrapText } from "./text.js";
 
 export type MainAxis = "horizontal" | "vertical";
 
@@ -10,6 +10,10 @@ export interface MainAxisLayout {
   sizes: Size[];
   /** True when at least one child was shrunk during this resolution. */
   shrank: boolean;
+}
+
+function isAbsoluteBox(node: Node): boolean {
+  return (node.kind === "vstack" || node.kind === "hstack") && node.style.position === "absolute";
 }
 
 /**
@@ -38,7 +42,7 @@ export function measureContent(node: Node, parentWidth: number): Size {
       const intrinsicWidth = measureText(props.font, props.size, node.text);
       const slotWidth = props.width ?? intrinsicWidth;
       const wrapWidth = props.width ?? parentWidth;
-      const lineHeight = props.lineHeight ?? fontAscent(props.font, props.size);
+      const lineHeight = props.lineHeight ?? fontLineHeight(props.font, props.size);
       const lines = props.width
         ? clampLines(wrapText(props.font, props.size, node.text, wrapWidth), props.maxLines)
         : [node.text];
@@ -59,8 +63,9 @@ export function measureContent(node: Node, parentWidth: number): Size {
       const innerWidth = (fixedWidth ?? parentWidth) - inset.left - inset.right;
       const fixedHeight = node.style.height;
       const availableHeight = fixedHeight === undefined ? Infinity : fixedHeight - inset.top - inset.bottom;
-      const layout = resolveMainAxis(node.children, "vertical", innerWidth, availableHeight, node.gap);
-      const totalGap = node.gap * Math.max(0, node.children.length - 1);
+      const children = node.children.filter((child) => !isAbsoluteBox(child));
+      const layout = resolveMainAxis(children, "vertical", availableHeight, innerWidth, node.gap);
+      const totalGap = node.gap * Math.max(0, layout.children.length - 1);
       const totalHeight = layout.sizes.reduce((s, sz) => s + sz.height, 0) + totalGap;
       const maxChildWidth = layout.sizes.reduce((m, s) => (s.width > m ? s.width : m), 0);
       return {
@@ -76,8 +81,9 @@ export function measureContent(node: Node, parentWidth: number): Size {
       const inset = edges(node.style.padding);
       const fixedWidth = node.style.width;
       const innerWidth = (fixedWidth ?? parentWidth) - inset.left - inset.right;
-      const layout = resolveMainAxis(node.children, "horizontal", innerWidth, innerWidth, node.gap);
-      const totalGap = node.gap * Math.max(0, node.children.length - 1);
+      const children = node.children.filter((child) => !isAbsoluteBox(child));
+      const layout = resolveMainAxis(children, "horizontal", innerWidth, innerWidth, node.gap);
+      const totalGap = node.gap * Math.max(0, layout.children.length - 1);
       const totalWidth = layout.sizes.reduce((s, sz) => s + sz.width, 0) + totalGap;
       const maxChildHeight = layout.sizes.reduce((m, s) => (s.height > m ? s.height : m), 0);
       return {
@@ -100,21 +106,21 @@ export function measureContent(node: Node, parentWidth: number): Size {
  * not fire in that case.
  *
  * `availableCross` is what `measure(child, ...)` should receive as
- * `parentWidth` for sizing context. For an hstack, the main axis IS the width,
- * so the parentWidth passed to children IS availableMain.
+ * `parentWidth` for vertical stacks. For an hstack, the main axis IS the
+ * width, so the parentWidth passed to children IS availableMain.
  */
 export function resolveMainAxis(
   children: Node[],
   axis: MainAxis,
   availableMain: number,
-  _availableCross: number,
+  availableCross: number,
   gap: number
 ): MainAxisLayout {
+  children = children.filter((child) => !isAbsoluteBox(child));
   if (children.length === 0) return { children: [], sizes: [], shrank: false };
 
-  // Measure children with availableMain as their parentWidth — keeps text
-  // wrapping behavior consistent with the previous (pre-shrink) measure path.
-  const sizes = children.map((c) => measure(c, availableMain));
+  const parentWidth = axis === "horizontal" ? availableMain : availableCross;
+  const sizes = children.map((c) => measure(c, parentWidth));
   if (!Number.isFinite(availableMain)) {
     return { children, sizes, shrank: false };
   }
@@ -144,7 +150,7 @@ export function resolveMainAxis(
   if (!shrank) return { children, sizes, shrank: false };
   // Re-measure shrunken children so cross-axis (e.g. wrapped text height)
   // reflects the new slot.
-  const newSizes = newChildren.map((c) => measure(c, availableMain));
+  const newSizes = newChildren.map((c) => measure(c, parentWidth));
   return { children: newChildren, sizes: newSizes, shrank: true };
 }
 
@@ -318,6 +324,7 @@ export function nodeMargin(node: Node): { top: number; right: number; bottom: nu
 }
 
 export function nodeGrow(node: Node): number {
+  if (isAbsoluteBox(node)) return 0;
   switch (node.kind) {
     case "vstack":
     case "hstack":
@@ -332,6 +339,7 @@ export function nodeGrow(node: Node): number {
 }
 
 export function nodeShrink(node: Node): number {
+  if (isAbsoluteBox(node)) return 0;
   switch (node.kind) {
     case "vstack":
     case "hstack":

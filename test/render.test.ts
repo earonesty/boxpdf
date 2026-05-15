@@ -1,9 +1,11 @@
-import { describe, expect, it, beforeAll } from "vitest";
+import { describe, expect, it, beforeAll, vi } from "vitest";
 import { PDFDocument, StandardFonts, type PDFFont } from "pdf-lib";
 import { hex } from "../src/colors.js";
 import { hline, hstack, keepTogether, spacer, text, vstack } from "../src/nodes.js";
 import { render } from "../src/render.js";
 import { renderFlow, renderToPdf } from "../src/document.js";
+import { measure } from "../src/measure.js";
+import { fontAscent } from "../src/text.js";
 
 let font: PDFFont;
 let bold: PDFFont;
@@ -160,5 +162,106 @@ describe("render", () => {
       )
     );
     expect(bytes.byteLength).toBeGreaterThan(200);
+  });
+
+  it("absolute stack children are ignored by parent measurement", () => {
+    const flow = text("Flow", { size: 12, font });
+    const node = vstack(
+      { gap: 10 },
+      flow,
+      hstack(
+        { position: "absolute", width: 300, height: 40 },
+        text("Absolute", { size: 12, font })
+      )
+    );
+    expect(measure(node, 500)).toEqual(measure(flow, 500));
+  });
+
+  it("positions an absolute child with top and right against a relative parent", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([300, 200]);
+    const drawText = vi.spyOn(page, "drawText");
+    const node = vstack(
+      { position: "relative", width: 200, height: 100 },
+      text("Flow", { size: 12, font }),
+      hstack(
+        { position: "absolute", top: 12, right: 20, width: 50 },
+        text("ABS", { size: 12, font })
+      )
+    );
+
+    render(node, page, 10, 190, 200);
+
+    const absCall = drawText.mock.calls.find((call) => call[0] === "ABS");
+    expect(absCall).toBeDefined();
+    expect(absCall![1]?.x).toBeCloseTo(140, 5);
+    expect(absCall![1]?.y).toBeCloseTo(178 - fontAscent(font, 12), 5);
+  });
+
+  it("uses the nearest relative ancestor as the absolute containing block", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([400, 240]);
+    const drawText = vi.spyOn(page, "drawText");
+    const node = vstack(
+      { position: "relative", width: 300, height: 160, padding: 10 },
+      vstack(
+        { width: 100, padding: 5 },
+        text("Inner", { size: 12, font }),
+        hstack(
+          { position: "absolute", top: 20, left: 250, width: 40 },
+          text("Pin", { size: 12, font })
+        )
+      )
+    );
+
+    render(node, page, 10, 220, 300);
+
+    const pinCall = drawText.mock.calls.find((call) => call[0] === "Pin");
+    expect(pinCall).toBeDefined();
+    expect(pinCall![1]?.x).toBeCloseTo(260, 5);
+    expect(pinCall![1]?.y).toBeCloseTo(200 - fontAscent(font, 12), 5);
+  });
+
+  it("stretches absolute boxes when left/right or top/bottom are both set", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([300, 200]);
+    const drawLine = vi.spyOn(page, "drawLine");
+    const node = vstack(
+      { position: "relative", width: 200, height: 100 },
+      vstack(
+        { position: "absolute", left: 20, right: 30, top: 10, bottom: 70 },
+        hline({ color: hex("#111111") })
+      )
+    );
+
+    render(node, page, 10, 190, 200);
+
+    const lineCall = drawLine.mock.calls[0]?.[0];
+    expect(lineCall?.start.x).toBeCloseTo(30, 5);
+    expect(lineCall?.end.x).toBeCloseTo(180, 5);
+    expect(lineCall?.start.y).toBeCloseTo(179.5, 5);
+  });
+
+  it("lets absolute boxes contain their own absolute descendants", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([300, 200]);
+    const drawText = vi.spyOn(page, "drawText");
+    const node = vstack(
+      { position: "relative", width: 200, height: 100 },
+      vstack(
+        { position: "absolute", left: 20, top: 10, width: 100, height: 50 },
+        hstack(
+          { position: "absolute", left: 30, top: 15, width: 40 },
+          text("Nested", { size: 12, font })
+        )
+      )
+    );
+
+    render(node, page, 10, 190, 200);
+
+    const nestedCall = drawText.mock.calls.find((call) => call[0] === "Nested");
+    expect(nestedCall).toBeDefined();
+    expect(nestedCall![1]?.x).toBeCloseTo(60, 5);
+    expect(nestedCall![1]?.y).toBeCloseTo(165 - fontAscent(font, 12), 5);
   });
 });

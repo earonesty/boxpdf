@@ -2,6 +2,7 @@ import { describe, expect, it, beforeAll } from "vitest";
 import { PDFDocument, StandardFonts, type PDFFont } from "pdf-lib";
 import { hline, hstack, spacer, text, vstack } from "../src/nodes.js";
 import { measure } from "../src/measure.js";
+import { fontLineHeight } from "../src/text.js";
 
 let font: PDFFont;
 let bold: PDFFont;
@@ -18,6 +19,11 @@ describe("measure", () => {
     const size = measure(node, 500);
     expect(size.width).toBeGreaterThan(0);
     expect(size.height).toBeGreaterThan(0);
+  });
+
+  it("uses full font height as the default text line height", () => {
+    const node = text("debug", { size: 12, font });
+    expect(measure(node, 500).height).toBeCloseTo(fontLineHeight(font, 12), 5);
   });
 
   it("wraps text when width is set and intrinsic exceeds it", () => {

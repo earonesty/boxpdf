@@ -1,6 +1,6 @@
 import { PDFArray, PDFName, PDFString, rgb, type PDFPage } from "pdf-lib";
 import { edges, type Justify, type Node, type RGB } from "./types.js";
-import { fontAscent, measureText } from "./text.js";
+import { fontAscent, fontLineHeight, measureText } from "./text.js";
 import {
   layoutText,
   measure,
@@ -16,6 +16,17 @@ export interface RenderOptions {
 }
 
 let currentOptions: RenderOptions = {};
+
+interface ContainingBlock {
+  x: number;
+  yTop: number;
+  width: number;
+  height: number;
+}
+
+function isAbsoluteBox(node: Node): node is Extract<Node, { kind: "vstack" | "hstack" }> {
+  return (node.kind === "vstack" || node.kind === "hstack") && node.style.position === "absolute";
+}
 
 function toRgb(color: RGB | undefined): ReturnType<typeof rgb> | undefined {
   return color ? rgb(color.r, color.g, color.b) : undefined;
@@ -49,8 +60,15 @@ function renderWithCurrent(
   page: PDFPage,
   x: number,
   yTop: number,
-  parentWidth: number
+  parentWidth: number,
+  containingBlock?: ContainingBlock
 ): number {
+  containingBlock ??= {
+    x,
+    yTop,
+    width: parentWidth,
+    height: measure(node, parentWidth).height
+  };
   const m = nodeMargin(node);
   if (currentOptions.debug) {
     const outer = measure(node, parentWidth);
@@ -61,7 +79,7 @@ function renderWithCurrent(
   const innerX = x + m.left;
   const innerYTop = yTop - m.top;
   const innerParentWidth = parentWidth - m.left - m.right;
-  const consumed = renderContent(node, page, innerX, innerYTop, innerParentWidth);
+  const consumed = renderContent(node, page, innerX, innerYTop, innerParentWidth, containingBlock);
   if (currentOptions.debug) {
     strokeDebugRect(page, innerX, innerYTop, parentWidth - m.left - m.right, consumed, DEBUG_STROKE);
   }
@@ -95,12 +113,19 @@ function strokeDebugRect(
   });
 }
 
-function renderContent(node: Node, page: PDFPage, x: number, yTop: number, parentWidth: number): number {
+function renderContent(
+  node: Node,
+  page: PDFPage,
+  x: number,
+  yTop: number,
+  parentWidth: number,
+  containingBlock: ContainingBlock
+): number {
   switch (node.kind) {
     case "text": {
       const { props } = node;
       const lines = layoutText(node, props.width ?? parentWidth);
-      const lineHeight = props.lineHeight ?? fontAscent(props.font, props.size);
+      const lineHeight = props.lineHeight ?? fontLineHeight(props.font, props.size);
       const slotWidth = props.width ?? measureText(props.font, props.size, node.text);
       const decorationThickness = Math.max(0.5, props.size * 0.06);
       const decorationColor = toRgb(props.color);
@@ -175,7 +200,7 @@ function renderContent(node: Node, page: PDFPage, x: number, yTop: number, paren
     }
     case "link": {
       const childSize = measure(node.child, parentWidth);
-      const consumed = renderWithCurrent(node.child, page, x, yTop, parentWidth);
+      const consumed = renderWithCurrent(node.child, page, x, yTop, parentWidth, containingBlock);
       attachLinkAnnotation(page, x, yTop - childSize.height, childSize.width, childSize.height, node.href);
       return consumed;
     }
@@ -194,9 +219,9 @@ function renderContent(node: Node, page: PDFPage, x: number, yTop: number, paren
       return node.height;
     }
     case "vstack":
-      return renderVStack(node, page, x, yTop, parentWidth);
+      return renderVStack(node, page, x, yTop, parentWidth, containingBlock);
     case "hstack":
-      return renderHStack(node, page, x, yTop, parentWidth);
+      return renderHStack(node, page, x, yTop, parentWidth, containingBlock);
   }
 }
 
@@ -234,12 +259,19 @@ function renderVStack(
   page: PDFPage,
   x: number,
   yTop: number,
-  parentWidth: number
+  parentWidth: number,
+  containingBlock: ContainingBlock
 ): number {
   const inset = edges(node.style.padding);
   const intrinsic = measureContent(node, parentWidth);
   const boxWidth = node.style.width ?? intrinsic.width;
   const boxHeight = node.style.height ?? intrinsic.height;
+  const flowChildren = node.children.filter((child) => !isAbsoluteBox(child));
+  const absoluteChildren = node.children.filter(isAbsoluteBox);
+  const childContainingBlock =
+    node.style.position !== undefined
+      ? { x, yTop, width: boxWidth, height: boxHeight }
+      : containingBlock;
 
   drawBackground(page, x, yTop, boxWidth, boxHeight, node.style.background, node.style.borderRadius);
   drawBorder(page, x, yTop, boxWidth, boxHeight, node.style.border, node.style.borderRadius);
@@ -253,7 +285,7 @@ function renderVStack(
   // re-sized before grow/justify positioning runs. When the vstack has no
   // fixed height, no overflow is possible so shrink is a no-op.
   const availableMain = node.style.height === undefined ? Infinity : innerHeight;
-  const layout = resolveMainAxis(node.children, "vertical", availableMain, innerWidth, node.gap);
+  const layout = resolveMainAxis(flowChildren, "vertical", availableMain, innerWidth, node.gap);
   const children = layout.children;
   const childSizes = layout.sizes;
 
@@ -278,7 +310,7 @@ function renderVStack(
       const slotHeight = childSizes[i]?.height ?? 0;
       const widthForChild = resolveCrossAxisWidth(child, childSizes[i]?.width ?? 0, innerWidth);
       const childX = resolveCrossAxisX(node.align, innerX, innerWidth, widthForChild);
-      renderWithFixedHeight(child, page, childX, cursorY, widthForChild, slotHeight);
+      renderWithFixedHeight(child, page, childX, cursorY, widthForChild, slotHeight, childContainingBlock);
       cursorY -= slotHeight;
       if (i < children.length - 1) cursorY -= offsets.between;
     });
@@ -289,10 +321,12 @@ function renderVStack(
       const slotHeight = baseHeight + (extraPerChild[i] ?? 0);
       const widthForChild = resolveCrossAxisWidth(child, childSizes[i]?.width ?? 0, innerWidth);
       const childX = resolveCrossAxisX(node.align, innerX, innerWidth, widthForChild);
-      renderWithFixedHeight(child, page, childX, cursorY, widthForChild, slotHeight);
+      renderWithFixedHeight(child, page, childX, cursorY, widthForChild, slotHeight, childContainingBlock);
       cursorY -= slotHeight;
     });
   }
+
+  absoluteChildren.forEach((child) => renderAbsoluteBox(child, page, childContainingBlock));
 
   return boxHeight;
 }
@@ -302,12 +336,19 @@ function renderHStack(
   page: PDFPage,
   x: number,
   yTop: number,
-  parentWidth: number
+  parentWidth: number,
+  containingBlock: ContainingBlock
 ): number {
   const inset = edges(node.style.padding);
   const intrinsic = measureContent(node, parentWidth);
   const boxWidth = node.style.width ?? intrinsic.width;
   const boxHeight = node.style.height ?? intrinsic.height;
+  const flowChildren = node.children.filter((child) => !isAbsoluteBox(child));
+  const absoluteChildren = node.children.filter(isAbsoluteBox);
+  const childContainingBlock =
+    node.style.position !== undefined
+      ? { x, yTop, width: boxWidth, height: boxHeight }
+      : containingBlock;
 
   drawBackground(page, x, yTop, boxWidth, boxHeight, node.style.background, node.style.borderRadius);
   drawBorder(page, x, yTop, boxWidth, boxHeight, node.style.border, node.style.borderRadius);
@@ -319,7 +360,7 @@ function renderHStack(
 
   // Resolve shrink before allocating slots — keeps grow/shrink independent
   // (shrink fires when intrinsic > inner, grow fires when intrinsic < inner).
-  const layout = resolveMainAxis(node.children, "horizontal", innerWidth, innerWidth, node.gap);
+  const layout = resolveMainAxis(flowChildren, "horizontal", innerWidth, innerWidth, node.gap);
   const children = layout.children;
   const childSizes = layout.sizes;
 
@@ -342,7 +383,7 @@ function renderHStack(
       const slotWidth = childSizes[i]?.width ?? 0;
       const heightForChild = resolveCrossAxisHeight(child, childSizes[i]?.height ?? 0, innerHeight);
       const childY = resolveCrossAxisY(node.align, innerYTop, innerHeight, heightForChild);
-      renderWithFixedWidth(child, page, cursorX, childY, slotWidth);
+      renderWithFixedWidth(child, page, cursorX, childY, slotWidth, childContainingBlock);
       cursorX += slotWidth;
       if (i < children.length - 1) cursorX += offsets.between;
     });
@@ -356,10 +397,12 @@ function renderHStack(
       const slotWidth = baseWidth + (extraPerChild[i] ?? 0);
       const heightForChild = resolveCrossAxisHeight(child, childSizes[i]?.height ?? 0, innerHeight);
       const childY = resolveCrossAxisY(node.align, innerYTop, innerHeight, heightForChild);
-      renderWithFixedWidth(child, page, cursorX, childY, slotWidth);
+      renderWithFixedWidth(child, page, cursorX, childY, slotWidth, childContainingBlock);
       cursorX += slotWidth;
     });
   }
+
+  absoluteChildren.forEach((child) => renderAbsoluteBox(child, page, childContainingBlock));
 
   return boxHeight;
 }
@@ -370,11 +413,12 @@ function renderWithFixedHeight(
   x: number,
   yTop: number,
   parentWidth: number,
-  _slotHeight: number
+  _slotHeight: number,
+  containingBlock: ContainingBlock
 ): number {
   // Currently we ignore slotHeight enforcement for non-grown children; flex grow
   // is handled by passing the resolved height into render via the slot above.
-  return renderWithCurrent(child, page, x, yTop, parentWidth);
+  return renderWithCurrent(child, page, x, yTop, parentWidth, containingBlock);
 }
 
 function renderWithFixedWidth(
@@ -382,9 +426,49 @@ function renderWithFixedWidth(
   page: PDFPage,
   x: number,
   yTop: number,
-  _slotWidth: number
+  _slotWidth: number,
+  containingBlock: ContainingBlock
 ): number {
-  return renderWithCurrent(child, page, x, yTop, _slotWidth);
+  return renderWithCurrent(child, page, x, yTop, _slotWidth, containingBlock);
+}
+
+function renderAbsoluteBox(
+  child: Extract<Node, { kind: "vstack" | "hstack" }>,
+  page: PDFPage,
+  containingBlock: ContainingBlock
+): void {
+  const positioned = resolveAbsoluteSize(child, containingBlock);
+  const size = measure(positioned, positioned.style.width ?? containingBlock.width);
+  const x =
+    positioned.style.left !== undefined
+      ? containingBlock.x + positioned.style.left
+      : positioned.style.right !== undefined
+        ? containingBlock.x + containingBlock.width - positioned.style.right - size.width
+        : containingBlock.x;
+  const yTop =
+    positioned.style.top !== undefined
+      ? containingBlock.yTop - positioned.style.top
+      : positioned.style.bottom !== undefined
+        ? containingBlock.yTop - containingBlock.height + positioned.style.bottom + size.height
+        : containingBlock.yTop;
+  renderWithCurrent(positioned, page, x, yTop, positioned.style.width ?? size.width, containingBlock);
+}
+
+function resolveAbsoluteSize(
+  node: Extract<Node, { kind: "vstack" | "hstack" }>,
+  containingBlock: ContainingBlock
+): Extract<Node, { kind: "vstack" | "hstack" }> {
+  const style = node.style;
+  const width =
+    style.width === undefined && style.left !== undefined && style.right !== undefined
+      ? Math.max(0, containingBlock.width - style.left - style.right)
+      : style.width;
+  const height =
+    style.height === undefined && style.top !== undefined && style.bottom !== undefined
+      ? Math.max(0, containingBlock.height - style.top - style.bottom)
+      : style.height;
+  if (width === style.width && height === style.height) return node;
+  return { ...node, style: { ...style, width, height } };
 }
 
 interface MainAxisOffsets {

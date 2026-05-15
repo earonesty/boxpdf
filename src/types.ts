@@ -8,6 +8,7 @@ export type EdgesInput = number | Partial<Edges>;
 export type Align = "left" | "center" | "right";
 export type Justify = "start" | "center" | "end" | "between" | "around" | "evenly";
 export type CrossAxis = "start" | "center" | "end" | "stretch";
+export type Position = "relative" | "absolute";
 
 export interface BoxStyle {
   /** Fixed width; if omitted, the box sizes to its content. */
@@ -24,6 +25,20 @@ export interface BoxStyle {
   border?: { color: RGB; width: number };
   /** Corner radius in points. Applies to background and border. */
   borderRadius?: number;
+  /**
+   * CSS-like positioning for boxes. Positioned boxes establish the containing
+   * block for absolute descendants. `absolute` removes the box from stack flow
+   * and positions it against the nearest positioned ancestor, or render root.
+   */
+  position?: Position;
+  /** Offset from the containing block's top edge when position is absolute. */
+  top?: number;
+  /** Offset from the containing block's right edge when position is absolute. */
+  right?: number;
+  /** Offset from the containing block's bottom edge when position is absolute. */
+  bottom?: number;
+  /** Offset from the containing block's left edge when position is absolute. */
+  left?: number;
   /** Flex grow weight (siblings divide remaining main-axis space proportionally). */
   grow?: number;
   /**
