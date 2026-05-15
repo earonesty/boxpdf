@@ -96,6 +96,7 @@ Container `style`:
 | `borderRadius` | number | Corner radius. |
 | `position` | `"relative"` \| `"absolute"` | CSS-like positioning for boxes. |
 | `top` / `right` / `bottom` / `left` | number | Absolute offsets in points. |
+| `zIndex` | number | Paint order for positioned boxes; higher values render later. |
 | `grow` | number | Flex grow weight along the parent's main axis. |
 | `shrink` | number | Flex shrink weight. |
 | `gap` | number | Spacing between children. |
@@ -339,11 +340,12 @@ Behavior:
 - Absolute boxes render after normal children, so they can be used for stamps, badges, overlays, and watermarks.
 - `top`, `right`, `bottom`, and `left` are point offsets from the nearest positioned ancestor. If there is no positioned ancestor, they resolve against the current `render()` root.
 - If both `left` and `right` are set and `width` is omitted, the box stretches to the remaining width. `top` plus `bottom` does the same for height.
+- Absolute siblings render by `zIndex` from low to high. Boxes with the same `zIndex` keep document order.
 - Absolute boxes do not affect parent measurement, gaps, flex grow/shrink, or pagination. Give the containing box a fixed `width` and `height` when you need stable placement.
 
 ## Limitations
 
-- Positioning is intentionally smaller than browser CSS: no percentages, z-index, fixed/sticky positioning, transforms, clipping/overflow model, or automatic page anchoring.
+- Positioning supports relative containing boxes, out-of-flow absolute boxes, point offsets, `zIndex`, and stretch from paired edges.
 - Font shaping is whatever pdf-lib and fontkit support. Complex Indic, Arabic, and Thai shaping isn't here. Full HarfBuzz requires a different stack, none of which run on Cloudflare Workers today.
 - PDF linearization (reordering the byte stream so byte 1 is page 1) is not done. Streaming generation is supported via `streamFlow`. Linearization is a separate post-process and out of scope.
 

@@ -326,7 +326,7 @@ function renderVStack(
     });
   }
 
-  absoluteChildren.forEach((child) => renderAbsoluteBox(child, page, childContainingBlock));
+  renderAbsoluteChildren(absoluteChildren, page, childContainingBlock);
 
   return boxHeight;
 }
@@ -402,7 +402,7 @@ function renderHStack(
     });
   }
 
-  absoluteChildren.forEach((child) => renderAbsoluteBox(child, page, childContainingBlock));
+  renderAbsoluteChildren(absoluteChildren, page, childContainingBlock);
 
   return boxHeight;
 }
@@ -452,6 +452,17 @@ function renderAbsoluteBox(
         ? containingBlock.yTop - containingBlock.height + positioned.style.bottom + size.height
         : containingBlock.yTop;
   renderWithCurrent(positioned, page, x, yTop, positioned.style.width ?? size.width, containingBlock);
+}
+
+function renderAbsoluteChildren(
+  children: Array<Extract<Node, { kind: "vstack" | "hstack" }>>,
+  page: PDFPage,
+  containingBlock: ContainingBlock
+): void {
+  children
+    .map((child, index) => ({ child, index }))
+    .sort((a, b) => (a.child.style.zIndex ?? 0) - (b.child.style.zIndex ?? 0) || a.index - b.index)
+    .forEach(({ child }) => renderAbsoluteBox(child, page, containingBlock));
 }
 
 function resolveAbsoluteSize(

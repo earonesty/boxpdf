@@ -39,6 +39,11 @@ export interface BoxStyle {
   bottom?: number;
   /** Offset from the containing block's left edge when position is absolute. */
   left?: number;
+  /**
+   * Paint order for positioned boxes. Higher values render later, above lower
+   * values. Boxes with the same `zIndex` keep document order. Default `0`.
+   */
+  zIndex?: number;
   /** Flex grow weight (siblings divide remaining main-axis space proportionally). */
   grow?: number;
   /**

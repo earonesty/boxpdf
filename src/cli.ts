@@ -136,7 +136,7 @@ Important APIs:
 - spacer(size), flex(weight): fixed or growing space.
 - link({ href }, child): PDF link annotation over a child node.
 - keepTogether(style, ...children): paginate a group atomically.
-- position: "relative" / "absolute" on vstack/hstack styles supports top/right/bottom/left overlays.
+- position: "relative" / "absolute" on vstack/hstack styles supports top/right/bottom/left overlays and zIndex paint order.
 - renderFlow(pdf, nodes, options): paginated rendering with margins, headers, footers, metadata, and debug overlays.
 - renderToPdf(node, options): convenience helper that returns Uint8Array.
 - measure(node, parentWidth): measure without drawing.
@@ -149,7 +149,7 @@ Known limits:
 
 - No flex-shrink yet.
 - No CSS or browser layout engine.
-- Positioning is CSS-like but intentionally small: no percentages, z-index, fixed/sticky positioning, transforms, or clipping/overflow model.
+- Positioning supports relative containing boxes, out-of-flow absolute boxes, point offsets, zIndex, and stretch from paired edges.
 - Complex text shaping is limited by pdf-lib/fontkit.
 - Output is Uint8Array, not streaming PDF generation.
 

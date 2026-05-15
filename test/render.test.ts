@@ -264,4 +264,30 @@ describe("render", () => {
     expect(nestedCall![1]?.x).toBeCloseTo(60, 5);
     expect(nestedCall![1]?.y).toBeCloseTo(165 - fontAscent(font, 12), 5);
   });
+
+  it("renders absolute siblings by zIndex, preserving document order for ties", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([300, 200]);
+    const drawText = vi.spyOn(page, "drawText");
+    const node = vstack(
+      { position: "relative", width: 200, height: 100 },
+      hstack(
+        { position: "absolute", top: 10, left: 10, width: 40, zIndex: 2 },
+        text("top", { size: 12, font })
+      ),
+      hstack(
+        { position: "absolute", top: 10, left: 10, width: 40, zIndex: 1 },
+        text("bottom", { size: 12, font })
+      ),
+      hstack(
+        { position: "absolute", top: 10, left: 10, width: 40, zIndex: 2 },
+        text("top-tie", { size: 12, font })
+      )
+    );
+
+    render(node, page, 10, 190, 200);
+
+    const rendered = drawText.mock.calls.map((call) => call[0]);
+    expect(rendered).toEqual(["bottom", "top", "top-tie"]);
+  });
 });
