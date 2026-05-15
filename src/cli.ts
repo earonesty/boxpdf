@@ -133,12 +133,15 @@ Important APIs:
 - text(content, style): text with wrapping when width is set, alignment, maxLines, underline, strikethrough, and full-height default line boxes.
 - paragraph(style, ...runs): mixed styled/link text runs that wrap together.
 - image(pdfImage, style): embedded PNG/JPEG image node.
+- imageFit(pdfImage, { width, height, fit }): image centered in a fixed rectangle, scaled to contain or cover with clipping.
 - hline(style), vline(style): rules.
 - spacer(size), flex(weight): fixed or growing space.
 - link({ href }, child): PDF link annotation over a child node.
 - keepTogether(style, ...children): paginate a group atomically.
-- table(options): fixed/auto/fr columns with header/footer rows, dividers, colSpan, styled cells, and vertical alignment.
+- table(options): fixed/auto/fr columns with header/footer rows, dividers, colSpan, styled cells, per-side borders, and vertical alignment.
 - position: "relative" / "absolute" on vstack/hstack styles supports top/right/bottom/left overlays and zIndex paint order.
+- borderSides: per-side box border strokes with top/right/bottom/left { color, width }.
+- aspectRatio(ratio, { width } | { height }): derive the missing dimension.
 - renderFlow(pdf, nodes, options): paginated rendering with margins, headers, footers, metadata, and debug overlays.
 - renderToPdf(node, options): convenience helper that returns Uint8Array.
 - measure(node, parentWidth): measure without drawing.

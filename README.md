@@ -39,7 +39,7 @@ npm install boxpdf pdf-lib
 ## What it does
 
 - Declarative layout primitives: `vstack`, `hstack`, `text`, `image`, `hline`, `vline`, `spacer`, `flex`, `keepTogether`, `link`, `svgPath`, `table`.
-- Padding, margin, background, border, borderRadius, flex-grow, flex-shrink, justify, align.
+- Padding, margin, background, borders, borderRadius, flex-grow, flex-shrink, justify, align.
 - Word wrapping with `maxLines` truncation and optional `breakWords`.
 - Themes: `cleanTheme`, `stripeTheme`, `editorialTheme`, `brutalistTheme`.
 - Multi-page flow with per-page headers and footers.
@@ -93,6 +93,7 @@ Container `style`:
 | `padding` / `margin` | number \| `{ top, right, bottom, left }` | Shorthand or per-side. |
 | `background` | RGB | Solid fill. |
 | `border` | `{ color, width }` | 1pt+ stroke around the box. |
+| `borderSides` | `{ top?, right?, bottom?, left? }` | Per-side strokes using `{ color, width }`. |
 | `borderRadius` | number | Corner radius. |
 | `position` | `"relative"` \| `"absolute"` | CSS-like positioning for boxes. |
 | `top` / `right` / `bottom` / `left` | number | Absolute offsets in points. |
@@ -108,11 +109,12 @@ Container `style`:
 - `text(content, { size, font, color?, align?, width?, lineHeight?, maxLines?, underline?, strikethrough?, margin? })`. Word-wraps when `width` is set. Truncates with ellipsis when `maxLines` is set. Default `lineHeight` uses the font's full height, including descenders.
 - `paragraph({ width?, align?, lineHeight?, margin? }, ...runs)`. Mixed inline text runs that wrap together as one paragraph. Use `run(text, style)` and `linkRun(text, style, href)` for styled/link segments.
 - `image(pdfImage, { width, height, margin? })`. Takes an already-embedded `PDFImage`.
+- `imageFit(pdfImage, { width, height, fit?, margin? })`. Draws an image centered in a fixed rectangle, scaled to contain (default) or cover with clipping.
 - `spacer(size, { grow? })` / `flex(weight = 1)`. Fixed or growing gap.
 - `hline({ color, thickness?, width?, margin? })`.
 - `vline({ color, thickness?, height?, margin? })`.
 - `link({ href }, child)`. Wraps a child and registers a PDF Link annotation over its rendered bounding box.
-- `table({ columns, rows, ... })`. Fixed / auto / fractional columns with header/footer rows, dividers, and styled cells. Cells can be plain nodes or `{ content, colSpan?, padding?, background?, border?, borderRadius?, align?, valign? }`.
+- `table({ columns, rows, ... })`. Fixed / auto / fractional columns with header/footer rows, dividers, and styled cells. Cells can be plain nodes or `{ content, colSpan?, padding?, background?, border?, borderSides?, borderRadius?, align?, valign? }`.
 
 ### Rendering
 
@@ -129,6 +131,7 @@ Pass `{ debug: true }` to outline content boxes in red and margin boxes in orang
 
 - `loadFont(pdf, source, options?)`. Embed a TTF from URL, bytes, base64, or data URL.
 - `loadImage(pdf, source)`. Embed a PNG or JPEG (auto-detected).
+- `aspectRatio(ratio, { width })` / `aspectRatio(ratio, { height })`. Derive the missing dimension for fixed-ratio boxes or images.
 - `formatCurrency(n, { currency, locale })`. `Intl.NumberFormat` wrapper.
 - `defineStyles({ ... })`. Typed identity for reusable style bundles.
 - `hex("#1f8a4d")` / `rgb255(31, 138, 77)`. Color builders.

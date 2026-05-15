@@ -10,6 +10,13 @@ export type Align = "left" | "center" | "right";
 export type Justify = "start" | "center" | "end" | "between" | "around" | "evenly";
 export type CrossAxis = "start" | "center" | "end" | "stretch";
 export type Position = "relative" | "absolute";
+export type Border = { color: RGB; width: number };
+export type BorderSides = {
+  top?: Border;
+  right?: Border;
+  bottom?: Border;
+  left?: Border;
+};
 
 export interface BoxStyle {
   /** Fixed width; if omitted, the box sizes to its content. */
@@ -23,7 +30,9 @@ export interface BoxStyle {
   /** Solid fill color. */
   background?: RGB;
   /** Border specification. */
-  border?: { color: RGB; width: number };
+  border?: Border;
+  /** Per-side border strokes. Square-corner; use `border` for rounded all-side borders. */
+  borderSides?: BorderSides;
   /** Corner radius in points. Applies to background and border. */
   borderRadius?: number;
   /**
@@ -124,6 +133,17 @@ export type Node =
       image: PDFImage;
       width: number;
       height: number;
+      margin?: EdgesInput;
+    }
+  | {
+      kind: "imageBox";
+      image: PDFImage;
+      width: number;
+      height: number;
+      imageWidth: number;
+      imageHeight: number;
+      offsetX: number;
+      offsetY: number;
       margin?: EdgesInput;
     }
   | {

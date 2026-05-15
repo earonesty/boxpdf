@@ -1,6 +1,7 @@
-import { describe, expect, it, beforeAll } from "vitest";
+import { describe, expect, it, beforeAll, vi } from "vitest";
 import { PDFDocument, StandardFonts, type PDFFont } from "pdf-lib";
 import { hex, renderToPdf, table, text, vstack } from "../src/index.js";
+import { render } from "../src/render.js";
 import { measure } from "../src/measure.js";
 
 let font: PDFFont;
@@ -82,6 +83,7 @@ describe("table()", () => {
               padding: 8,
               background: hex("#f1f5f9"),
               border: { color: hex("#cbd5e1"), width: 1 },
+              borderSides: { bottom: { color: hex("#64748b"), width: 2 } },
               align: "center"
             }
           ],
@@ -102,5 +104,42 @@ describe("table()", () => {
       })
     );
     expect(bytes.byteLength).toBeGreaterThan(300);
+  });
+
+  it("aligns styled cell content vertically within the row height", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([420, 240]);
+    const drawText = vi.spyOn(page, "drawText");
+    const node = table({
+      width: 360,
+      columns: [{ width: 120 }, { width: 120 }, { width: 120 }],
+      rows: [
+        [
+          {
+            content: vstack(
+              { gap: 2 },
+              cell("top row"),
+              cell("middle row"),
+              cell("bottom row")
+            ),
+            padding: 8
+          },
+          { content: cell("middle"), padding: 8, valign: "middle" },
+          { content: cell("bottom"), padding: 8, valign: "bottom" }
+        ]
+      ],
+      columnGap: 0
+    });
+
+    render(node, page, 10, 220, 360);
+
+    const top = drawText.mock.calls.find((call) => call[0] === "top row")?.[1]?.y;
+    const middle = drawText.mock.calls.find((call) => call[0] === "middle")?.[1]?.y;
+    const bottom = drawText.mock.calls.find((call) => call[0] === "bottom")?.[1]?.y;
+    expect(top).toBeDefined();
+    expect(middle).toBeDefined();
+    expect(bottom).toBeDefined();
+    expect(middle!).toBeLessThan(top!);
+    expect(bottom!).toBeLessThan(middle!);
   });
 });

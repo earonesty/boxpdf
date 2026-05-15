@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeAll, vi } from "vitest";
 import { PDFDocument, StandardFonts, type PDFFont } from "pdf-lib";
 import { hex } from "../src/colors.js";
-import { hline, hstack, keepTogether, spacer, text, vstack } from "../src/nodes.js";
+import { hline, hstack, imageFit, keepTogether, spacer, text, vstack } from "../src/nodes.js";
 import { render } from "../src/render.js";
 import { renderFlow, renderToPdf } from "../src/document.js";
 import { measure } from "../src/measure.js";
@@ -86,6 +86,55 @@ describe("render", () => {
       )
     );
     expect(bytes.byteLength).toBeGreaterThan(200);
+  });
+
+  it("draws per-side borders inside the box bounds", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([240, 220]);
+    const drawLine = vi.spyOn(page, "drawLine");
+    const node = vstack({
+      width: 100,
+      height: 50,
+      borderSides: {
+        top: { color: hex("#111111"), width: 2 },
+        right: { color: hex("#222222"), width: 4 },
+        bottom: { color: hex("#333333"), width: 6 },
+        left: { color: hex("#444444"), width: 8 }
+      }
+    });
+
+    render(node, page, 10, 190, 200);
+
+    expect(drawLine).toHaveBeenCalledTimes(4);
+    expect(drawLine.mock.calls[0]?.[0]?.start).toMatchObject({ x: 10, y: 189 });
+    expect(drawLine.mock.calls[0]?.[0]?.end).toMatchObject({ x: 110, y: 189 });
+    expect(drawLine.mock.calls[1]?.[0]?.start).toMatchObject({ x: 108, y: 190 });
+    expect(drawLine.mock.calls[1]?.[0]?.end).toMatchObject({ x: 108, y: 140 });
+    expect(drawLine.mock.calls[2]?.[0]?.start).toMatchObject({ x: 10, y: 143 });
+    expect(drawLine.mock.calls[2]?.[0]?.end).toMatchObject({ x: 110, y: 143 });
+    expect(drawLine.mock.calls[3]?.[0]?.start).toMatchObject({ x: 14, y: 190 });
+    expect(drawLine.mock.calls[3]?.[0]?.end).toMatchObject({ x: 14, y: 140 });
+  });
+
+  it("renders fitted images as a clipped fixed-size box", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([240, 220]);
+    const drawImage = vi.spyOn(page, "drawImage").mockImplementation(() => {});
+    const pushOperators = vi.spyOn(page, "pushOperators");
+    const node = imageFit({ width: 400, height: 200 } as any, {
+      width: 100,
+      height: 100,
+      fit: "cover"
+    });
+
+    render(node, page, 10, 190, 200);
+
+    expect(drawImage).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ x: -40, y: 90, width: 200, height: 100 })
+    );
+    expect(pushOperators).toHaveBeenCalledTimes(2);
+    expect(measure(node, 200)).toEqual({ width: 100, height: 100 });
   });
 
   it("debug option produces a larger PDF than non-debug for the same layout", async () => {

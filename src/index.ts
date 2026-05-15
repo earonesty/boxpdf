@@ -8,11 +8,13 @@
  */
 
 export {
+  aspectRatio,
   flex,
   group,
   hline,
   hstack,
   image,
+  imageFit,
   keepTogether,
   link,
   linkRun,
@@ -62,6 +64,8 @@ export { brutalistTheme } from "./themes/brutalist.js";
 
 export type {
   Align,
+  Border,
+  BorderSides,
   BoxStyle,
   CrossAxis,
   Edges,

@@ -112,6 +112,54 @@ export function image(
   };
 }
 
+export function imageFit(
+  pdfImage: PDFImage,
+  options: {
+    width: number;
+    height: number;
+    fit?: "contain" | "cover";
+    margin?: EdgesInput;
+  }
+): Node {
+  if (options.width <= 0 || options.height <= 0) {
+    throw new Error("boxpdf imageFit: width and height must be positive");
+  }
+  const fit = options.fit ?? "contain";
+  const imageWidth = pdfImage.width;
+  const imageHeight = pdfImage.height;
+  if (imageWidth <= 0 || imageHeight <= 0) {
+    throw new Error("boxpdf imageFit: image dimensions must be positive");
+  }
+  const scale =
+    fit === "cover"
+      ? Math.max(options.width / imageWidth, options.height / imageHeight)
+      : Math.min(options.width / imageWidth, options.height / imageHeight);
+  const fittedWidth = imageWidth * scale;
+  const fittedHeight = imageHeight * scale;
+  return {
+    kind: "imageBox",
+    image: pdfImage,
+    width: options.width,
+    height: options.height,
+    imageWidth: fittedWidth,
+    imageHeight: fittedHeight,
+    offsetX: (options.width - fittedWidth) / 2,
+    offsetY: (options.height - fittedHeight) / 2,
+    margin: options.margin
+  };
+}
+
+export function aspectRatio(
+  ratio: number,
+  options: { width: number; height?: never } | { height: number; width?: never }
+): { width: number; height: number } {
+  if (ratio <= 0 || !Number.isFinite(ratio)) {
+    throw new Error("boxpdf aspectRatio: ratio must be a positive finite number");
+  }
+  if (options.width !== undefined) return { width: options.width, height: options.width / ratio };
+  return { width: options.height * ratio, height: options.height };
+}
+
 export function spacer(size: number, options?: { grow?: number; shrink?: number }): Node {
   return { kind: "spacer", size, grow: options?.grow, shrink: options?.shrink };
 }

@@ -57,6 +57,8 @@ export function measureContent(node: Node, parentWidth: number): Size {
     }
     case "image":
       return { width: node.width, height: node.height };
+    case "imageBox":
+      return { width: node.width, height: node.height };
     case "spacer":
       return { width: 0, height: node.size };
     case "hline":
@@ -325,6 +327,7 @@ export function nodeMargin(node: Node): { top: number; right: number; bottom: nu
     case "paragraph":
       return edges(node.props.margin);
     case "image":
+    case "imageBox":
     case "hline":
     case "vline":
     case "link":

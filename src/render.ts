@@ -1,5 +1,16 @@
-import { PDFArray, PDFName, PDFString, rgb, type PDFPage } from "pdf-lib";
-import { edges, type Justify, type Node, type RGB } from "./types.js";
+import {
+  PDFArray,
+  PDFName,
+  PDFString,
+  clip,
+  endPath,
+  popGraphicsState,
+  pushGraphicsState,
+  rectangle,
+  rgb,
+  type PDFPage
+} from "pdf-lib";
+import { edges, type BorderSides, type Justify, type Node, type RGB } from "./types.js";
 import { fontAscent, fontLineHeight, measureText } from "./text.js";
 import { layoutParagraph, measureParagraphIntrinsicWidth } from "./paragraph.js";
 import {
@@ -225,6 +236,22 @@ function renderContent(
         height: node.height
       });
       return node.height;
+    case "imageBox": {
+      page.pushOperators(
+        pushGraphicsState(),
+        rectangle(x, yTop - node.height, node.width, node.height),
+        clip(),
+        endPath()
+      );
+      page.drawImage(node.image, {
+        x: x + node.offsetX,
+        y: yTop - node.offsetY - node.imageHeight,
+        width: node.imageWidth,
+        height: node.imageHeight
+      });
+      page.pushOperators(popGraphicsState());
+      return node.height;
+    }
     case "spacer":
       return node.size;
     case "hline": {
@@ -326,6 +353,7 @@ function renderVStack(
 
   drawBackground(page, x, yTop, boxWidth, boxHeight, node.style.background, node.style.borderRadius);
   drawBorder(page, x, yTop, boxWidth, boxHeight, node.style.border, node.style.borderRadius);
+  drawBorderSides(page, x, yTop, boxWidth, boxHeight, node.style.borderSides);
 
   const innerX = x + inset.left;
   const innerWidth = boxWidth - inset.left - inset.right;
@@ -403,6 +431,7 @@ function renderHStack(
 
   drawBackground(page, x, yTop, boxWidth, boxHeight, node.style.background, node.style.borderRadius);
   drawBorder(page, x, yTop, boxWidth, boxHeight, node.style.border, node.style.borderRadius);
+  drawBorderSides(page, x, yTop, boxWidth, boxHeight, node.style.borderSides);
 
   const innerX = x + inset.left;
   const innerWidth = boxWidth - inset.left - inset.right;
@@ -670,6 +699,54 @@ function drawBorder(
     borderColor: toRgb(border.color),
     borderWidth: border.width
   });
+}
+
+function drawBorderSides(
+  page: PDFPage,
+  x: number,
+  yTop: number,
+  width: number,
+  height: number,
+  borderSides: BorderSides | undefined
+): void {
+  if (!borderSides) return;
+  const yBottom = yTop - height;
+  if (borderSides.top) {
+    const y = yTop - borderSides.top.width / 2;
+    page.drawLine({
+      start: { x, y },
+      end: { x: x + width, y },
+      thickness: borderSides.top.width,
+      color: toRgb(borderSides.top.color)
+    });
+  }
+  if (borderSides.right) {
+    const lineX = x + width - borderSides.right.width / 2;
+    page.drawLine({
+      start: { x: lineX, y: yTop },
+      end: { x: lineX, y: yBottom },
+      thickness: borderSides.right.width,
+      color: toRgb(borderSides.right.color)
+    });
+  }
+  if (borderSides.bottom) {
+    const y = yBottom + borderSides.bottom.width / 2;
+    page.drawLine({
+      start: { x, y },
+      end: { x: x + width, y },
+      thickness: borderSides.bottom.width,
+      color: toRgb(borderSides.bottom.color)
+    });
+  }
+  if (borderSides.left) {
+    const lineX = x + borderSides.left.width / 2;
+    page.drawLine({
+      start: { x: lineX, y: yTop },
+      end: { x: lineX, y: yBottom },
+      thickness: borderSides.left.width,
+      color: toRgb(borderSides.left.color)
+    });
+  }
 }
 
 /**

@@ -1,6 +1,7 @@
-import type { Align, BoxStyle, EdgesInput, Node, RGB } from "./types.js";
+import type { Align, BorderSides, BoxStyle, EdgesInput, Node, RGB } from "./types.js";
 import { edges } from "./types.js";
 import { hline, hstack, vstack } from "./nodes.js";
+import { measure } from "./measure.js";
 
 export type ColumnWidth = number | "auto" | `${number}fr`;
 export type CellVerticalAlign = "top" | "middle" | "bottom";
@@ -31,6 +32,7 @@ export interface TableCell {
   padding?: EdgesInput;
   background?: RGB;
   border?: BoxStyle["border"];
+  borderSides?: BorderSides;
   borderRadius?: number;
   align?: Align;
   valign?: CellVerticalAlign;
@@ -73,6 +75,7 @@ export interface TableOptions {
   /** Top-level container style. */
   background?: RGB;
   border?: { color: RGB; width: number };
+  borderSides?: BorderSides;
   borderRadius?: number;
   margin?: EdgesInput;
 }
@@ -150,6 +153,7 @@ function buildCellShell(cell: TableCellInput, width: number, padding: EdgesInput
       padding: cellPadding,
       background: spec.background,
       border: spec.border,
+      borderSides: spec.borderSides,
       borderRadius: spec.borderRadius,
       justify: justifyForVerticalAlign(spec.valign)
     },
@@ -184,9 +188,14 @@ function buildRow(
       `boxpdf table: row covers ${column} column(s) but columns defines ${widths.length}`
     );
   }
+  const rowHeight = shells.reduce((max, shell) => Math.max(max, measure(shell, totalWidth).height), 0);
   return hstack(
     { width: totalWidth, gap: columnGap },
-    ...shells
+    ...shells.map((shell) =>
+      shell.kind === "vstack"
+        ? { ...shell, style: { ...shell.style, height: rowHeight } }
+        : shell
+    )
   );
 }
 
@@ -239,6 +248,7 @@ export function table(options: TableOptions): Node {
     footerDivider = rowDivider,
     background,
     border,
+    borderSides,
     borderRadius,
     margin
   } = options;
@@ -275,7 +285,7 @@ export function table(options: TableOptions): Node {
   }
 
   return vstack(
-    { width: totalWidth, padding, background, border, borderRadius, margin },
+    { width: totalWidth, padding, background, border, borderSides, borderRadius, margin },
     ...children
   );
 }
