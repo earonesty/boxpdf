@@ -26,7 +26,8 @@ const scripts = [
   "examples/itinerary.ts",
   "examples/invoice.ts",
   "examples/debug.ts",
-  "examples/absolute-positioning.ts"
+  "examples/absolute-positioning.ts",
+  "examples/rich-content.ts"
 ];
 
 console.log("→ rendering all templates");

@@ -1,6 +1,8 @@
 import { describe, expect, it, beforeAll } from "vitest";
 import { PDFDocument, StandardFonts, type PDFFont } from "pdf-lib";
 import { ellipsize, measureText, wrapText } from "../src/text.js";
+import { linkRun, paragraph, run } from "../src/nodes.js";
+import { measure } from "../src/measure.js";
 
 let font: PDFFont;
 
@@ -43,5 +45,21 @@ describe("ellipsize", () => {
     const out = ellipsize(font, 12, "this is a long sentence that will not fit", 60);
     expect(out.endsWith("…")).toBe(true);
     expect(measureText(font, 12, out)).toBeLessThanOrEqual(60);
+  });
+});
+
+describe("paragraph", () => {
+  it("wraps mixed styled runs as one paragraph", () => {
+    const node = paragraph(
+      { width: 90 },
+      run("Hello ", { size: 12, font }),
+      run("bold world", { size: 12, font }),
+      linkRun(" link", { size: 12, font, underline: true }, "https://example.com")
+    );
+    const single = paragraph(
+      { width: 500 },
+      run("Hello bold world link", { size: 12, font })
+    );
+    expect(measure(node, 500).height).toBeGreaterThan(measure(single, 500).height);
   });
 });

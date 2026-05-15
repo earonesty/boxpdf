@@ -1,6 +1,7 @@
 import { PDFArray, PDFName, PDFString, rgb, type PDFPage } from "pdf-lib";
 import { edges, type Justify, type Node, type RGB } from "./types.js";
 import { fontAscent, fontLineHeight, measureText } from "./text.js";
+import { layoutParagraph, measureParagraphIntrinsicWidth } from "./paragraph.js";
 import {
   layoutText,
   measure,
@@ -165,6 +166,56 @@ function renderContent(
         cursorY -= lineHeight;
       }
       return lineHeight * Math.max(1, lines.length);
+    }
+    case "paragraph": {
+      const slotWidth = node.props.width ?? Math.min(measureParagraphIntrinsicWidth(node.runs), parentWidth);
+      const lines = layoutParagraph(node.runs, slotWidth, node.props.lineHeight);
+      let cursorY = yTop;
+      for (const line of lines) {
+        let drawX = x;
+        if (node.props.align === "center") drawX = x + (slotWidth - line.width) / 2;
+        else if (node.props.align === "right") drawX = x + (slotWidth - line.width);
+        const lineAscent = line.segments.reduce(
+          (max, segment) => Math.max(max, fontAscent(segment.style.font, segment.style.size)),
+          0
+        );
+        const baseline = cursorY - lineAscent;
+        for (const segment of line.segments) {
+          page.drawText(segment.text, {
+            x: drawX,
+            y: baseline,
+            size: segment.style.size,
+            font: segment.style.font,
+            color: toRgb(segment.style.color)
+          });
+          const decorationThickness = Math.max(0.5, segment.style.size * 0.06);
+          const decorationColor = toRgb(segment.style.color);
+          if (segment.style.underline && segment.text.length > 0) {
+            const underlineY = baseline - Math.max(1, segment.style.size * 0.12);
+            page.drawLine({
+              start: { x: drawX, y: underlineY },
+              end: { x: drawX + segment.width, y: underlineY },
+              thickness: decorationThickness,
+              color: decorationColor
+            });
+          }
+          if (segment.style.strikethrough && segment.text.length > 0) {
+            const midY = baseline + segment.style.size * 0.28;
+            page.drawLine({
+              start: { x: drawX, y: midY },
+              end: { x: drawX + segment.width, y: midY },
+              thickness: decorationThickness,
+              color: decorationColor
+            });
+          }
+          if (segment.href && segment.text.length > 0) {
+            attachLinkAnnotation(page, drawX, cursorY - line.height, segment.width, line.height, segment.href);
+          }
+          drawX += segment.width;
+        }
+        cursorY -= line.height;
+      }
+      return lines.reduce((sum, line) => sum + line.height, 0);
     }
     case "image":
       page.drawImage(node.image, {

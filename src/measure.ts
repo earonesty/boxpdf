@@ -1,5 +1,6 @@
 import { edges, type Node, type Size } from "./types.js";
 import { ellipsize, fontLineHeight, measureText, wrapText } from "./text.js";
+import { measureParagraphHeight, measureParagraphIntrinsicWidth } from "./paragraph.js";
 
 export type MainAxis = "horizontal" | "vertical";
 
@@ -48,6 +49,11 @@ export function measureContent(node: Node, parentWidth: number): Size {
         : [node.text];
       const usedLines = props.maxLines ? Math.min(lines.length, props.maxLines) : lines.length;
       return { width: slotWidth, height: lineHeight * Math.max(1, usedLines) };
+    }
+    case "paragraph": {
+      const slotWidth = node.props.width ?? Math.min(measureParagraphIntrinsicWidth(node.runs), parentWidth);
+      const height = measureParagraphHeight(node.runs, slotWidth, node.props.lineHeight);
+      return { width: slotWidth, height };
     }
     case "image":
       return { width: node.width, height: node.height };
@@ -213,6 +219,8 @@ function nodeMinMain(node: Node, axis: MainAxis, base: number): number {
     switch (node.kind) {
       case "text":
         return minTextWidth(node);
+      case "paragraph":
+        return 0;
       case "vstack":
       case "hstack":
         return 0;
@@ -277,6 +285,8 @@ export function applyShrink(node: Node, newMainSize: number, axis: MainAxis): No
     switch (node.kind) {
       case "text":
         return { ...node, props: { ...node.props, width: size } };
+      case "paragraph":
+        return { ...node, props: { ...node.props, width: size } };
       case "vstack":
       case "hstack":
         return { ...node, style: { ...node.style, width: size } };
@@ -311,6 +321,8 @@ export function nodeMargin(node: Node): { top: number; right: number; bottom: nu
     case "hstack":
       return edges(node.style.margin);
     case "text":
+      return edges(node.props.margin);
+    case "paragraph":
       return edges(node.props.margin);
     case "image":
     case "hline":
@@ -348,6 +360,8 @@ export function nodeShrink(node: Node): number {
       return node.shrink ?? 0;
     case "text":
       return node.props.shrink ?? 0;
+    case "paragraph":
+      return 0;
     case "link":
       return nodeShrink(node.child);
     default:

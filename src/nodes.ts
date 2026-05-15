@@ -8,6 +8,7 @@ import type {
   RGB,
   TextProps
 } from "./types.js";
+import type { ParagraphProps, ParagraphRun, TextRunStyle } from "./paragraph.js";
 
 type StackOptions = BoxStyle & {
   gap?: number;
@@ -75,6 +76,27 @@ export function text(content: string, options: TextOptions): Node {
     breakWords: options.breakWords
   };
   return { kind: "text", text: content, props };
+}
+
+export function run(content: string, style: TextRunStyle): ParagraphRun {
+  return { text: content, style };
+}
+
+export function linkRun(content: string, style: TextRunStyle, href: string): ParagraphRun {
+  return { text: content, style, href };
+}
+
+export function paragraph(options: ParagraphProps, ...runs: ParagraphRun[]): Node {
+  return {
+    kind: "paragraph",
+    runs,
+    props: {
+      width: options.width,
+      align: options.align ?? "left",
+      lineHeight: options.lineHeight,
+      margin: options.margin
+    }
+  };
 }
 
 export function image(

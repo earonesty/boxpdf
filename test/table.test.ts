@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeAll } from "vitest";
 import { PDFDocument, StandardFonts, type PDFFont } from "pdf-lib";
-import { hex, renderToPdf, table, text } from "../src/index.js";
+import { hex, renderToPdf, table, text, vstack } from "../src/index.js";
 import { measure } from "../src/measure.js";
 
 let font: PDFFont;
@@ -66,6 +66,41 @@ describe("table()", () => {
         columns: [{ width: 100 }, { width: 100 }, { width: 100 }],
         rows: [[cell("a"), cell("b")]]
       })
-    ).toThrow(/cell\(s\).*columns defines/);
+    ).toThrow(/covers .*columns defines/);
+  });
+
+  it("supports styled cells and colSpan", async () => {
+    const bytes = await renderToPdf(
+      table({
+        width: 360,
+        columns: [{ width: 120 }, { width: 120 }, { width: 120 }],
+        rows: [
+          [
+            {
+              content: cell("Spanning header"),
+              colSpan: 3,
+              padding: 8,
+              background: hex("#f1f5f9"),
+              border: { color: hex("#cbd5e1"), width: 1 },
+              align: "center"
+            }
+          ],
+          [
+            {
+              content: vstack(
+                { gap: 2 },
+                text("Tall", { size: 10, font }),
+                text("cell", { size: 10, font })
+              ),
+              padding: 8
+            },
+            { content: cell("Middle"), padding: 8, valign: "middle" },
+            { content: cell("Bottom"), padding: 8, align: "right", valign: "bottom" }
+          ]
+        ],
+        columnGap: 0
+      })
+    );
+    expect(bytes.byteLength).toBeGreaterThan(300);
   });
 });

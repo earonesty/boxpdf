@@ -15,6 +15,9 @@ export {
   image,
   keepTogether,
   link,
+  linkRun,
+  paragraph,
+  run,
   spacer,
   svgPath,
   text,
@@ -22,8 +25,9 @@ export {
   vstack
 } from "./nodes.js";
 export { table } from "./table.js";
-export type { ColumnSpec, ColumnWidth, TableDivider, TableOptions } from "./table.js";
+export type { CellVerticalAlign, ColumnSpec, ColumnWidth, TableCell, TableCellInput, TableDivider, TableOptions } from "./table.js";
 export type { TextOptions } from "./nodes.js";
+export type { ParagraphProps, ParagraphRun, TextRunStyle } from "./paragraph.js";
 
 export { measure, measureContent, resolveMainAxis } from "./measure.js";
 export type { MainAxis, MainAxisLayout } from "./measure.js";

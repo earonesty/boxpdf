@@ -1,4 +1,5 @@
 import type { PDFFont, PDFImage } from "pdf-lib";
+import type { ParagraphProps, ParagraphRun } from "./paragraph.js";
 
 export type RGB = { r: number; g: number; b: number };
 
@@ -64,7 +65,7 @@ export interface TextProps {
   align?: Align;
   /** Slot width (enables word wrapping). If omitted, width is intrinsic. */
   width?: number;
-  /** Line height in points; defaults to font's ascender for the size. */
+  /** Line height in points; defaults to the font's full height for the size. */
   lineHeight?: number;
   /** Maximum number of wrapped lines (truncates with ellipsis when exceeded). */
   maxLines?: number;
@@ -112,6 +113,11 @@ export type Node =
       kind: "text";
       text: string;
       props: TextProps;
+    }
+  | {
+      kind: "paragraph";
+      runs: ParagraphRun[];
+      props: ParagraphProps;
     }
   | {
       kind: "image";

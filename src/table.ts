@@ -1,8 +1,9 @@
-import type { Align, EdgesInput, Node, RGB } from "./types.js";
+import type { Align, BoxStyle, EdgesInput, Node, RGB } from "./types.js";
 import { edges } from "./types.js";
 import { hline, hstack, vstack } from "./nodes.js";
 
 export type ColumnWidth = number | "auto" | `${number}fr`;
+export type CellVerticalAlign = "top" | "middle" | "bottom";
 
 export interface ColumnSpec {
   /**
@@ -24,17 +25,30 @@ export interface TableDivider {
   thickness?: number;
 }
 
+export interface TableCell {
+  content: Node;
+  colSpan?: number;
+  padding?: EdgesInput;
+  background?: RGB;
+  border?: BoxStyle["border"];
+  borderRadius?: number;
+  align?: Align;
+  valign?: CellVerticalAlign;
+}
+
+export type TableCellInput = Node | TableCell;
+
 export interface TableOptions {
   /** Total table width including any `padding`. If omitted, fixed columns sum + any `fr` columns get 0 width. */
   width?: number;
   /** Column definitions. Must match the length of every row / header / footer. */
   columns: ColumnSpec[];
   /** Optional header row — drawn first, with a stronger divider beneath by default. */
-  header?: Node[];
-  /** Body rows. Each row is an array of cells matching `columns.length`. */
-  rows: Node[][];
+  header?: TableCellInput[];
+  /** Body rows. Cells may span columns; each row must cover `columns.length` columns. */
+  rows: TableCellInput[][];
   /** Optional footer row — drawn last, with a stronger divider above. */
-  footer?: Node[];
+  footer?: TableCellInput[];
   /**
    * Vertical padding inside each cell row (top + bottom only). Defaults to
    * `{ top: 6, bottom: 6 }`. Horizontal spacing is handled by `columnGap`
@@ -106,25 +120,73 @@ function resolveColumnWidths(
   return widths;
 }
 
-function buildCellShell(cell: Node, width: number, padding: EdgesInput): Node {
-  return vstack({ width, padding }, cell);
+function isTableCell(cell: TableCellInput): cell is TableCell {
+  return "content" in cell;
+}
+
+function justifyForAlign(align: Align | undefined): "start" | "center" | "end" {
+  if (align === "center") return "center";
+  if (align === "right") return "end";
+  return "start";
+}
+
+function justifyForVerticalAlign(align: CellVerticalAlign | undefined): "start" | "center" | "end" {
+  if (align === "middle") return "center";
+  if (align === "bottom") return "end";
+  return "start";
+}
+
+function buildCellShell(cell: TableCellInput, width: number, padding: EdgesInput): Node {
+  const spec = isTableCell(cell) ? cell : { content: cell };
+  const cellPadding = spec.padding ?? padding;
+  const pad = edges(cellPadding);
+  const innerWidth = Math.max(0, width - pad.left - pad.right);
+  const content = spec.align
+    ? hstack({ width: innerWidth, justify: justifyForAlign(spec.align) }, spec.content)
+    : spec.content;
+  return vstack(
+    {
+      width,
+      padding: cellPadding,
+      background: spec.background,
+      border: spec.border,
+      borderRadius: spec.borderRadius,
+      justify: justifyForVerticalAlign(spec.valign)
+    },
+    content
+  );
 }
 
 function buildRow(
-  cells: Node[],
+  cells: TableCellInput[],
   widths: number[],
   columnGap: number,
   padding: EdgesInput,
   totalWidth: number
 ): Node {
-  if (cells.length !== widths.length) {
+  const shells: Node[] = [];
+  let column = 0;
+  for (const cell of cells) {
+    const span = Math.max(1, Math.floor(isTableCell(cell) ? cell.colSpan ?? 1 : 1));
+    if (column + span > widths.length) {
+      throw new Error(
+        `boxpdf table: row spans ${column + span} column(s) but columns defines ${widths.length}`
+      );
+    }
+    const width =
+      widths.slice(column, column + span).reduce((sum, w) => sum + w, 0) +
+      columnGap * Math.max(0, span - 1);
+    shells.push(buildCellShell(cell, width, padding));
+    column += span;
+  }
+  if (column !== widths.length) {
     throw new Error(
-      `boxpdf table: row has ${cells.length} cell(s) but columns defines ${widths.length}`
+      `boxpdf table: row covers ${column} column(s) but columns defines ${widths.length}`
     );
   }
   return hstack(
     { width: totalWidth, gap: columnGap },
-    ...cells.map((cell, i) => buildCellShell(cell, widths[i] ?? 0, padding))
+    ...shells
   );
 }
 

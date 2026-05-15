@@ -131,11 +131,13 @@ Important APIs:
 - vstack(style, ...children): vertical box layout.
 - hstack(style, ...children): horizontal box layout.
 - text(content, style): text with wrapping when width is set, alignment, maxLines, underline, strikethrough, and full-height default line boxes.
+- paragraph(style, ...runs): mixed styled/link text runs that wrap together.
 - image(pdfImage, style): embedded PNG/JPEG image node.
 - hline(style), vline(style): rules.
 - spacer(size), flex(weight): fixed or growing space.
 - link({ href }, child): PDF link annotation over a child node.
 - keepTogether(style, ...children): paginate a group atomically.
+- table(options): fixed/auto/fr columns with header/footer rows, dividers, colSpan, styled cells, and vertical alignment.
 - position: "relative" / "absolute" on vstack/hstack styles supports top/right/bottom/left overlays and zIndex paint order.
 - renderFlow(pdf, nodes, options): paginated rendering with margins, headers, footers, metadata, and debug overlays.
 - renderToPdf(node, options): convenience helper that returns Uint8Array.

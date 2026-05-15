@@ -106,11 +106,13 @@ Container `style`:
 ### Leaves
 
 - `text(content, { size, font, color?, align?, width?, lineHeight?, maxLines?, underline?, strikethrough?, margin? })`. Word-wraps when `width` is set. Truncates with ellipsis when `maxLines` is set. Default `lineHeight` uses the font's full height, including descenders.
+- `paragraph({ width?, align?, lineHeight?, margin? }, ...runs)`. Mixed inline text runs that wrap together as one paragraph. Use `run(text, style)` and `linkRun(text, style, href)` for styled/link segments.
 - `image(pdfImage, { width, height, margin? })`. Takes an already-embedded `PDFImage`.
 - `spacer(size, { grow? })` / `flex(weight = 1)`. Fixed or growing gap.
 - `hline({ color, thickness?, width?, margin? })`.
 - `vline({ color, thickness?, height?, margin? })`.
 - `link({ href }, child)`. Wraps a child and registers a PDF Link annotation over its rendered bounding box.
+- `table({ columns, rows, ... })`. Fixed / auto / fractional columns with header/footer rows, dividers, and styled cells. Cells can be plain nodes or `{ content, colSpan?, padding?, background?, border?, borderRadius?, align?, valign? }`.
 
 ### Rendering
 
