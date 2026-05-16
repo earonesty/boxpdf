@@ -62,6 +62,12 @@ export interface TableOptions {
   /** Horizontal gap between columns. Defaults to 12. */
   columnGap?: number;
   /**
+   * Border model for cell borders. `"separate"` preserves each cell's own
+   * border. `"collapse"` draws shared cell boundaries once, similar to CSS
+   * `border-collapse: collapse`.
+   */
+  borderCollapse?: "separate" | "collapse";
+  /**
    * Padding applied to the whole table — wraps every row, useful when you
    * want to inset table content from an outer `border` / `background`.
    */
@@ -139,7 +145,41 @@ function justifyForVerticalAlign(align: CellVerticalAlign | undefined): "start" 
   return "start";
 }
 
-function buildCellShell(cell: TableCellInput, width: number, padding: EdgesInput): Node {
+function borderToSides(border: BoxStyle["border"] | undefined): BorderSides | undefined {
+  if (!border) return undefined;
+  return { top: border, right: border, bottom: border, left: border };
+}
+
+function collapsedCellBorderSides(
+  cell: TableCellInput,
+  rowIndex: number,
+  rowCount: number,
+  columnStart: number,
+  columnEnd: number,
+  columnCount: number
+): BorderSides | undefined {
+  const spec = isTableCell(cell) ? cell : undefined;
+  const declared = spec?.borderSides ?? borderToSides(spec?.border);
+  if (!declared) return undefined;
+  const sides: BorderSides = {};
+
+  const internalTop = rowIndex > 0 ? declared.top ?? declared.bottom : declared.top;
+  const internalLeft = columnStart > 0 ? declared.left ?? declared.right : declared.left;
+  if (internalTop) sides.top = internalTop;
+  if (internalLeft) sides.left = internalLeft;
+  if (columnEnd === columnCount && declared.right) sides.right = declared.right;
+  if (rowIndex === rowCount - 1 && declared.bottom) sides.bottom = declared.bottom;
+
+  return Object.keys(sides).length > 0 ? sides : undefined;
+}
+
+function buildCellShell(
+  cell: TableCellInput,
+  width: number,
+  padding: EdgesInput,
+  borderCollapse: TableOptions["borderCollapse"],
+  collapsedBorderSides?: BorderSides
+): Node {
   const spec = isTableCell(cell) ? cell : { content: cell };
   const cellPadding = spec.padding ?? padding;
   const pad = edges(cellPadding);
@@ -152,9 +192,9 @@ function buildCellShell(cell: TableCellInput, width: number, padding: EdgesInput
       width,
       padding: cellPadding,
       background: spec.background,
-      border: spec.border,
-      borderSides: spec.borderSides,
-      borderRadius: spec.borderRadius,
+      border: borderCollapse === "collapse" ? undefined : spec.border,
+      borderSides: borderCollapse === "collapse" ? collapsedBorderSides : spec.borderSides,
+      borderRadius: borderCollapse === "collapse" ? undefined : spec.borderRadius,
       justify: justifyForVerticalAlign(spec.valign)
     },
     content
@@ -166,7 +206,10 @@ function buildRow(
   widths: number[],
   columnGap: number,
   padding: EdgesInput,
-  totalWidth: number
+  totalWidth: number,
+  borderCollapse: TableOptions["borderCollapse"],
+  rowIndex: number,
+  rowCount: number
 ): Node {
   const shells: Node[] = [];
   let column = 0;
@@ -180,7 +223,17 @@ function buildRow(
     const width =
       widths.slice(column, column + span).reduce((sum, w) => sum + w, 0) +
       columnGap * Math.max(0, span - 1);
-    shells.push(buildCellShell(cell, width, padding));
+    shells.push(
+      buildCellShell(
+        cell,
+        width,
+        padding,
+        borderCollapse,
+        borderCollapse === "collapse"
+          ? collapsedCellBorderSides(cell, rowIndex, rowCount, column, column + span, widths.length)
+          : undefined
+      )
+    );
     column += span;
   }
   if (column !== widths.length) {
@@ -242,6 +295,7 @@ export function table(options: TableOptions): Node {
     footer,
     cellPadding = { top: 6, bottom: 6 },
     columnGap = 12,
+    borderCollapse = "separate",
     padding,
     rowDivider,
     headerDivider = rowDivider,
@@ -261,19 +315,26 @@ export function table(options: TableOptions): Node {
   const totalWidth = width ?? fallbackWidth;
   const innerWidth = totalWidth - pad.left - pad.right;
 
-  const widths = resolveColumnWidths(columns, innerWidth, columnGap);
+  const effectiveColumnGap = borderCollapse === "collapse" ? 0 : columnGap;
+  const widths = resolveColumnWidths(columns, innerWidth, effectiveColumnGap);
   const children: Node[] = [];
+  const tableRows = [
+    ...(header ? [header] : []),
+    ...rows,
+    ...(footer ? [footer] : [])
+  ];
+  let rowIndex = 0;
 
   if (header) {
-    children.push(buildRow(header, widths, columnGap, cellPadding, innerWidth));
+    children.push(buildRow(header, widths, effectiveColumnGap, cellPadding, innerWidth, borderCollapse, rowIndex++, tableRows.length));
     const d = dividerNode(headerDivider);
-    if (d) children.push(d);
+    if (d && borderCollapse !== "collapse") children.push(d);
   }
   const headerCount = children.length;
 
   rows.forEach((row, i) => {
-    children.push(buildRow(row, widths, columnGap, cellPadding, innerWidth));
-    if (rowDivider && i < rows.length - 1) {
+    children.push(buildRow(row, widths, effectiveColumnGap, cellPadding, innerWidth, borderCollapse, rowIndex++, tableRows.length));
+    if (rowDivider && i < rows.length - 1 && borderCollapse !== "collapse") {
       const d = dividerNode(rowDivider);
       if (d) children.push(d);
     }
@@ -282,11 +343,11 @@ export function table(options: TableOptions): Node {
   let footerCount = 0;
   if (footer) {
     const d = dividerNode(footerDivider);
-    if (d) {
+    if (d && borderCollapse !== "collapse") {
       children.push(d);
       footerCount += 1;
     }
-    children.push(buildRow(footer, widths, columnGap, cellPadding, innerWidth));
+    children.push(buildRow(footer, widths, effectiveColumnGap, cellPadding, innerWidth, borderCollapse, rowIndex++, tableRows.length));
     footerCount += 1;
   }
 

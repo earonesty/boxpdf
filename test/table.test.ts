@@ -106,6 +106,42 @@ describe("table()", () => {
     expect(bytes.byteLength).toBeGreaterThan(300);
   });
 
+  it("collapses repeated cell borders into single grid boundaries", () => {
+    const border = { color: hex("#cbd5e1"), width: 1 };
+    const node = table({
+      width: 200,
+      columns: [{ width: 100 }, { width: 100 }],
+      rows: [
+        [
+          { content: cell("A"), border },
+          { content: cell("B"), border }
+        ],
+        [
+          { content: cell("C"), border },
+          { content: cell("D"), border }
+        ]
+      ],
+      columnGap: 12,
+      borderCollapse: "collapse"
+    });
+
+    if (node.kind !== "vstack") throw new Error("expected table container");
+    const firstRow = node.children[0]!;
+    const secondRow = node.children[1]!;
+    if (firstRow.kind !== "hstack" || secondRow.kind !== "hstack") throw new Error("expected table rows");
+    const topLeft = firstRow.children[0]!;
+    const topRight = firstRow.children[1]!;
+    const bottomLeft = secondRow.children[0]!;
+    expect(firstRow.gap).toBe(0);
+    if (topLeft.kind !== "vstack" || topRight.kind !== "vstack" || bottomLeft.kind !== "vstack") {
+      throw new Error("expected table cells");
+    }
+    expect(topLeft.style.border).toBeUndefined();
+    expect(topLeft.style.borderSides).toMatchObject({ top: border, left: border });
+    expect(topRight.style.borderSides).toMatchObject({ top: border, left: border, right: border });
+    expect(bottomLeft.style.borderSides).toMatchObject({ top: border, left: border, bottom: border });
+  });
+
   it("aligns styled cell content vertically within the row height", async () => {
     const pdf = await PDFDocument.create();
     const page = pdf.addPage([420, 240]);
