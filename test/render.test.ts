@@ -1,11 +1,12 @@
 import { describe, expect, it, beforeAll, vi } from "vitest";
-import { PDFDocument, StandardFonts, type PDFFont } from "pdf-lib";
+import { PDFDocument, PDFPage, StandardFonts, type PDFFont } from "pdf-lib";
 import { hex } from "../src/colors.js";
 import { hline, hstack, imageFit, keepTogether, spacer, text, vstack } from "../src/nodes.js";
 import { render } from "../src/render.js";
 import { renderFlow, renderToPdf } from "../src/document.js";
 import { measure } from "../src/measure.js";
 import { fontAscent } from "../src/text.js";
+import { table } from "../src/table.js";
 
 let font: PDFFont;
 let bold: PDFFont;
@@ -199,6 +200,60 @@ describe("render", () => {
     const { pages } = await renderFlow(pdf, [filler, group], { margin: 36 });
     // Group should land on page 2 intact, not split across pages.
     expect(pages.length).toBe(2);
+  });
+
+  it("fragments a top-level vstack between children", async () => {
+    const pdf = await PDFDocument.create();
+    const blocks = Array.from({ length: 6 }, (_, i) =>
+      vstack(
+        { height: 54, padding: 6, border: { color: hex("#dddddd"), width: 1 } },
+        text(`Fragment ${i + 1}`, { size: 10, font })
+      )
+    );
+    const node = vstack({ gap: 4 }, ...blocks);
+
+    const { pages } = await renderFlow(pdf, [node], {
+      size: { width: 240, height: 220 },
+      margin: 20
+    });
+
+    expect(pages.length).toBeGreaterThan(1);
+  });
+
+  it("fragments tables between rows and repeats the header", async () => {
+    const drawText = vi.spyOn(PDFPage.prototype, "drawText");
+    try {
+      const pdf = await PDFDocument.create();
+      const node = table({
+        width: 180,
+        columns: [{ width: "1fr" }, { width: 50 }],
+        header: [
+          text("Item", { size: 10, font: bold }),
+          text("Qty", { size: 10, font: bold })
+        ],
+        rows: Array.from({ length: 10 }, (_, i) => [
+          vstack(
+            { padding: { top: 5, bottom: 5 } },
+            text(`Row ${i + 1}`, { size: 10, font })
+          ),
+          text(String(i + 1), { size: 10, font })
+        ]),
+        rowDivider: { color: hex("#dddddd"), thickness: 1 },
+        headerDivider: { color: hex("#111111"), thickness: 1 },
+        columnGap: 0
+      });
+
+      const { pages } = await renderFlow(pdf, [node], {
+        size: { width: 240, height: 220 },
+        margin: 20
+      });
+
+      const headerDraws = drawText.mock.calls.filter((call) => call[0] === "Item").length;
+      expect(pages.length).toBeGreaterThan(1);
+      expect(headerDraws).toBe(pages.length);
+    } finally {
+      drawText.mockRestore();
+    }
   });
 
   it("hline takes parent width when no width supplied", async () => {

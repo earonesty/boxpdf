@@ -115,6 +115,79 @@ function applyMetadata(pdf: PDFDocument, options: DocumentMetadata): void {
   if (options.producer !== undefined) pdf.setProducer(options.producer);
 }
 
+function isFragmentableStack(node: Node): node is Extract<Node, { kind: "vstack" }> {
+  return node.kind === "vstack" && node.style.breakInside !== "avoid" && node.style.height === undefined;
+}
+
+function cloneStackWithChildren(node: Extract<Node, { kind: "vstack" }>, children: Node[]): Node {
+  return { ...node, children };
+}
+
+function splitNormalStack(
+  node: Extract<Node, { kind: "vstack" }>,
+  availableHeight: number,
+  contentWidth: number
+): { before: Node; after?: Node } | undefined {
+  if (node.children.length <= 1) return undefined;
+  let splitAt = 0;
+  for (let i = 0; i < node.children.length; i += 1) {
+    const candidate = cloneStackWithChildren(node, node.children.slice(0, i + 1));
+    if (measure(candidate, contentWidth).height <= availableHeight || i === 0) {
+      splitAt = i + 1;
+      continue;
+    }
+    break;
+  }
+  if (splitAt <= 0 || splitAt >= node.children.length) return undefined;
+  return {
+    before: cloneStackWithChildren(node, node.children.slice(0, splitAt)),
+    after: cloneStackWithChildren(node, node.children.slice(splitAt))
+  };
+}
+
+function splitTableStack(
+  node: Extract<Node, { kind: "vstack" }>,
+  availableHeight: number,
+  contentWidth: number
+): { before: Node; after?: Node } | undefined {
+  const meta = node.fragmentation;
+  if (meta?.kind !== "table") return undefined;
+  const header = node.children.slice(0, meta.headerCount);
+  const footerStart = node.children.length - meta.footerCount;
+  const footer = meta.footerCount > 0 ? node.children.slice(footerStart) : [];
+  const body = node.children.slice(meta.headerCount, footerStart);
+  if (body.length <= 1) return undefined;
+
+  let splitAt = 0;
+  for (let i = 0; i < body.length; i += 1) {
+    const candidate = cloneStackWithChildren(node, [...header, ...body.slice(0, i + 1)]);
+    if (measure(candidate, contentWidth).height <= availableHeight || i === 0) {
+      splitAt = i + 1;
+      continue;
+    }
+    break;
+  }
+
+  if (splitAt <= 0 || splitAt >= body.length) return undefined;
+  const remainingBody = body.slice(splitAt);
+  if (remainingBody[0]?.kind === "hline") remainingBody.shift();
+  const before = cloneStackWithChildren(node, [...header, ...body.slice(0, splitAt)]);
+  const after = cloneStackWithChildren(node, [...header, ...remainingBody, ...footer]);
+  return { before, after };
+}
+
+function splitForPage(
+  node: Node,
+  availableHeight: number,
+  contentWidth: number
+): { before: Node; after?: Node } | undefined {
+  if (!isFragmentableStack(node)) return undefined;
+  if (node.fragmentation?.kind === "table") {
+    return splitTableStack(node, availableHeight, contentWidth);
+  }
+  return splitNormalStack(node, availableHeight, contentWidth);
+}
+
 export interface PageContext {
   pageNumber: number;
   totalPages: number;
@@ -182,13 +255,49 @@ export async function renderFlow(
   pages.push(page);
   let cursorY = contentTop;
 
-  for (const node of nodes) {
+  const pending = [...nodes];
+  while (pending.length > 0) {
+    const node = pending.shift()!;
     const nodeSize = measure(node, contentWidth);
     if (warnings) warnIfOverflowing(node, nodeSize.width, contentWidth, size, m);
+    const remainingHeight = cursorY - contentBottom;
+    if (nodeSize.height > remainingHeight) {
+      const split = splitForPage(node, remainingHeight, contentWidth);
+      if (split && cursorY !== contentTop) {
+        const beforeSize = measure(split.before, contentWidth);
+        render(split.before, page, m.left, cursorY, contentWidth, { debug: options.debug });
+        cursorY -= beforeSize.height;
+        if (split.after) {
+          page = pdf.addPage([size.width, size.height]);
+          pages.push(page);
+          cursorY = contentTop;
+          pending.unshift(split.after);
+        }
+        continue;
+      }
+    }
     if (cursorY - nodeSize.height < contentBottom && cursorY !== contentTop) {
       page = pdf.addPage([size.width, size.height]);
       pages.push(page);
       cursorY = contentTop;
+      pending.unshift(node);
+      continue;
+    }
+    const topRemainingHeight = cursorY - contentBottom;
+    if (nodeSize.height > topRemainingHeight) {
+      const split = splitForPage(node, topRemainingHeight, contentWidth);
+      if (split) {
+        const beforeSize = measure(split.before, contentWidth);
+        render(split.before, page, m.left, cursorY, contentWidth, { debug: options.debug });
+        cursorY -= beforeSize.height;
+        if (split.after) {
+          page = pdf.addPage([size.width, size.height]);
+          pages.push(page);
+          cursorY = contentTop;
+          pending.unshift(split.after);
+        }
+        continue;
+      }
     }
     render(node, page, m.left, cursorY, contentWidth, { debug: options.debug });
     cursorY -= nodeSize.height;

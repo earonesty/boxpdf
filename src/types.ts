@@ -17,6 +17,12 @@ export type BorderSides = {
   bottom?: Border;
   left?: Border;
 };
+export type BreakInside = "auto" | "avoid";
+export type Fragmentation = {
+  kind: "table";
+  headerCount: number;
+  footerCount: number;
+};
 
 export interface BoxStyle {
   /** Fixed width; if omitted, the box sizes to its content. */
@@ -64,6 +70,8 @@ export interface BoxStyle {
    * has no effect. Default `0` (no shrink).
    */
   shrink?: number;
+  /** Page fragmentation hint. `avoid` keeps the box atomic under renderFlow. */
+  breakInside?: BreakInside;
 }
 
 export interface TextProps {
@@ -109,6 +117,7 @@ export type Node =
       gap: number;
       justify: Justify;
       align: CrossAxis;
+      fragmentation?: Fragmentation;
     }
   | {
       kind: "hstack";

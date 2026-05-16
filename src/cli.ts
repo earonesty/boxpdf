@@ -138,21 +138,20 @@ Important APIs:
 - spacer(size), flex(weight): fixed or growing space.
 - link({ href }, child): PDF link annotation over a child node.
 - keepTogether(style, ...children): paginate a group atomically.
-- table(options): fixed/auto/fr columns with header/footer rows, dividers, colSpan, styled cells, per-side borders, and vertical alignment.
+- table(options): fixed/auto/fr columns with header/footer rows, dividers, colSpan, styled cells, per-side borders, vertical alignment, and row-level fragmentation.
 - position: "relative" / "absolute" on vstack/hstack styles supports top/right/bottom/left overlays and zIndex paint order.
 - borderSides: per-side box border strokes with top/right/bottom/left { color, width }.
 - aspectRatio(ratio, { width } | { height }): derive the missing dimension.
-- renderFlow(pdf, nodes, options): paginated rendering with margins, headers, footers, metadata, and debug overlays.
+- renderFlow(pdf, nodes, options): paginated rendering with margins, headers, footers, metadata, debug overlays, top-level vstack fragmentation, and table row fragmentation with repeated headers.
 - renderToPdf(node, options): convenience helper that returns Uint8Array.
 - measure(node, parentWidth): measure without drawing.
 - cleanTheme, stripeTheme, editorialTheme, brutalistTheme: shared tokenized themes.
 - formatCurrency, defineStyles, hex, rgb255: helpers.
 
-Use explicit widths for wrapping text and table columns. boxpdf does not implement flex-shrink yet, so oversized children overflow instead of shrinking.
+Use explicit widths for wrapping text and table columns. Set shrink on overflowing stack children when they should give up space and rewrap.
 
 Known limits:
 
-- No flex-shrink yet.
 - No CSS or browser layout engine.
 - Positioning supports relative containing boxes, out-of-flow absolute boxes, point offsets, zIndex, and stretch from paired edges.
 - Complex text shaping is limited by pdf-lib/fontkit.

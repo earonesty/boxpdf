@@ -66,6 +66,7 @@ export type {
   Align,
   Border,
   BorderSides,
+  BreakInside,
   BoxStyle,
   CrossAxis,
   Edges,
@@ -73,6 +74,7 @@ export type {
   Justify,
   Node,
   Position,
+  Fragmentation,
   RGB,
   Size,
   TextProps

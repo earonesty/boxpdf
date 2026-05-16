@@ -42,7 +42,7 @@ export function keepTogether(
   ...children: Node[]
 ): Node {
   const { gap = 0, margin } = options;
-  return vstack({ gap, margin }, ...children);
+  return vstack({ gap, margin, breakInside: "avoid" }, ...children);
 }
 
 export interface TextOptions {

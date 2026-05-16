@@ -269,6 +269,7 @@ export function table(options: TableOptions): Node {
     const d = dividerNode(headerDivider);
     if (d) children.push(d);
   }
+  const headerCount = children.length;
 
   rows.forEach((row, i) => {
     children.push(buildRow(row, widths, columnGap, cellPadding, innerWidth));
@@ -278,14 +279,23 @@ export function table(options: TableOptions): Node {
     }
   });
 
+  let footerCount = 0;
   if (footer) {
     const d = dividerNode(footerDivider);
-    if (d) children.push(d);
+    if (d) {
+      children.push(d);
+      footerCount += 1;
+    }
     children.push(buildRow(footer, widths, columnGap, cellPadding, innerWidth));
+    footerCount += 1;
   }
 
-  return vstack(
+  const node = vstack(
     { width: totalWidth, padding, background, border, borderSides, borderRadius, margin },
     ...children
   );
+  if (node.kind === "vstack") {
+    node.fragmentation = { kind: "table", headerCount, footerCount };
+  }
+  return node;
 }
