@@ -8,7 +8,7 @@ export type EdgesInput = number | Partial<Edges>;
 
 export type Align = "left" | "center" | "right";
 export type Justify = "start" | "center" | "end" | "between" | "around" | "evenly";
-export type CrossAxis = "start" | "center" | "end" | "stretch";
+export type CrossAxis = "start" | "center" | "end" | "stretch" | "baseline";
 export type Position = "relative" | "absolute";
 export type Border = { color: RGB; width: number };
 export type BorderSides = {

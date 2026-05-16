@@ -102,7 +102,7 @@ Container `style`:
 | `shrink` | number | Flex shrink weight. |
 | `gap` | number | Spacing between children. |
 | `justify` | `"start"` \| `"center"` \| `"end"` \| `"between"` \| `"around"` \| `"evenly"` | Main-axis distribution. |
-| `align` | `"start"` \| `"center"` \| `"end"` \| `"stretch"` | Cross-axis alignment. |
+| `align` | `"start"` \| `"center"` \| `"end"` \| `"stretch"` \| `"baseline"` | Cross-axis alignment. `baseline` is intended for `hstack` rows. |
 
 ### Leaves
 

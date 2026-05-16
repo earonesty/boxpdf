@@ -5,7 +5,7 @@ import { hline, hstack, imageFit, keepTogether, spacer, text, vstack } from "../
 import { render } from "../src/render.js";
 import { renderFlow, renderToPdf } from "../src/document.js";
 import { measure } from "../src/measure.js";
-import { fontAscent } from "../src/text.js";
+import { fontAscent, fontLineMetrics } from "../src/text.js";
 import { table } from "../src/table.js";
 
 let font: PDFFont;
@@ -108,6 +108,41 @@ describe("render", () => {
 
     expect(drawRectangle).toHaveBeenCalledWith(
       expect.objectContaining({ x: 10, y: 40, width: 30, height: 60 })
+    );
+  });
+
+  it("hstack align:baseline aligns first-line text baselines", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([240, 140]);
+    const drawText = vi.spyOn(page, "drawText");
+    const node = hstack(
+      { align: "baseline", gap: 8 },
+      text("Big", { size: 24, font: bold }),
+      text("small", { size: 10, font })
+    );
+
+    render(node, page, 20, 100, 200);
+
+    const big = drawText.mock.calls.find((call) => call[0] === "Big");
+    const small = drawText.mock.calls.find((call) => call[0] === "small");
+    expect(big?.[1]?.y).toBeCloseTo(small?.[1]?.y ?? 0, 5);
+  });
+
+  it("hstack align:baseline synthesizes box baselines at their bottom edge", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([240, 140]);
+    const drawRectangle = vi.spyOn(page, "drawRectangle");
+    const node = hstack(
+      { align: "baseline", gap: 8 },
+      text("Text", { size: 12, font }),
+      vstack({ width: 20, height: 30, background: hex("#ddeeff") })
+    );
+
+    render(node, page, 20, 100, 200);
+
+    const sharedBaseline = 100 - Math.max(fontLineMetrics(font, 12).ascent, 30);
+    expect(drawRectangle).toHaveBeenCalledWith(
+      expect.objectContaining({ x: expect.any(Number), y: sharedBaseline, width: 20, height: 30 })
     );
   });
 

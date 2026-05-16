@@ -1,6 +1,6 @@
 import { edges, type Node, type Size } from "./types.js";
-import { ellipsize, fontLineHeight, measureText, wrapText } from "./text.js";
-import { measureParagraphHeight, measureParagraphIntrinsicWidth } from "./paragraph.js";
+import { ellipsize, fontLineHeight, fontLineMetrics, measureText, wrapText } from "./text.js";
+import { layoutParagraph, measureParagraphHeight, measureParagraphIntrinsicWidth } from "./paragraph.js";
 
 export type MainAxis = "horizontal" | "vertical";
 
@@ -104,7 +104,10 @@ export function measureContent(node: Node, parentWidth: number): Size {
       }
       const totalGap = node.gap * Math.max(0, layout.children.length - 1);
       const totalWidth = layout.sizes.reduce((s, sz) => s + sz.width, 0) + totalGap;
-      const maxChildHeight = layout.sizes.reduce((m, s) => (s.height > m ? s.height : m), 0);
+      const maxChildHeight =
+        node.align === "baseline"
+          ? measureBaselineStackHeight(layout.children, layout.sizes, innerWidth)
+          : layout.sizes.reduce((m, s) => (s.height > m ? s.height : m), 0);
       return {
         width: fixedWidth ?? totalWidth + inset.left + inset.right,
         height: node.style.height ?? maxChildHeight + inset.top + inset.bottom
@@ -117,10 +120,42 @@ export function stretchCrossAxisChildren(
   children: Node[],
   axis: MainAxis,
   availableCross: number,
-  align: "start" | "center" | "end" | "stretch"
+  align: "start" | "center" | "end" | "stretch" | "baseline"
 ): Node[] {
   if (align !== "stretch" || !Number.isFinite(availableCross)) return children;
   return children.map((child) => applyCrossAxisStretch(child, axis, availableCross));
+}
+
+function measureBaselineStackHeight(children: Node[], sizes: Size[], parentWidth: number): number {
+  let ascent = 0;
+  let descent = 0;
+  children.forEach((child, i) => {
+    const size = sizes[i] ?? measure(child, parentWidth);
+    const baseline = nodeBaselineOffset(child, parentWidth);
+    ascent = Math.max(ascent, baseline);
+    descent = Math.max(descent, Math.max(0, size.height - baseline));
+  });
+  return ascent + descent;
+}
+
+export function nodeBaselineOffset(node: Node, parentWidth: number): number {
+  const m = nodeMargin(node);
+  switch (node.kind) {
+    case "text": {
+      const lineHeight = node.props.lineHeight ?? fontLineHeight(node.props.font, node.props.size);
+      return m.top + fontLineMetrics(node.props.font, node.props.size, lineHeight).ascent;
+    }
+    case "paragraph": {
+      const slotWidth = node.props.width ?? Math.min(measureParagraphIntrinsicWidth(node.runs), parentWidth);
+      const [line] = layoutParagraph(node.runs, slotWidth, node.props.lineHeight);
+      const baseline = line?.segments.reduce((max, segment) => Math.max(max, segment.ascent), 0) ?? 0;
+      return m.top + baseline;
+    }
+    case "link":
+      return m.top + nodeBaselineOffset(node.child, parentWidth);
+    default:
+      return measure(node, parentWidth).height;
+  }
 }
 
 function applyCrossAxisStretch(node: Node, axis: MainAxis, availableCross: number): Node {

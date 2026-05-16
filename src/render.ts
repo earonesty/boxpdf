@@ -19,6 +19,7 @@ import {
   measureContent,
   nodeGrow,
   nodeMargin,
+  nodeBaselineOffset,
   resolveMainAxis,
   stretchCrossAxisChildren
 } from "./measure.js";
@@ -468,6 +469,10 @@ function renderHStack(
   const totalGrow = children.reduce((sum, c) => sum + nodeGrow(c), 0);
   let extra = innerWidth - totalChildWidth - totalGap;
   if (extra < 0) extra = 0;
+  const baselineOffset =
+    node.align === "baseline"
+      ? children.reduce((max, child) => Math.max(max, nodeBaselineOffset(child, innerWidth)), 0)
+      : 0;
 
   let cursorX = innerX;
   if (totalGrow === 0) {
@@ -481,7 +486,15 @@ function renderHStack(
     children.forEach((child, i) => {
       const slotWidth = childSizes[i]?.width ?? 0;
       const heightForChild = resolveCrossAxisHeight(child, childSizes[i]?.height ?? 0, innerHeight);
-      const childY = resolveCrossAxisY(node.align, innerYTop, innerHeight, heightForChild);
+      const childY = resolveCrossAxisY(
+        node.align,
+        innerYTop,
+        innerHeight,
+        heightForChild,
+        child,
+        innerWidth,
+        baselineOffset
+      );
       renderWithFixedWidth(child, page, cursorX, childY, slotWidth, childContainingBlock);
       cursorX += slotWidth;
       if (i < children.length - 1) cursorX += offsets.between;
@@ -495,7 +508,15 @@ function renderHStack(
       const baseWidth = childSizes[i]?.width ?? 0;
       const slotWidth = baseWidth + (extraPerChild[i] ?? 0);
       const heightForChild = resolveCrossAxisHeight(child, childSizes[i]?.height ?? 0, innerHeight);
-      const childY = resolveCrossAxisY(node.align, innerYTop, innerHeight, heightForChild);
+      const childY = resolveCrossAxisY(
+        node.align,
+        innerYTop,
+        innerHeight,
+        heightForChild,
+        child,
+        innerWidth,
+        baselineOffset
+      );
       renderWithFixedWidth(child, page, cursorX, childY, slotWidth, childContainingBlock);
       cursorX += slotWidth;
     });
@@ -632,7 +653,7 @@ function resolveCrossAxisHeight(child: Node, intrinsicHeight: number, available:
 }
 
 function resolveCrossAxisX(
-  align: "start" | "center" | "end" | "stretch",
+  align: "start" | "center" | "end" | "stretch" | "baseline",
   innerX: number,
   innerWidth: number,
   childWidth: number
@@ -642,6 +663,7 @@ function resolveCrossAxisX(
       return innerX + (innerWidth - childWidth) / 2;
     case "end":
       return innerX + (innerWidth - childWidth);
+    case "baseline":
     case "stretch":
     case "start":
     default:
@@ -650,16 +672,21 @@ function resolveCrossAxisX(
 }
 
 function resolveCrossAxisY(
-  align: "start" | "center" | "end" | "stretch",
+  align: "start" | "center" | "end" | "stretch" | "baseline",
   innerYTop: number,
   innerHeight: number,
-  childHeight: number
+  childHeight: number,
+  child?: Node,
+  parentWidth?: number,
+  baselineOffset = 0
 ): number {
   switch (align) {
     case "center":
       return innerYTop - (innerHeight - childHeight) / 2;
     case "end":
       return innerYTop - (innerHeight - childHeight);
+    case "baseline":
+      return innerYTop - Math.max(0, baselineOffset - (child ? nodeBaselineOffset(child, parentWidth ?? childHeight) : 0));
     case "stretch":
     case "start":
     default:
