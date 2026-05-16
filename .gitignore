@@ -11,3 +11,4 @@ fixtures/png
 examples/*.pdf
 out/
 boxpdf-*.tgz
+/html/
