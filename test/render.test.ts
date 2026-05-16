@@ -73,6 +73,44 @@ describe("render", () => {
     expect(bytes.byteLength).toBeGreaterThan(100);
   });
 
+  it("vstack align:stretch gives auto-width children the full cross-axis width", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([200, 120]);
+    const drawRectangle = vi.spyOn(page, "drawRectangle");
+    const node = vstack(
+      { width: 120, align: "stretch" },
+      hstack(
+        { height: 20, background: hex("#ddeeff") },
+        text("stretched", { size: 10, font })
+      )
+    );
+
+    render(node, page, 10, 100, 200);
+
+    expect(drawRectangle).toHaveBeenCalledWith(
+      expect.objectContaining({ x: 10, y: 80, width: 120, height: 20 })
+    );
+  });
+
+  it("hstack align:stretch gives auto-height children the full cross-axis height", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([200, 120]);
+    const drawRectangle = vi.spyOn(page, "drawRectangle");
+    const node = hstack(
+      { width: 120, height: 60, align: "stretch" },
+      vstack(
+        { width: 30, background: hex("#ddeeff") },
+        text("A", { size: 10, font })
+      )
+    );
+
+    render(node, page, 10, 100, 200);
+
+    expect(drawRectangle).toHaveBeenCalledWith(
+      expect.objectContaining({ x: 10, y: 40, width: 30, height: 60 })
+    );
+  });
+
   it("borderRadius emits an SVG path stroke instead of throwing", async () => {
     const bytes = await renderToPdf(
       vstack(

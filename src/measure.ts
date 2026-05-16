@@ -71,7 +71,12 @@ export function measureContent(node: Node, parentWidth: number): Size {
       const innerWidth = (fixedWidth ?? parentWidth) - inset.left - inset.right;
       const fixedHeight = node.style.height;
       const availableHeight = fixedHeight === undefined ? Infinity : fixedHeight - inset.top - inset.bottom;
-      const children = node.children.filter((child) => !isAbsoluteBox(child));
+      const children = stretchCrossAxisChildren(
+        node.children.filter((child) => !isAbsoluteBox(child)),
+        "vertical",
+        innerWidth,
+        node.align
+      );
       const layout = resolveMainAxis(children, "vertical", availableHeight, innerWidth, node.gap);
       const totalGap = node.gap * Math.max(0, layout.children.length - 1);
       const totalHeight = layout.sizes.reduce((s, sz) => s + sz.height, 0) + totalGap;
@@ -89,8 +94,14 @@ export function measureContent(node: Node, parentWidth: number): Size {
       const inset = edges(node.style.padding);
       const fixedWidth = node.style.width;
       const innerWidth = (fixedWidth ?? parentWidth) - inset.left - inset.right;
-      const children = node.children.filter((child) => !isAbsoluteBox(child));
-      const layout = resolveMainAxis(children, "horizontal", innerWidth, innerWidth, node.gap);
+      let children = node.children.filter((child) => !isAbsoluteBox(child));
+      let layout = resolveMainAxis(children, "horizontal", innerWidth, innerWidth, node.gap);
+      if (node.align === "stretch") {
+        const initialMaxHeight = layout.sizes.reduce((m, s) => (s.height > m ? s.height : m), 0);
+        const innerHeight = (node.style.height ?? initialMaxHeight + inset.top + inset.bottom) - inset.top - inset.bottom;
+        children = stretchCrossAxisChildren(children, "horizontal", innerHeight, node.align);
+        layout = resolveMainAxis(children, "horizontal", innerWidth, innerWidth, node.gap);
+      }
       const totalGap = node.gap * Math.max(0, layout.children.length - 1);
       const totalWidth = layout.sizes.reduce((s, sz) => s + sz.width, 0) + totalGap;
       const maxChildHeight = layout.sizes.reduce((m, s) => (s.height > m ? s.height : m), 0);
@@ -99,6 +110,52 @@ export function measureContent(node: Node, parentWidth: number): Size {
         height: node.style.height ?? maxChildHeight + inset.top + inset.bottom
       };
     }
+  }
+}
+
+export function stretchCrossAxisChildren(
+  children: Node[],
+  axis: MainAxis,
+  availableCross: number,
+  align: "start" | "center" | "end" | "stretch"
+): Node[] {
+  if (align !== "stretch" || !Number.isFinite(availableCross)) return children;
+  return children.map((child) => applyCrossAxisStretch(child, axis, availableCross));
+}
+
+function applyCrossAxisStretch(node: Node, axis: MainAxis, availableCross: number): Node {
+  const m = nodeMargin(node);
+  const size =
+    axis === "vertical"
+      ? Math.max(0, availableCross - m.left - m.right)
+      : Math.max(0, availableCross - m.top - m.bottom);
+  if (axis === "vertical") {
+    switch (node.kind) {
+      case "text":
+        return node.props.width === undefined ? { ...node, props: { ...node.props, width: size } } : node;
+      case "paragraph":
+        return node.props.width === undefined ? { ...node, props: { ...node.props, width: size } } : node;
+      case "vstack":
+      case "hstack":
+        return node.style.width === undefined ? { ...node, style: { ...node.style, width: size } } : node;
+      case "hline":
+        return node.width === undefined ? { ...node, width: size } : node;
+      case "link":
+        return { ...node, child: applyCrossAxisStretch(node.child, axis, size) };
+      default:
+        return node;
+    }
+  }
+  switch (node.kind) {
+    case "vstack":
+    case "hstack":
+      return node.style.height === undefined ? { ...node, style: { ...node.style, height: size } } : node;
+    case "vline":
+      return node.height === undefined ? { ...node, height: size } : node;
+    case "link":
+      return { ...node, child: applyCrossAxisStretch(node.child, axis, size) };
+    default:
+      return node;
   }
 }
 

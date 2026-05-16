@@ -19,7 +19,8 @@ import {
   measureContent,
   nodeGrow,
   nodeMargin,
-  resolveMainAxis
+  resolveMainAxis,
+  stretchCrossAxisChildren
 } from "./measure.js";
 
 export interface RenderOptions {
@@ -352,7 +353,12 @@ function renderVStack(
   const intrinsic = measureContent(node, parentWidth);
   const boxWidth = node.style.width ?? intrinsic.width;
   const boxHeight = node.style.height ?? intrinsic.height;
-  const flowChildren = node.children.filter((child) => !isAbsoluteBox(child));
+  const flowChildren = stretchCrossAxisChildren(
+    node.children.filter((child) => !isAbsoluteBox(child)),
+    "vertical",
+    boxWidth - inset.left - inset.right,
+    node.align
+  );
   const absoluteChildren = node.children.filter(isAbsoluteBox);
   const childContainingBlock =
     node.style.position !== undefined
@@ -430,7 +436,12 @@ function renderHStack(
   const intrinsic = measureContent(node, parentWidth);
   const boxWidth = node.style.width ?? intrinsic.width;
   const boxHeight = node.style.height ?? intrinsic.height;
-  const flowChildren = node.children.filter((child) => !isAbsoluteBox(child));
+  const flowChildren = stretchCrossAxisChildren(
+    node.children.filter((child) => !isAbsoluteBox(child)),
+    "horizontal",
+    boxHeight - inset.top - inset.bottom,
+    node.align
+  );
   const absoluteChildren = node.children.filter(isAbsoluteBox);
   const childContainingBlock =
     node.style.position !== undefined
