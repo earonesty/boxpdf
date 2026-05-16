@@ -53,8 +53,15 @@ type FontkitEmbedder = {
  * possible. Words that exceed maxWidth on their own are hard-broken at the
  * character that overflows.
  */
-export function wrapText(font: PDFFont, size: number, value: string, maxWidth: number): string[] {
+export function wrapText(
+  font: PDFFont,
+  size: number,
+  value: string,
+  maxWidth: number,
+  options: { wrap?: boolean } = {}
+): string[] {
   if (maxWidth <= 0) return [value];
+  if (options.wrap === false) return value.split(/\r?\n/);
   const lines: string[] = [];
   for (const paragraph of value.split(/\r?\n/)) {
     if (paragraph.length === 0) {

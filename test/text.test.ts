@@ -35,6 +35,14 @@ describe("wrapText", () => {
     expect(lines.length).toBeGreaterThan(1);
     expect(lines.join("")).toBe(huge);
   });
+
+  it("honors explicit hard line breaks", () => {
+    expect(wrapText(font, 12, "line one\nline two", 1000)).toEqual(["line one", "line two"]);
+  });
+
+  it("can disable soft wrapping while preserving hard line breaks", () => {
+    expect(wrapText(font, 12, "one two three\nfour five", 20, { wrap: false })).toEqual(["one two three", "four five"]);
+  });
 });
 
 describe("ellipsize", () => {
@@ -133,5 +141,21 @@ describe("paragraph", () => {
     expect(lines).toHaveLength(1);
     expect(lines[0]!.segments.map((segment) => segment.text ?? "").join("")).toBe(content);
     expect(lines[0]!.width).toBeCloseTo(width, 5);
+  });
+
+  it("honors explicit hard breaks in paragraphs", () => {
+    const lines = layoutParagraph([run("alpha\nbeta\n\ngamma", { size: 12, font })], 500);
+    expect(lines).toHaveLength(4);
+    expect(lines.map((line) => line.segments.map((segment) => segment.text ?? "").join(""))).toEqual(["alpha", "beta", "", "gamma"]);
+    expect(lines[2]!.height).toBeGreaterThan(0);
+  });
+
+  it("can disable paragraph soft wrapping while preserving hard breaks", () => {
+    const lines = layoutParagraph([run("alpha beta gamma\nsecond line", { size: 12, font })], 30, undefined, { wrap: false });
+    expect(lines).toHaveLength(2);
+    expect(lines.map((line) => line.segments.map((segment) => segment.text ?? "").join(""))).toEqual([
+      "alpha beta gamma",
+      "second line"
+    ]);
   });
 });

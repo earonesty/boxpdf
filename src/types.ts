@@ -82,6 +82,8 @@ export interface TextProps {
   align?: Align;
   /** Slot width (enables word wrapping). If omitted, width is intrinsic. */
   width?: number;
+  /** When false, explicit newlines still break but width does not soft-wrap. */
+  wrap?: boolean;
   /** Line height in points; defaults to the font's full height for the size. */
   lineHeight?: number;
   /** Maximum number of wrapped lines (truncates with ellipsis when exceeded). */

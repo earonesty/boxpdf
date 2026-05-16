@@ -181,7 +181,7 @@ function renderContent(
       return lineHeight * Math.max(1, lines.length);
     }
     case "paragraph": {
-      const indent = { paddingLeft: node.props.paddingLeft, textIndent: node.props.textIndent };
+      const indent = { paddingLeft: node.props.paddingLeft, textIndent: node.props.textIndent, wrap: node.props.wrap };
       const slotWidth = node.props.width ?? Math.min(measureParagraphIntrinsicWidthWithIndent(node.runs, indent), parentWidth);
       const lines = layoutParagraph(node.runs, slotWidth, node.props.lineHeight, indent);
       let cursorY = yTop;

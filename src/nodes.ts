@@ -51,6 +51,7 @@ export interface TextOptions {
   color?: RGB;
   align?: "left" | "center" | "right";
   width?: number;
+  wrap?: boolean;
   lineHeight?: number;
   maxLines?: number;
   margin?: EdgesInput;
@@ -67,6 +68,7 @@ export function text(content: string, options: TextOptions): Node {
     color: options.color,
     align: options.align ?? "left",
     width: options.width,
+    wrap: options.wrap,
     lineHeight: options.lineHeight,
     maxLines: options.maxLines,
     margin: options.margin,
@@ -111,7 +113,8 @@ export function paragraph(options: ParagraphProps, ...runs: ParagraphItem[]): No
       lineHeight: options.lineHeight,
       margin: options.margin,
       paddingLeft: options.paddingLeft,
-      textIndent: options.textIndent
+      textIndent: options.textIndent,
+      wrap: options.wrap
     }
   };
 }

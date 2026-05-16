@@ -49,13 +49,13 @@ export function measureContent(node: Node, parentWidth: number): Size {
       const wrapWidth = props.width ?? parentWidth;
       const lineHeight = props.lineHeight ?? fontLineHeight(props.font, props.size);
       const lines = props.width
-        ? clampLines(wrapText(props.font, props.size, node.text, wrapWidth), props.maxLines)
-        : [node.text];
+        ? clampLines(wrapText(props.font, props.size, node.text, wrapWidth, { wrap: props.wrap }), props.maxLines)
+        : node.text.split(/\r?\n/);
       const usedLines = props.maxLines ? Math.min(lines.length, props.maxLines) : lines.length;
       return { width: slotWidth, height: lineHeight * Math.max(1, usedLines) };
     }
     case "paragraph": {
-      const indent = { paddingLeft: node.props.paddingLeft, textIndent: node.props.textIndent };
+      const indent = { paddingLeft: node.props.paddingLeft, textIndent: node.props.textIndent, wrap: node.props.wrap };
       const slotWidth = node.props.width ?? Math.min(measureParagraphIntrinsicWidthWithIndent(node.runs, indent), parentWidth);
       const height = measureParagraphHeight(node.runs, slotWidth, node.props.lineHeight, indent);
       return { width: slotWidth, height };
@@ -151,7 +151,7 @@ export function nodeBaselineOffset(node: Node, parentWidth: number): number {
       return m.top + fontLineMetrics(node.props.font, node.props.size, lineHeight).ascent;
     }
     case "paragraph": {
-      const indent = { paddingLeft: node.props.paddingLeft, textIndent: node.props.textIndent };
+      const indent = { paddingLeft: node.props.paddingLeft, textIndent: node.props.textIndent, wrap: node.props.wrap };
       const slotWidth = node.props.width ?? Math.min(measureParagraphIntrinsicWidthWithIndent(node.runs, indent), parentWidth);
       const [line] = layoutParagraph(node.runs, slotWidth, node.props.lineHeight, indent);
       const baseline = line?.segments.reduce((max, segment) => Math.max(max, segment.ascent), 0) ?? 0;
@@ -480,9 +480,9 @@ export function layoutText(
     if (props.maxLines && props.maxLines >= 1) {
       return [ellipsize(props.font, props.size, text, slotWidth)];
     }
-    return [text];
+    return text.split(/\r?\n/);
   }
-  const all = wrapText(props.font, props.size, text, props.width);
+  const all = wrapText(props.font, props.size, text, props.width, { wrap: props.wrap });
   if (!props.maxLines || all.length <= props.maxLines) return all;
   const kept = all.slice(0, props.maxLines);
   const last = kept[kept.length - 1];

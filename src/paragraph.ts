@@ -37,6 +37,7 @@ export interface ParagraphProps {
   margin?: import("./types.js").EdgesInput;
   paddingLeft?: number;
   textIndent?: number;
+  wrap?: boolean;
 }
 
 export interface ParagraphLineSegment {
@@ -63,15 +64,27 @@ function isInlineRun(run: ParagraphItem): run is InlineNodeRun {
   return "node" in run;
 }
 
+type ParagraphToken = ParagraphItem | { kind: "hardBreak" };
+
+function isHardBreak(token: ParagraphToken): token is { kind: "hardBreak" } {
+  return "kind" in token && token.kind === "hardBreak";
+}
+
 function runLineHeight(run: ParagraphItem): number {
   if (isInlineRun(run)) return measureInlineRun(run).height;
   return run.style.lineHeight ?? fontLineHeight(run.style.font, run.style.size);
 }
 
-function splitRun(run: ParagraphItem): ParagraphItem[] {
+function splitRun(run: ParagraphItem): ParagraphToken[] {
   if (isInlineRun(run)) return [run];
-  const parts = run.text.match(/\S+|\s+/g) ?? [run.text];
-  return parts.map((text) => ({ ...run, text }));
+  const tokens: ParagraphToken[] = [];
+  const parts = run.text.split(/\r?\n/);
+  parts.forEach((part, index) => {
+    if (index > 0) tokens.push({ kind: "hardBreak" });
+    const textTokens = part.match(/\S+|[^\S\r\n]+/g) ?? (part.length > 0 ? [part] : []);
+    tokens.push(...textTokens.map((text) => ({ ...run, text })));
+  });
+  return tokens;
 }
 
 function hardBreakRun(run: ParagraphRun, maxWidth: number): ParagraphRun[] {
@@ -153,14 +166,15 @@ function measureSegments(segments: ParagraphLineSegment[]): number {
 function lineFromSegments(
   segments: ParagraphLineSegment[],
   forcedLineHeight: number | undefined,
-  xOffset: number
+  xOffset: number,
+  fallbackLineHeight: number
 ): ParagraphLine {
   const resolvedSegments = resolveMiddleInlineSegments(normalizeTextSegments(segments));
   const width = resolvedSegments.reduce((sum, segment) => sum + segment.width, 0);
   const naturalHeight =
     resolvedSegments.reduce((max, segment) => Math.max(max, segment.ascent), 0) +
     resolvedSegments.reduce((max, segment) => Math.max(max, segment.descent), 0);
-  const height = forcedLineHeight ?? naturalHeight;
+  const height = forcedLineHeight ?? (naturalHeight || fallbackLineHeight);
   return { segments: resolvedSegments, width, height, xOffset };
 }
 
@@ -181,10 +195,12 @@ export function layoutParagraph(
   runs: ParagraphItem[],
   width: number,
   forcedLineHeight?: number,
-  options: Pick<ParagraphProps, "paddingLeft" | "textIndent"> = {}
+  options: Pick<ParagraphProps, "paddingLeft" | "textIndent" | "wrap"> = {}
 ): ParagraphLine[] {
   if (runs.length === 0) return [];
 
+  const wrap = options.wrap ?? true;
+  const fallbackLineHeight = runs.reduce((max, run) => Math.max(max, runLineHeight(run)), 0);
   const paddingLeft = options.paddingLeft ?? 0;
   const textIndent = options.textIndent ?? 0;
   const lineOffset = (lineIndex: number): number => paddingLeft + (lineIndex === 0 ? textIndent : 0);
@@ -202,11 +218,15 @@ export function layoutParagraph(
     ) {
       segments.pop();
     }
-    lines.push(lineFromSegments(segments, forcedLineHeight, lineOffset(currentLineIndex)));
+    lines.push(lineFromSegments(segments, forcedLineHeight, lineOffset(currentLineIndex), fallbackLineHeight));
     segments = [];
   };
 
   for (const token of tokens) {
+    if (isHardBreak(token)) {
+      pushLine();
+      continue;
+    }
     const availableWidth = lineWidth(lines.length);
     if (isInlineRun(token)) {
       const inline = measureInlineRun(token);
@@ -220,7 +240,7 @@ export function layoutParagraph(
         ascent: token.verticalAlign === "middle" ? inline.height / 2 : inline.height,
         descent: token.verticalAlign === "middle" ? inline.height / 2 : 0
       };
-      if (segments.length > 0 && measureSegments([...segments, segment]) > availableWidth) pushLine();
+      if (wrap && segments.length > 0 && measureSegments([...segments, segment]) > availableWidth) pushLine();
       segments.push(segment);
       continue;
     }
@@ -228,13 +248,13 @@ export function layoutParagraph(
     if (/^\s+$/.test(token.text) && segments.length === 0) continue;
 
     const tokenSegment = segmentFromTextRun(token);
-    if (segments.length > 0 && measureSegments([...segments, tokenSegment]) > availableWidth) {
+    if (wrap && segments.length > 0 && measureSegments([...segments, tokenSegment]) > availableWidth) {
       pushLine();
       if (/^\s+$/.test(token.text)) continue;
     }
 
     const currentAvailableWidth = lineWidth(lines.length);
-    if (measureSegments([tokenSegment]) > currentAvailableWidth && !/^\s+$/.test(token.text)) {
+    if (wrap && measureSegments([tokenSegment]) > currentAvailableWidth && !/^\s+$/.test(token.text)) {
       const pieces = hardBreakRun(token, currentAvailableWidth);
       for (const piece of pieces) {
         const pieceSegment = segmentFromTextRun(piece);
@@ -248,7 +268,7 @@ export function layoutParagraph(
   }
 
   if (segments.length > 0) pushLine();
-  return lines.length > 0 ? lines : [lineFromSegments([], forcedLineHeight, lineOffset(0))];
+  return lines.length > 0 ? lines : [lineFromSegments([], forcedLineHeight, lineOffset(0), fallbackLineHeight)];
 }
 
 function measureInlineRun(run: InlineNodeRun): { width: number; height: number } {
@@ -260,25 +280,27 @@ function measureInlineRun(run: InlineNodeRun): { width: number; height: number }
 }
 
 export function measureParagraphIntrinsicWidth(runs: ParagraphItem[]): number {
-  return runs.reduce((sum, run) => {
-    if (isInlineRun(run)) return sum + measureInlineRun(run).width;
-    return sum + measureText(run.style.font, run.style.size, run.text);
-  }, 0);
+  return Math.max(
+    0,
+    ...layoutParagraph(runs, Number.POSITIVE_INFINITY, undefined, { wrap: false }).map((line) => line.width)
+  );
 }
 
 export function measureParagraphIntrinsicWidthWithIndent(
   runs: ParagraphItem[],
   options: Pick<ParagraphProps, "paddingLeft" | "textIndent"> = {}
 ): number {
-  const base = measureParagraphIntrinsicWidth(runs);
-  return base + Math.max(options.paddingLeft ?? 0, (options.paddingLeft ?? 0) + (options.textIndent ?? 0));
+  return Math.max(
+    0,
+    ...layoutParagraph(runs, Number.POSITIVE_INFINITY, undefined, { ...options, wrap: false }).map((line) => line.xOffset + line.width)
+  );
 }
 
 export function measureParagraphHeight(
   runs: ParagraphItem[],
   width: number,
   forcedLineHeight?: number,
-  options: Pick<ParagraphProps, "paddingLeft" | "textIndent"> = {}
+  options: Pick<ParagraphProps, "paddingLeft" | "textIndent" | "wrap"> = {}
 ): number {
   const lines = layoutParagraph(runs, width, forcedLineHeight, options);
   if (lines.length === 0) {
