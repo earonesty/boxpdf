@@ -111,4 +111,17 @@ describe("paragraph", () => {
     expect(inline).toBeDefined();
     expect(inline!.ascent - inline!.height / 2).toBeCloseTo(fontXHeight(font, 12) / 2, 5);
   });
+
+  it("supports hanging indents with textIndent and paddingLeft", () => {
+    const lines = layoutParagraph(
+      [run("• Wrapped list item with enough text to continue on the next line.", { size: 12, font })],
+      150,
+      undefined,
+      { paddingLeft: 18, textIndent: -18 }
+    );
+    expect(lines.length).toBeGreaterThan(1);
+    expect(lines[0]!.xOffset).toBe(0);
+    expect(lines[1]!.xOffset).toBe(18);
+    expect(lines[1]!.width).toBeLessThanOrEqual(132);
+  });
 });

@@ -1,6 +1,10 @@
 import { edges, type Node, type Size } from "./types.js";
 import { ellipsize, fontLineHeight, fontLineMetrics, measureText, wrapText } from "./text.js";
-import { layoutParagraph, measureParagraphHeight, measureParagraphIntrinsicWidth } from "./paragraph.js";
+import {
+  layoutParagraph,
+  measureParagraphHeight,
+  measureParagraphIntrinsicWidthWithIndent
+} from "./paragraph.js";
 
 export type MainAxis = "horizontal" | "vertical";
 
@@ -51,8 +55,9 @@ export function measureContent(node: Node, parentWidth: number): Size {
       return { width: slotWidth, height: lineHeight * Math.max(1, usedLines) };
     }
     case "paragraph": {
-      const slotWidth = node.props.width ?? Math.min(measureParagraphIntrinsicWidth(node.runs), parentWidth);
-      const height = measureParagraphHeight(node.runs, slotWidth, node.props.lineHeight);
+      const indent = { paddingLeft: node.props.paddingLeft, textIndent: node.props.textIndent };
+      const slotWidth = node.props.width ?? Math.min(measureParagraphIntrinsicWidthWithIndent(node.runs, indent), parentWidth);
+      const height = measureParagraphHeight(node.runs, slotWidth, node.props.lineHeight, indent);
       return { width: slotWidth, height };
     }
     case "image":
@@ -146,8 +151,9 @@ export function nodeBaselineOffset(node: Node, parentWidth: number): number {
       return m.top + fontLineMetrics(node.props.font, node.props.size, lineHeight).ascent;
     }
     case "paragraph": {
-      const slotWidth = node.props.width ?? Math.min(measureParagraphIntrinsicWidth(node.runs), parentWidth);
-      const [line] = layoutParagraph(node.runs, slotWidth, node.props.lineHeight);
+      const indent = { paddingLeft: node.props.paddingLeft, textIndent: node.props.textIndent };
+      const slotWidth = node.props.width ?? Math.min(measureParagraphIntrinsicWidthWithIndent(node.runs, indent), parentWidth);
+      const [line] = layoutParagraph(node.runs, slotWidth, node.props.lineHeight, indent);
       const baseline = line?.segments.reduce((max, segment) => Math.max(max, segment.ascent), 0) ?? 0;
       return m.top + baseline;
     }

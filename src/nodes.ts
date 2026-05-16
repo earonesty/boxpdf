@@ -109,7 +109,9 @@ export function paragraph(options: ParagraphProps, ...runs: ParagraphItem[]): No
       width: options.width,
       align: options.align ?? "left",
       lineHeight: options.lineHeight,
-      margin: options.margin
+      margin: options.margin,
+      paddingLeft: options.paddingLeft,
+      textIndent: options.textIndent
     }
   };
 }

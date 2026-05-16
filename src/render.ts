@@ -12,7 +12,7 @@ import {
 } from "pdf-lib";
 import { edges, type BorderSides, type Justify, type Node, type RGB } from "./types.js";
 import { fontLineHeight, fontLineMetrics, measureText } from "./text.js";
-import { layoutParagraph, measureParagraphIntrinsicWidth } from "./paragraph.js";
+import { layoutParagraph, measureParagraphIntrinsicWidthWithIndent } from "./paragraph.js";
 import {
   layoutText,
   measure,
@@ -181,13 +181,14 @@ function renderContent(
       return lineHeight * Math.max(1, lines.length);
     }
     case "paragraph": {
-      const slotWidth = node.props.width ?? Math.min(measureParagraphIntrinsicWidth(node.runs), parentWidth);
-      const lines = layoutParagraph(node.runs, slotWidth, node.props.lineHeight);
+      const indent = { paddingLeft: node.props.paddingLeft, textIndent: node.props.textIndent };
+      const slotWidth = node.props.width ?? Math.min(measureParagraphIntrinsicWidthWithIndent(node.runs, indent), parentWidth);
+      const lines = layoutParagraph(node.runs, slotWidth, node.props.lineHeight, indent);
       let cursorY = yTop;
       for (const line of lines) {
-        let drawX = x;
-        if (node.props.align === "center") drawX = x + (slotWidth - line.width) / 2;
-        else if (node.props.align === "right") drawX = x + (slotWidth - line.width);
+        let drawX = x + line.xOffset;
+        if (node.props.align === "center") drawX = x + line.xOffset + (slotWidth - line.xOffset - line.width) / 2;
+        else if (node.props.align === "right") drawX = x + line.xOffset + (slotWidth - line.xOffset - line.width);
         const lineAscent = line.segments.reduce((max, segment) => Math.max(max, segment.ascent), 0);
         const baseline = cursorY - lineAscent;
         for (const segment of line.segments) {
