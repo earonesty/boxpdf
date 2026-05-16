@@ -91,12 +91,71 @@ function hardBreakRun(run: ParagraphRun, maxWidth: number): ParagraphRun[] {
   return out;
 }
 
+function textStyleKey(style: TextRunStyle): string {
+  const color = style.color ? `${style.color.r},${style.color.g},${style.color.b}` : "";
+  return [
+    style.size,
+    style.lineHeight ?? "",
+    style.underline ? "u" : "",
+    style.strikethrough ? "s" : "",
+    color
+  ].join("|");
+}
+
+function sameTextPaint(a: ParagraphLineSegment, b: ParagraphLineSegment): boolean {
+  if (a.kind !== "text" || b.kind !== "text" || !a.style || !b.style) return false;
+  return a.style.font === b.style.font && textStyleKey(a.style) === textStyleKey(b.style) && a.href === b.href;
+}
+
+function segmentFromTextRun(run: ParagraphRun): ParagraphLineSegment {
+  const lineHeight = run.style.lineHeight ?? fontLineHeight(run.style.font, run.style.size);
+  const metrics = fontLineMetrics(run.style.font, run.style.size, lineHeight);
+  return {
+    kind: "text",
+    text: run.text,
+    style: run.style,
+    href: run.href,
+    width: measureText(run.style.font, run.style.size, run.text),
+    height: lineHeight,
+    ascent: metrics.ascent,
+    descent: metrics.descent
+  };
+}
+
+function normalizeTextSegments(segments: ParagraphLineSegment[]): ParagraphLineSegment[] {
+  const out: ParagraphLineSegment[] = [];
+  for (const segment of segments) {
+    const previous = out[out.length - 1];
+    if (previous && sameTextPaint(previous, segment)) {
+      const text = `${previous.text ?? ""}${segment.text ?? ""}`;
+      const style = previous.style!;
+      const lineHeight = style.lineHeight ?? fontLineHeight(style.font, style.size);
+      const metrics = fontLineMetrics(style.font, style.size, lineHeight);
+      out[out.length - 1] = {
+        ...previous,
+        text,
+        width: measureText(style.font, style.size, text),
+        height: lineHeight,
+        ascent: metrics.ascent,
+        descent: metrics.descent
+      };
+      continue;
+    }
+    out.push(segment);
+  }
+  return out;
+}
+
+function measureSegments(segments: ParagraphLineSegment[]): number {
+  return normalizeTextSegments(segments).reduce((sum, segment) => sum + segment.width, 0);
+}
+
 function lineFromSegments(
   segments: ParagraphLineSegment[],
   forcedLineHeight: number | undefined,
   xOffset: number
 ): ParagraphLine {
-  const resolvedSegments = resolveMiddleInlineSegments(segments);
+  const resolvedSegments = resolveMiddleInlineSegments(normalizeTextSegments(segments));
   const width = resolvedSegments.reduce((sum, segment) => sum + segment.width, 0);
   const naturalHeight =
     resolvedSegments.reduce((max, segment) => Math.max(max, segment.ascent), 0) +
@@ -133,7 +192,6 @@ export function layoutParagraph(
   const tokens = runs.flatMap(splitRun);
   const lines: ParagraphLine[] = [];
   let segments: ParagraphLineSegment[] = [];
-  let currentWidth = 0;
 
   const pushLine = (): void => {
     const currentLineIndex = lines.length;
@@ -142,19 +200,17 @@ export function layoutParagraph(
       segments[segments.length - 1]!.kind === "text" &&
       /^\s+$/.test(segments[segments.length - 1]!.text ?? "")
     ) {
-      currentWidth -= segments.pop()!.width;
+      segments.pop();
     }
     lines.push(lineFromSegments(segments, forcedLineHeight, lineOffset(currentLineIndex)));
     segments = [];
-    currentWidth = 0;
   };
 
   for (const token of tokens) {
     const availableWidth = lineWidth(lines.length);
     if (isInlineRun(token)) {
       const inline = measureInlineRun(token);
-      if (currentWidth > 0 && currentWidth + inline.width > availableWidth) pushLine();
-      segments.push({
+      const segment: ParagraphLineSegment = {
         kind: "inline",
         node: token.node,
         href: token.href,
@@ -163,55 +219,32 @@ export function layoutParagraph(
         height: inline.height,
         ascent: token.verticalAlign === "middle" ? inline.height / 2 : inline.height,
         descent: token.verticalAlign === "middle" ? inline.height / 2 : 0
-      });
-      currentWidth += inline.width;
+      };
+      if (segments.length > 0 && measureSegments([...segments, segment]) > availableWidth) pushLine();
+      segments.push(segment);
       continue;
     }
 
     if (/^\s+$/.test(token.text) && segments.length === 0) continue;
 
-    const tokenWidth = measureText(token.style.font, token.style.size, token.text);
-    if (currentWidth > 0 && currentWidth + tokenWidth > availableWidth) {
+    const tokenSegment = segmentFromTextRun(token);
+    if (segments.length > 0 && measureSegments([...segments, tokenSegment]) > availableWidth) {
       pushLine();
       if (/^\s+$/.test(token.text)) continue;
     }
 
     const currentAvailableWidth = lineWidth(lines.length);
-    if (tokenWidth > currentAvailableWidth && !/^\s+$/.test(token.text)) {
+    if (measureSegments([tokenSegment]) > currentAvailableWidth && !/^\s+$/.test(token.text)) {
       const pieces = hardBreakRun(token, currentAvailableWidth);
       for (const piece of pieces) {
-        const pieceWidth = measureText(piece.style.font, piece.style.size, piece.text);
-        if (currentWidth > 0 && currentWidth + pieceWidth > lineWidth(lines.length)) pushLine();
-        const lineHeight = piece.style.lineHeight ?? fontLineHeight(piece.style.font, piece.style.size);
-        const metrics = fontLineMetrics(piece.style.font, piece.style.size, lineHeight);
-        segments.push({
-          kind: "text",
-          text: piece.text,
-          style: piece.style,
-          href: piece.href,
-          width: pieceWidth,
-          height: lineHeight,
-          ascent: metrics.ascent,
-          descent: metrics.descent
-        });
-        currentWidth += pieceWidth;
+        const pieceSegment = segmentFromTextRun(piece);
+        if (segments.length > 0 && measureSegments([...segments, pieceSegment]) > lineWidth(lines.length)) pushLine();
+        segments.push(pieceSegment);
       }
       continue;
     }
 
-    const lineHeight = token.style.lineHeight ?? fontLineHeight(token.style.font, token.style.size);
-    const metrics = fontLineMetrics(token.style.font, token.style.size, lineHeight);
-    segments.push({
-      kind: "text",
-      text: token.text,
-      style: token.style,
-      href: token.href,
-      width: tokenWidth,
-      height: lineHeight,
-      ascent: metrics.ascent,
-      descent: metrics.descent
-    });
-    currentWidth += tokenWidth;
+    segments.push(tokenSegment);
   }
 
   if (segments.length > 0) pushLine();

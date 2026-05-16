@@ -124,4 +124,14 @@ describe("paragraph", () => {
     expect(lines[1]!.xOffset).toBe(18);
     expect(lines[1]!.width).toBeLessThanOrEqual(132);
   });
+
+  it("does not wrap an auto-width line because token widths differ from full text width", () => {
+    const content = "Plain list item without marker";
+    const width = measureText(font, 9.75, content);
+    const lines = layoutParagraph([run(content, { size: 9.75, font })], width);
+
+    expect(lines).toHaveLength(1);
+    expect(lines[0]!.segments.map((segment) => segment.text ?? "").join("")).toBe(content);
+    expect(lines[0]!.width).toBeCloseTo(width, 5);
+  });
 });
