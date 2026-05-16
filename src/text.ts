@@ -8,9 +8,45 @@ export function fontLineHeight(font: PDFFont, size: number): number {
   return font.heightAtSize(size, { descender: true });
 }
 
+export function fontDescent(font: PDFFont, size: number): number {
+  return fontLineHeight(font, size) - fontAscent(font, size);
+}
+
+export function fontLineMetrics(
+  font: PDFFont,
+  size: number,
+  lineHeight = fontLineHeight(font, size)
+): { ascent: number; descent: number } {
+  const ascent = fontAscent(font, size);
+  const descent = fontDescent(font, size);
+  const leading = lineHeight - ascent - descent;
+  return {
+    ascent: ascent + leading / 2,
+    descent: descent + leading / 2
+  };
+}
+
+export function fontXHeight(font: PDFFont, size: number): number {
+  const embedder = (font as unknown as { embedder?: FontkitEmbedder }).embedder;
+  const fontkitXHeight = embedder?.font?.xHeight;
+  if (typeof fontkitXHeight === "number" && typeof embedder?.font?.unitsPerEm === "number") {
+    return (fontkitXHeight / embedder.font.unitsPerEm) * size;
+  }
+  const standardXHeight = (embedder?.font as { XHeight?: unknown } | undefined)?.XHeight;
+  if (typeof standardXHeight === "number") return (standardXHeight / 1000) * size;
+  return fontAscent(font, size) * 0.5;
+}
+
 export function measureText(font: PDFFont, size: number, value: string): number {
   return font.widthOfTextAtSize(value, size);
 }
+
+type FontkitEmbedder = {
+  font?: {
+    unitsPerEm?: number;
+    xHeight?: number;
+  };
+};
 
 /**
  * Wrap text into lines that fit within `maxWidth`, breaking on whitespace where

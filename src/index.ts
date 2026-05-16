@@ -15,6 +15,7 @@ export {
   hstack,
   image,
   imageFit,
+  inlineNode,
   keepTogether,
   link,
   linkRun,
@@ -29,7 +30,7 @@ export {
 export { table } from "./table.js";
 export type { CellVerticalAlign, ColumnSpec, ColumnWidth, TableCell, TableCellInput, TableDivider, TableOptions } from "./table.js";
 export type { TextOptions } from "./nodes.js";
-export type { ParagraphProps, ParagraphRun, TextRunStyle } from "./paragraph.js";
+export type { InlineNodeRun, InlineVerticalAlign, ParagraphItem, ParagraphProps, ParagraphRun, TextRunStyle } from "./paragraph.js";
 
 export { measure, measureContent, resolveMainAxis } from "./measure.js";
 export type { MainAxis, MainAxisLayout } from "./measure.js";

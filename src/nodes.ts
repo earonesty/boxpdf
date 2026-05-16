@@ -8,7 +8,7 @@ import type {
   RGB,
   TextProps
 } from "./types.js";
-import type { ParagraphProps, ParagraphRun, TextRunStyle } from "./paragraph.js";
+import type { InlineNodeRun, ParagraphItem, ParagraphProps, ParagraphRun, TextRunStyle } from "./paragraph.js";
 
 type StackOptions = BoxStyle & {
   gap?: number;
@@ -86,7 +86,22 @@ export function linkRun(content: string, style: TextRunStyle, href: string): Par
   return { text: content, style, href };
 }
 
-export function paragraph(options: ParagraphProps, ...runs: ParagraphRun[]): Node {
+export function inlineNode(node: Node, options?: {
+  width?: number;
+  height?: number;
+  verticalAlign?: InlineNodeRun["verticalAlign"];
+  href?: string;
+}): InlineNodeRun {
+  return {
+    node,
+    width: options?.width,
+    height: options?.height,
+    verticalAlign: options?.verticalAlign,
+    href: options?.href
+  };
+}
+
+export function paragraph(options: ParagraphProps, ...runs: ParagraphItem[]): Node {
   return {
     kind: "paragraph",
     runs,

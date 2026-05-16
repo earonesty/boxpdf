@@ -107,7 +107,7 @@ Container `style`:
 ### Leaves
 
 - `text(content, { size, font, color?, align?, width?, lineHeight?, maxLines?, underline?, strikethrough?, margin? })`. Word-wraps when `width` is set. Truncates with ellipsis when `maxLines` is set. Default `lineHeight` uses the font's full height, including descenders.
-- `paragraph({ width?, align?, lineHeight?, margin? }, ...runs)`. Mixed inline text runs that wrap together as one paragraph. Use `run(text, style)` and `linkRun(text, style, href)` for styled/link segments.
+- `paragraph({ width?, align?, lineHeight?, margin? }, ...runs)`. Mixed inline text runs and atomic inline nodes that wrap together as one paragraph. Use `run(text, style)`, `linkRun(text, style, href)`, and `inlineNode(node, { verticalAlign?, href? })`.
 - `image(pdfImage, { width, height, margin? })`. Takes an already-embedded `PDFImage`.
 - `imageFit(pdfImage, { width, height, fit?, margin? })`. Draws an image centered in a fixed rectangle, scaled to contain (default) or cover with clipping.
 - `spacer(size, { grow? })` / `flex(weight = 1)`. Fixed or growing gap.

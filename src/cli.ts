@@ -131,7 +131,8 @@ Important APIs:
 - vstack(style, ...children): vertical box layout.
 - hstack(style, ...children): horizontal box layout.
 - text(content, style): text with wrapping when width is set, alignment, maxLines, underline, strikethrough, and full-height default line boxes.
-- paragraph(style, ...runs): mixed styled/link text runs that wrap together.
+- paragraph(style, ...runs): mixed styled/link text runs and atomic inline nodes that wrap together.
+- inlineNode(node, options): place an image, badge, or small box inside a paragraph line.
 - image(pdfImage, style): embedded PNG/JPEG image node.
 - imageFit(pdfImage, { width, height, fit }): image centered in a fixed rectangle, scaled to contain or cover with clipping.
 - hline(style), vline(style): rules.

@@ -11,7 +11,7 @@ import {
   type PDFPage
 } from "pdf-lib";
 import { edges, type BorderSides, type Justify, type Node, type RGB } from "./types.js";
-import { fontAscent, fontLineHeight, measureText } from "./text.js";
+import { fontLineHeight, fontLineMetrics, measureText } from "./text.js";
 import { layoutParagraph, measureParagraphIntrinsicWidth } from "./paragraph.js";
 import {
   layoutText,
@@ -148,7 +148,7 @@ function renderContent(
         let drawX = x;
         if (props.align === "center") drawX = x + (slotWidth - lineWidth) / 2;
         else if (props.align === "right") drawX = x + (slotWidth - lineWidth);
-        const baseline = cursorY - fontAscent(props.font, props.size);
+        const baseline = cursorY - fontLineMetrics(props.font, props.size, lineHeight).ascent;
         page.drawText(line, {
           x: drawX,
           y: baseline,
@@ -186,41 +186,49 @@ function renderContent(
         let drawX = x;
         if (node.props.align === "center") drawX = x + (slotWidth - line.width) / 2;
         else if (node.props.align === "right") drawX = x + (slotWidth - line.width);
-        const lineAscent = line.segments.reduce(
-          (max, segment) => Math.max(max, fontAscent(segment.style.font, segment.style.size)),
-          0
-        );
+        const lineAscent = line.segments.reduce((max, segment) => Math.max(max, segment.ascent), 0);
         const baseline = cursorY - lineAscent;
         for (const segment of line.segments) {
-          page.drawText(segment.text, {
-            x: drawX,
-            y: baseline,
-            size: segment.style.size,
-            font: segment.style.font,
-            color: toRgb(segment.style.color)
-          });
-          const decorationThickness = Math.max(0.5, segment.style.size * 0.06);
-          const decorationColor = toRgb(segment.style.color);
-          if (segment.style.underline && segment.text.length > 0) {
-            const underlineY = baseline - Math.max(1, segment.style.size * 0.12);
-            page.drawLine({
-              start: { x: drawX, y: underlineY },
-              end: { x: drawX + segment.width, y: underlineY },
-              thickness: decorationThickness,
-              color: decorationColor
+          if (segment.kind === "text" && segment.text !== undefined && segment.style !== undefined) {
+            page.drawText(segment.text, {
+              x: drawX,
+              y: baseline,
+              size: segment.style.size,
+              font: segment.style.font,
+              color: toRgb(segment.style.color)
             });
+            const decorationThickness = Math.max(0.5, segment.style.size * 0.06);
+            const decorationColor = toRgb(segment.style.color);
+            if (segment.style.underline && segment.text.length > 0) {
+              const underlineY = baseline - Math.max(1, segment.style.size * 0.12);
+              page.drawLine({
+                start: { x: drawX, y: underlineY },
+                end: { x: drawX + segment.width, y: underlineY },
+                thickness: decorationThickness,
+                color: decorationColor
+              });
+            }
+            if (segment.style.strikethrough && segment.text.length > 0) {
+              const midY = baseline + segment.style.size * 0.28;
+              page.drawLine({
+                start: { x: drawX, y: midY },
+                end: { x: drawX + segment.width, y: midY },
+                thickness: decorationThickness,
+                color: decorationColor
+              });
+            }
+          } else if (segment.kind === "inline" && segment.node !== undefined) {
+            renderWithCurrent(
+              segment.node,
+              page,
+              drawX,
+              baseline + segment.ascent,
+              segment.width,
+              containingBlock
+            );
           }
-          if (segment.style.strikethrough && segment.text.length > 0) {
-            const midY = baseline + segment.style.size * 0.28;
-            page.drawLine({
-              start: { x: drawX, y: midY },
-              end: { x: drawX + segment.width, y: midY },
-              thickness: decorationThickness,
-              color: decorationColor
-            });
-          }
-          if (segment.href && segment.text.length > 0) {
-            attachLinkAnnotation(page, drawX, cursorY - line.height, segment.width, line.height, segment.href);
+          if (segment.href) {
+            attachLinkAnnotation(page, drawX, baseline - segment.descent, segment.width, segment.height, segment.href);
           }
           drawX += segment.width;
         }

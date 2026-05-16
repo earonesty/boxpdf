@@ -1,5 +1,5 @@
 import type { PDFFont, PDFImage } from "pdf-lib";
-import type { ParagraphProps, ParagraphRun } from "./paragraph.js";
+import type { ParagraphItem, ParagraphProps } from "./paragraph.js";
 
 export type RGB = { r: number; g: number; b: number };
 
@@ -134,7 +134,7 @@ export type Node =
     }
   | {
       kind: "paragraph";
-      runs: ParagraphRun[];
+      runs: ParagraphItem[];
       props: ParagraphProps;
     }
   | {
