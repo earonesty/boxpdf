@@ -10,3 +10,9 @@ Current drift example: the README documents flex-shrink, but the CLI guide still
 - add a check that generated README sections are current
 
 Avoid a full docs framework unless the docs grow enough to need it.
+
+README length is still acceptable while it is the primary API overview. Split when:
+
+- examples or option tables start hiding the install/quickstart path
+- the website, README, and CLI need the same long API sections
+- release-specific docs need more than a short current-surface summary

@@ -39,10 +39,11 @@ npm install boxpdf pdf-lib
 ## What it does
 
 - Declarative layout primitives: `vstack`, `hstack`, `text`, `image`, `hline`, `vline`, `spacer`, `flex`, `keepTogether`, `link`, `svgPath`, `table`.
-- Padding, margin, background, borders, borderRadius, flex-grow, flex-shrink, justify, align.
-- Word wrapping with `maxLines` truncation and optional `breakWords`.
+- Padding, margin, background, background images, borders, borderRadius, overflow clipping, flex-grow, flex-shrink, justify, align.
+- Rich paragraphs with mixed inline runs, inline replaced nodes, hard breaks, hanging indents, and optional paragraph floats.
+- Word wrapping with `maxLines` truncation, optional `breakWords`, and no-wrap control.
 - Themes: `cleanTheme`, `stripeTheme`, `editorialTheme`, `brutalistTheme`.
-- Multi-page flow with per-page headers and footers.
+- Multi-page flow with per-page headers and footers, stack fragmentation, and table row fragmentation.
 - Streaming generation for memory-bounded output.
 - PDF link annotations, text decorations, document metadata.
 - ~7 KB minified core. Custom fonts pull in `@pdf-lib/fontkit` only when you call `loadFont` or `embedInter`.
@@ -92,14 +93,17 @@ Container `style`:
 | `width` / `height` | number | Fixed dimensions; otherwise size to content. |
 | `padding` / `margin` | number \| `{ top, right, bottom, left }` | Shorthand or per-side. |
 | `background` | RGB | Solid fill. |
+| `backgroundImage` | `{ image, width, height, offsetX?, offsetY?, repeat? }` | Image painted behind children and clipped to the box. |
 | `border` | `{ color, width }` | 1pt+ stroke around the box. |
 | `borderSides` | `{ top?, right?, bottom?, left? }` | Per-side strokes using `{ color, width }`. |
 | `borderRadius` | number | Corner radius. |
+| `overflow` | `"visible"` \| `"hidden"` | Clips stack children and absolute descendants to the box rectangle. |
 | `position` | `"relative"` \| `"absolute"` | CSS-like positioning for boxes. |
 | `top` / `right` / `bottom` / `left` | number | Absolute offsets in points. |
 | `zIndex` | number | Paint order for positioned boxes; higher values render later. |
 | `grow` | number | Flex grow weight along the parent's main axis. |
 | `shrink` | number | Flex shrink weight. |
+| `breakInside` | `"auto"` \| `"avoid"` | Fragmentation hint under `renderFlow`; `avoid` keeps the box atomic. |
 | `gap` | number | Spacing between children. |
 | `justify` | `"start"` \| `"center"` \| `"end"` \| `"between"` \| `"around"` \| `"evenly"` | Main-axis distribution. |
 | `align` | `"start"` \| `"center"` \| `"end"` \| `"stretch"` \| `"baseline"` | Cross-axis alignment. `baseline` is intended for `hstack` rows. |
@@ -107,7 +111,7 @@ Container `style`:
 ### Leaves
 
 - `text(content, { size, font, color?, align?, width?, lineHeight?, maxLines?, underline?, strikethrough?, margin? })`. Word-wraps when `width` is set. Truncates with ellipsis when `maxLines` is set. Default `lineHeight` uses the font's full height, including descenders.
-- `paragraph({ width?, align?, lineHeight?, margin? }, ...runs)`. Mixed inline text runs and atomic inline nodes that wrap together as one paragraph. Use `run(text, style)`, `linkRun(text, style, href)`, and `inlineNode(node, { verticalAlign?, href? })`.
+- `paragraph({ width?, align?, lineHeight?, margin?, paddingLeft?, textIndent?, wrap?, floats? }, ...runs)`. Mixed inline text runs and atomic inline nodes that wrap together as one paragraph. Use `run(text, style)`, `linkRun(text, style, href)`, and `inlineNode(node, { verticalAlign?, href? })`. Newlines in runs create hard breaks; `wrap: false` disables soft wrapping.
 - `image(pdfImage, { width, height, margin? })`. Takes an already-embedded `PDFImage`.
 - `imageFit(pdfImage, { width, height, fit?, margin? })`. Draws an image centered in a fixed rectangle, scaled to contain (default) or cover with clipping.
 - `spacer(size, { grow? })` / `flex(weight = 1)`. Fixed or growing gap.
@@ -118,7 +122,7 @@ Container `style`:
 
 ### Rendering
 
-- `renderFlow(pdf, nodes[], options)`. Paginates a sequence of top-level children. Top-level `vstack` nodes may fragment between children; `table()` fragments between rows and repeats headers on continuation pages. Use `keepTogether()` or `breakInside: "avoid"` for atomic blocks. Options: `size`, `margin`, `header?`, `footer?`, `reserveBottom?`, `title?`, `author?`, `subject?`, `keywords?`, `creator?`, `producer?`, `debug?`, `warnings?`. Headers and footers receive `{ pageNumber, totalPages }`. Defaults to LETTER (612×792). Pass `{ size: PageSizes.A4 }` for A4. When a top-level child's measured width exceeds the page content area, boxpdf emits a `console.warn`. Suppress with `warnings: false`.
+- `renderFlow(pdf, nodes[], options)`. Paginates a sequence of top-level children. Top-level `vstack` nodes may fragment between children; `table()` fragments between rows and repeats headers on continuation pages. Use `keepTogether()` or `breakInside: "avoid"` for atomic blocks. Options: `size`, `margin`, `header?`, `footer?`, `reserveBottom?`, `title?`, `author?`, `subject?`, `keywords?`, `creator?`, `producer?`, `debug?`, `warnings?`, `profile?`. Headers and footers receive `{ pageNumber, totalPages }`. Defaults to LETTER (612×792). Pass `{ size: PageSizes.A4 }` for A4. When a top-level child's measured width exceeds the page content area, boxpdf emits a `console.warn`. Suppress with `warnings: false`.
 - `streamFlow(pdf, writable, asyncIterable, options)`. Incremental page-by-page rendering. Memory stays bounded regardless of page count. Writes PDF bytes to a `WritableStream<Uint8Array>` as each page closes. See the Streaming section below for the contract.
 - `renderToPdf(node, options)`. One-page convenience.
 - `pageInner(size, margin)` / `pageContent(size, margin)`. Compute the inner content width or rectangle of a page.
@@ -295,6 +299,8 @@ Runnable scripts in [`examples/`](./examples):
 - `themes-showcase.ts`. The same receipt rendered in all four themes.
 - `inter-showcase.ts`. Clean theme rendered with Inter.
 - `flex-shrink.ts`. Three URL-overflow behaviors side by side.
+- `hanging-indent.ts`. Paragraph `paddingLeft` plus negative `textIndent` for list markers.
+- `overflow-clipping.ts`. Clipped cards with absolute overlays and background images.
 
 ## Flex-shrink
 

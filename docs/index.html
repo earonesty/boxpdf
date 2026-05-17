@@ -243,6 +243,26 @@ const bytes = await pdf.save(); // -&gt; Uint8Array</code></pre>
           <a class="source" href="https://github.com/earonesty/boxpdf/blob/main/examples/rich-content.ts" target="_blank" rel="noopener">examples/rich-content.ts</a>
         </figcaption>
       </figure>
+      <figure class="template-card">
+        <a href="./gallery/pdf/hanging-indent.pdf" target="_blank" rel="noopener">
+          <img src="./gallery/png/hanging-indent-1.png" alt="Hanging indent paragraph example" />
+        </a>
+        <figcaption>
+          <strong>Hanging indent</strong>
+          <span class="muted">paragraph paddingLeft · negative textIndent</span>
+          <a class="source" href="https://github.com/earonesty/boxpdf/blob/main/examples/hanging-indent.ts" target="_blank" rel="noopener">examples/hanging-indent.ts</a>
+        </figcaption>
+      </figure>
+      <figure class="template-card">
+        <a href="./gallery/pdf/overflow-clipping.pdf" target="_blank" rel="noopener">
+          <img src="./gallery/png/overflow-clipping-1.png" alt="Overflow clipping with absolute overlay and background image" />
+        </a>
+        <figcaption>
+          <strong>Overflow clipping</strong>
+          <span class="muted">overflow hidden · backgroundImage · imageFit</span>
+          <a class="source" href="https://github.com/earonesty/boxpdf/blob/main/examples/overflow-clipping.ts" target="_blank" rel="noopener">examples/overflow-clipping.ts</a>
+        </figcaption>
+      </figure>
     </div>
   </section>
 
@@ -313,20 +333,23 @@ export default app;</code></pre>
   </section>
 
   <section id="roadmap" class="block">
-    <h2>Shipped in 1.4</h2>
+    <h2>Current surface</h2>
     <ul class="roadmap">
       <li class="done">✓ Box layout DSL: vstack, hstack, text, image, hline, vline, spacer, flex, keepTogether</li>
-      <li class="done">✓ Padding, margin, background, borders, borderRadius, flex-grow, justify, align</li>
+      <li class="done">✓ Padding, margin, background, backgroundImage, borders, per-side borders, borderRadius, overflow clipping, flex-grow, justify, align</li>
       <li class="done">✓ Flex-shrink with whitespace-only wrapping (opt in to mid-word break or ellipsis)</li>
-      <li class="done">✓ Word-wrap, ellipsis, multi-line text with maxLines</li>
+      <li class="done">✓ Word-wrap, no-wrap, hard breaks, ellipsis, multi-line text with maxLines</li>
+      <li class="done">✓ Rich paragraphs with mixed runs, links, inline replaced nodes, hanging indents, and paragraph floats</li>
       <li class="done">✓ Themes: clean, stripe, editorial, brutalist</li>
-      <li class="done">✓ Multi-page flow with header, footer, PageContext</li>
+      <li class="done">✓ Multi-page flow with header, footer, PageContext, stack fragmentation, and table row fragmentation</li>
       <li class="done">✓ Links (PDF annotations), text decorations, document metadata</li>
       <li class="done">✓ <code>loadFont</code> (URL, bytes, base64, data URL), <code>embedInter</code>, <code>loadImage</code> helpers</li>
       <li class="done">✓ <code>boxpdf font add</code> CLI bundles any TTF as base64 bytes for <code>loadFont</code></li>
       <li class="done">✓ Tabular numerals on Inter for money columns (<code>embedInter(pdf, &#123; tabularFigures: true &#125;)</code>)</li>
-      <li class="done">✓ First-class <code>table()</code> primitive and <code>svgPath()</code> node</li>
-      <li class="done">✓ Debug overlay, formatCurrency, defineStyles</li>
+      <li class="done">✓ First-class <code>table()</code> primitive with styled cells, colSpan, valign, border collapse, and repeated headers</li>
+      <li class="done">✓ <code>svgPath()</code>, <code>imageFit()</code>, <code>aspectRatio()</code>, debug overlay, formatCurrency, defineStyles</li>
+      <li class="done">✓ CSS-like absolute positioning with paired-edge stretch and <code>zIndex</code></li>
+      <li class="done">✓ Optional renderFlow profiling hooks for diagnosing layout measurement costs</li>
       <li class="done">✓ Verified end-to-end on Cloudflare Workers (core and Inter path)</li>
       <li class="done">✓ Streaming page-at-a-time output via <code>streamFlow</code>. Peak heap stays flat at any page count.</li>
     </ul>

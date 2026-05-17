@@ -27,7 +27,9 @@ const scripts = [
   "examples/invoice.ts",
   "examples/debug.ts",
   "examples/absolute-positioning.ts",
-  "examples/rich-content.ts"
+  "examples/rich-content.ts",
+  "examples/hanging-indent.ts",
+  "examples/overflow-clipping.ts"
 ];
 
 console.log("→ rendering all templates");
