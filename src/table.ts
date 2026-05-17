@@ -34,6 +34,7 @@ export interface TableCell {
   border?: BoxStyle["border"];
   borderSides?: BorderSides;
   borderRadius?: number;
+  overflow?: BoxStyle["overflow"];
   align?: Align;
   valign?: CellVerticalAlign;
 }
@@ -195,6 +196,7 @@ function buildCellShell(
       border: borderCollapse === "collapse" ? undefined : spec.border,
       borderSides: borderCollapse === "collapse" ? collapsedBorderSides : spec.borderSides,
       borderRadius: borderCollapse === "collapse" ? undefined : spec.borderRadius,
+      overflow: spec.overflow,
       justify: justifyForVerticalAlign(spec.valign)
     },
     content

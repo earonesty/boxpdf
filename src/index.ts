@@ -85,6 +85,7 @@ export type {
   EdgesInput,
   Justify,
   Node,
+  Overflow,
   Position,
   Fragmentation,
   RGB,

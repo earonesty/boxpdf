@@ -10,7 +10,7 @@ import {
   rgb,
   type PDFPage
 } from "pdf-lib";
-import { edges, type BackgroundImage, type BorderSides, type Justify, type Node, type RGB } from "./types.js";
+import { edges, type BackgroundImage, type BorderSides, type BoxStyle, type Justify, type Node, type RGB } from "./types.js";
 import { fontLineHeight, fontLineMetrics, measureText } from "./text.js";
 import { layoutParagraph, layoutParagraphWithFloats, measureParagraphIntrinsicWidthWithIndent } from "./paragraph.js";
 import {
@@ -406,35 +406,37 @@ function renderVStack(
   const extraPerChild = children.map((c) => (totalGrow > 0 ? (nodeGrow(c) / totalGrow) * extra : 0));
 
   let cursorY = innerYTop;
-  if (totalGrow === 0) {
-    const offsets = computeMainAxisOffsets(
-      node.justify,
-      childSizes.map((s) => s.height),
-      innerHeight,
-      node.gap
-    );
-    cursorY = innerYTop - offsets.start;
-    children.forEach((child, i) => {
-      const slotHeight = childSizes[i]?.height ?? 0;
-      const widthForChild = resolveCrossAxisWidth(child, childSizes[i]?.width ?? 0, innerWidth);
-      const childX = resolveCrossAxisX(node.align, innerX, innerWidth, widthForChild);
-      renderWithFixedHeight(child, page, childX, cursorY, widthForChild, slotHeight, childContainingBlock);
-      cursorY -= slotHeight;
-      if (i < children.length - 1) cursorY -= offsets.between;
-    });
-  } else {
-    children.forEach((child, i) => {
-      if (i > 0) cursorY -= node.gap;
-      const baseHeight = childSizes[i]?.height ?? 0;
-      const slotHeight = baseHeight + (extraPerChild[i] ?? 0);
-      const widthForChild = resolveCrossAxisWidth(child, childSizes[i]?.width ?? 0, innerWidth);
-      const childX = resolveCrossAxisX(node.align, innerX, innerWidth, widthForChild);
-      renderWithFixedHeight(child, page, childX, cursorY, widthForChild, slotHeight, childContainingBlock);
-      cursorY -= slotHeight;
-    });
-  }
+  withBoxOverflowClip(page, node.style, x, yTop, boxWidth, boxHeight, () => {
+    if (totalGrow === 0) {
+      const offsets = computeMainAxisOffsets(
+        node.justify,
+        childSizes.map((s) => s.height),
+        innerHeight,
+        node.gap
+      );
+      cursorY = innerYTop - offsets.start;
+      children.forEach((child, i) => {
+        const slotHeight = childSizes[i]?.height ?? 0;
+        const widthForChild = resolveCrossAxisWidth(child, childSizes[i]?.width ?? 0, innerWidth);
+        const childX = resolveCrossAxisX(node.align, innerX, innerWidth, widthForChild);
+        renderWithFixedHeight(child, page, childX, cursorY, widthForChild, slotHeight, childContainingBlock);
+        cursorY -= slotHeight;
+        if (i < children.length - 1) cursorY -= offsets.between;
+      });
+    } else {
+      children.forEach((child, i) => {
+        if (i > 0) cursorY -= node.gap;
+        const baseHeight = childSizes[i]?.height ?? 0;
+        const slotHeight = baseHeight + (extraPerChild[i] ?? 0);
+        const widthForChild = resolveCrossAxisWidth(child, childSizes[i]?.width ?? 0, innerWidth);
+        const childX = resolveCrossAxisX(node.align, innerX, innerWidth, widthForChild);
+        renderWithFixedHeight(child, page, childX, cursorY, widthForChild, slotHeight, childContainingBlock);
+        cursorY -= slotHeight;
+      });
+    }
 
-  renderAbsoluteChildren(absoluteChildren, page, childContainingBlock);
+    renderAbsoluteChildren(absoluteChildren, page, childContainingBlock);
+  });
 
   return boxHeight;
 }
@@ -490,56 +492,95 @@ function renderHStack(
       : 0;
 
   let cursorX = innerX;
-  if (totalGrow === 0) {
-    const offsets = computeMainAxisOffsets(
-      node.justify,
-      childSizes.map((s) => s.width),
-      innerWidth,
-      node.gap
-    );
-    cursorX = innerX + offsets.start;
-    children.forEach((child, i) => {
-      const slotWidth = childSizes[i]?.width ?? 0;
-      const heightForChild = resolveCrossAxisHeight(child, childSizes[i]?.height ?? 0, innerHeight);
-      const childY = resolveCrossAxisY(
-        node.align,
-        innerYTop,
-        innerHeight,
-        heightForChild,
-        child,
+  withBoxOverflowClip(page, node.style, x, yTop, boxWidth, boxHeight, () => {
+    if (totalGrow === 0) {
+      const offsets = computeMainAxisOffsets(
+        node.justify,
+        childSizes.map((s) => s.width),
         innerWidth,
-        baselineOffset
+        node.gap
       );
-      renderWithFixedWidth(child, page, cursorX, childY, slotWidth, childContainingBlock);
-      cursorX += slotWidth;
-      if (i < children.length - 1) cursorX += offsets.between;
-    });
-  } else {
-    const extraPerChild = children.map((c) =>
-      totalGrow > 0 ? (nodeGrow(c) / totalGrow) * extra : 0
-    );
-    children.forEach((child, i) => {
-      if (i > 0) cursorX += node.gap;
-      const baseWidth = childSizes[i]?.width ?? 0;
-      const slotWidth = baseWidth + (extraPerChild[i] ?? 0);
-      const heightForChild = resolveCrossAxisHeight(child, childSizes[i]?.height ?? 0, innerHeight);
-      const childY = resolveCrossAxisY(
-        node.align,
-        innerYTop,
-        innerHeight,
-        heightForChild,
-        child,
-        innerWidth,
-        baselineOffset
+      cursorX = innerX + offsets.start;
+      children.forEach((child, i) => {
+        const slotWidth = childSizes[i]?.width ?? 0;
+        const heightForChild = resolveCrossAxisHeight(child, childSizes[i]?.height ?? 0, innerHeight);
+        const childY = resolveCrossAxisY(
+          node.align,
+          innerYTop,
+          innerHeight,
+          heightForChild,
+          child,
+          innerWidth,
+          baselineOffset
+        );
+        renderWithFixedWidth(child, page, cursorX, childY, slotWidth, childContainingBlock);
+        cursorX += slotWidth;
+        if (i < children.length - 1) cursorX += offsets.between;
+      });
+    } else {
+      const extraPerChild = children.map((c) =>
+        totalGrow > 0 ? (nodeGrow(c) / totalGrow) * extra : 0
       );
-      renderWithFixedWidth(child, page, cursorX, childY, slotWidth, childContainingBlock);
-      cursorX += slotWidth;
-    });
-  }
+      children.forEach((child, i) => {
+        if (i > 0) cursorX += node.gap;
+        const baseWidth = childSizes[i]?.width ?? 0;
+        const slotWidth = baseWidth + (extraPerChild[i] ?? 0);
+        const heightForChild = resolveCrossAxisHeight(child, childSizes[i]?.height ?? 0, innerHeight);
+        const childY = resolveCrossAxisY(
+          node.align,
+          innerYTop,
+          innerHeight,
+          heightForChild,
+          child,
+          innerWidth,
+          baselineOffset
+        );
+        renderWithFixedWidth(child, page, cursorX, childY, slotWidth, childContainingBlock);
+        cursorX += slotWidth;
+      });
+    }
 
-  renderAbsoluteChildren(absoluteChildren, page, childContainingBlock);
+    renderAbsoluteChildren(absoluteChildren, page, childContainingBlock);
+  });
 
   return boxHeight;
+}
+
+function withBoxOverflowClip(
+  page: PDFPage,
+  style: BoxStyle,
+  x: number,
+  yTop: number,
+  width: number,
+  height: number,
+  renderChildren: () => void
+): void {
+  if (style.overflow !== "hidden" || width <= 0 || height <= 0) {
+    renderChildren();
+    return;
+  }
+  const inset = overflowClipInset(style);
+  const clipX = x + inset.left;
+  const clipYTop = yTop - inset.top;
+  const clipWidth = Math.max(0, width - inset.left - inset.right);
+  const clipHeight = Math.max(0, height - inset.top - inset.bottom);
+  if (clipWidth <= 0 || clipHeight <= 0) return;
+  page.pushOperators(pushGraphicsState(), rectangle(clipX, clipYTop - clipHeight, clipWidth, clipHeight), clip(), endPath());
+  try {
+    renderChildren();
+  } finally {
+    page.pushOperators(popGraphicsState());
+  }
+}
+
+function overflowClipInset(style: BoxStyle): { top: number; right: number; bottom: number; left: number } {
+  const borderWidth = style.border?.width ?? 0;
+  return {
+    top: style.borderSides?.top?.width ?? borderWidth,
+    right: style.borderSides?.right?.width ?? borderWidth,
+    bottom: style.borderSides?.bottom?.width ?? borderWidth,
+    left: style.borderSides?.left?.width ?? borderWidth
+  };
 }
 
 function renderWithFixedHeight(

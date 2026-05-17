@@ -211,6 +211,37 @@ describe("render", () => {
     expect(measure(node, 200)).toEqual({ width: 100, height: 100 });
   });
 
+  it("clips stack descendants when overflow is hidden", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([240, 220]);
+    const pushOperators = vi.spyOn(page, "pushOperators");
+    const drawText = vi.spyOn(page, "drawText");
+    const node = vstack(
+      { width: 80, height: 20, overflow: "hidden" },
+      text("This line is intentionally taller than the box", { size: 18, font, width: 160 })
+    );
+
+    render(node, page, 10, 190, 200);
+
+    expect(drawText).toHaveBeenCalled();
+    expect(pushOperators).toHaveBeenCalledTimes(2);
+    expect(measure(node, 200)).toEqual({ width: 80, height: 20 });
+  });
+
+  it("clips absolute descendants when overflow is hidden", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([240, 220]);
+    const pushOperators = vi.spyOn(page, "pushOperators");
+    const node = vstack(
+      { width: 80, height: 40, position: "relative", overflow: "hidden" },
+      vstack({ position: "absolute", left: 60, top: 8, width: 50, height: 20, background: hex("#dbeafe") })
+    );
+
+    render(node, page, 10, 190, 200);
+
+    expect(pushOperators).toHaveBeenCalledTimes(2);
+  });
+
   it("debug option produces a larger PDF than non-debug for the same layout", async () => {
     const tree = vstack(
       { padding: 16, gap: 8, width: 300 },

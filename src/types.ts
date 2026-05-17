@@ -26,6 +26,7 @@ export type BackgroundImage = {
   repeat?: "no-repeat" | "repeat" | "repeat-x" | "repeat-y";
 };
 export type BreakInside = "auto" | "avoid";
+export type Overflow = "visible" | "hidden";
 export type Fragmentation = {
   kind: "table";
   headerCount: number;
@@ -51,6 +52,11 @@ export interface BoxStyle {
   borderSides?: BorderSides;
   /** Corner radius in points. Applies to background and border. */
   borderRadius?: number;
+  /**
+   * Paint overflow behavior for stack descendants. `hidden` clips children and
+   * absolute descendants to the box rectangle. Default `visible`.
+   */
+  overflow?: Overflow;
   /**
    * CSS-like positioning for boxes. Positioned boxes establish the containing
    * block for absolute descendants. `absolute` removes the box from stack flow
