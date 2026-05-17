@@ -251,6 +251,20 @@ pre code { color: inherit; }
 }
 .template-card .source:hover { color: var(--accent); }
 
+.tailwind-example {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  gap: 22px;
+  align-items: start;
+}
+.tailwind-example pre {
+  margin: 0;
+  min-width: 0;
+}
+.tailwind-example .template-card img {
+  height: 360px;
+}
+
 /* Comparison table */
 .compare {
   width: 100%;
@@ -308,4 +322,5 @@ pre code { color: inherit; }
   .site nav { gap: 12px; }
   .site nav a { font-size: 13px; }
   .hero { padding: 48px 0 32px; }
+  .tailwind-example { grid-template-columns: 1fr; }
 }

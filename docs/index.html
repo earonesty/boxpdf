@@ -12,6 +12,7 @@
   <a class="brand" href="./">boxpdf</a>
   <nav>
     <a href="#features">Features</a>
+    <a href="#tailwind">Tailwind</a>
     <a href="#themes">Themes</a>
     <a href="#templates">Templates</a>
     <a href="#memory">Memory</a>
@@ -96,6 +97,35 @@ const bytes = await pdf.save(); // -&gt; Uint8Array</code></pre>
         <h3>Tiny, tree-shakable</h3>
         <p>Core is &lt;7 KB minified. <code>boxpdf/inter</code> and <code>@pdf-lib/fontkit</code> only load when you use them.</p>
       </div>
+    </div>
+  </section>
+
+  <section id="tailwind" class="block">
+    <h2>Tailwind HTML</h2>
+    <p class="block-lede">
+      <code>boxpdf-html</code> can render document-style HTML from generated Tailwind CSS. Run Tailwind first, embed the CSS, then translate the HTML to boxpdf primitives.
+    </p>
+    <div class="tailwind-example">
+      <pre><code>&lt;div class="p-8 bg-white"&gt;
+  &lt;h1 class="text-2xl font-bold text-gray-900"&gt;
+    Invoice #1234
+  &lt;/h1&gt;
+
+  &lt;div class="mt-4 flex justify-between"&gt;
+    &lt;span class="text-gray-600"&gt;Total&lt;/span&gt;
+    &lt;span class="text-xl font-semibold"&gt;$1,250.00&lt;/span&gt;
+  &lt;/div&gt;
+&lt;/div&gt;</code></pre>
+      <figure class="template-card">
+        <a href="./gallery/pdf/tailwind-invoice.pdf" target="_blank" rel="noopener">
+          <img src="./gallery/png/tailwind-invoice-1.png" alt="Tailwind invoice HTML rendered by boxpdf-html" />
+        </a>
+        <figcaption>
+          <strong>Tailwind invoice</strong>
+          <span class="muted">generated utilities · flex · OKLCH colors</span>
+          <a class="source" href="https://github.com/earonesty/boxpdf/tree/main/html/fixtures" target="_blank" rel="noopener">html/fixtures</a>
+        </figcaption>
+      </figure>
     </div>
   </section>
 
