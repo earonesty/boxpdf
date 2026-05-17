@@ -106,23 +106,32 @@ const bytes = await pdf.save(); // -&gt; Uint8Array</code></pre>
       <code>boxpdf-html</code> can render document-style HTML from generated Tailwind CSS. Run Tailwind first, embed the CSS, then translate the HTML to boxpdf primitives.
     </p>
     <div class="tailwind-example">
-      <pre><code>&lt;div class="p-8 bg-white"&gt;
-  &lt;h1 class="text-2xl font-bold text-gray-900"&gt;
-    Invoice #1234
-  &lt;/h1&gt;
+      <pre><code>&lt;div class="p-6 bg-[#f8fafc] text-gray-900"&gt;
+  &lt;div class="max-w-[520px] rounded-[10px] border bg-white p-5 shadow-sm"&gt;
+    &lt;div class="grid grid-cols-[1fr_2fr] gap-x-4 gap-y-3"&gt;
+      &lt;div class="rounded-md border border-blue-200 bg-blue-50 p-3"&gt;
+        &lt;p class="text-xs font-semibold uppercase tracking-wide text-blue-700"&gt;Status&lt;/p&gt;
+        &lt;p class="mt-1 text-sm font-bold"&gt;Paid&lt;/p&gt;
+      &lt;/div&gt;
+      &lt;div class="rounded-md border border-gray-200 p-3"&gt;
+        &lt;p class="text-xs font-semibold uppercase tracking-wide text-gray-600"&gt;Notes&lt;/p&gt;
+        &lt;p class="mt-1 text-sm leading-5"&gt;Two fraction column wraps later.&lt;/p&gt;
+      &lt;/div&gt;
+    &lt;/div&gt;
 
-  &lt;div class="mt-4 flex justify-between"&gt;
-    &lt;span class="text-gray-600"&gt;Total&lt;/span&gt;
-    &lt;span class="text-xl font-semibold"&gt;$1,250.00&lt;/span&gt;
+    &lt;div class="mt-4 flex items-center justify-between rounded-md bg-gray-900 px-4 py-3 text-white"&gt;
+      &lt;span class="text-sm font-semibold"&gt;Amount due&lt;/span&gt;
+      &lt;span class="text-xl font-bold leading-none"&gt;$1,250.00&lt;/span&gt;
+    &lt;/div&gt;
   &lt;/div&gt;
 &lt;/div&gt;</code></pre>
       <figure class="template-card">
-        <a href="./gallery/pdf/tailwind-invoice.pdf" target="_blank" rel="noopener">
-          <img src="./gallery/png/tailwind-invoice-1.png" alt="Tailwind invoice HTML rendered by boxpdf-html" />
+        <a href="./gallery/pdf/tailwind-utilities.pdf" target="_blank" rel="noopener">
+          <img src="./gallery/png/tailwind-utilities-1.png" alt="Tailwind utility HTML rendered by boxpdf-html" />
         </a>
         <figcaption>
-          <strong>Tailwind invoice</strong>
-          <span class="muted">generated utilities · flex · OKLCH colors</span>
+          <strong>Tailwind utilities</strong>
+          <span class="muted">generated utilities · grid · flex · arbitrary values</span>
           <a class="source" href="https://github.com/earonesty/boxpdf/tree/main/html/fixtures" target="_blank" rel="noopener">html/fixtures</a>
         </figcaption>
       </figure>
