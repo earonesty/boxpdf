@@ -65,6 +65,7 @@ export { brutalistTheme } from "./themes/brutalist.js";
 
 export type {
   Align,
+  BackgroundImage,
   Border,
   BorderSides,
   BreakInside,

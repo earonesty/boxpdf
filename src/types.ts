@@ -17,6 +17,14 @@ export type BorderSides = {
   bottom?: Border;
   left?: Border;
 };
+export type BackgroundImage = {
+  image: PDFImage;
+  width: number;
+  height: number;
+  offsetX?: number;
+  offsetY?: number;
+  repeat?: "no-repeat" | "repeat" | "repeat-x" | "repeat-y";
+};
 export type BreakInside = "auto" | "avoid";
 export type Fragmentation = {
   kind: "table";
@@ -35,6 +43,8 @@ export interface BoxStyle {
   margin?: EdgesInput;
   /** Solid fill color. */
   background?: RGB;
+  /** Image painted behind children and clipped to the box rectangle. */
+  backgroundImage?: BackgroundImage;
   /** Border specification. */
   border?: Border;
   /** Per-side border strokes. Square-corner; use `border` for rounded all-side borders. */

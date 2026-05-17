@@ -10,7 +10,7 @@ import {
   rgb,
   type PDFPage
 } from "pdf-lib";
-import { edges, type BorderSides, type Justify, type Node, type RGB } from "./types.js";
+import { edges, type BackgroundImage, type BorderSides, type Justify, type Node, type RGB } from "./types.js";
 import { fontLineHeight, fontLineMetrics, measureText } from "./text.js";
 import { layoutParagraph, measureParagraphIntrinsicWidthWithIndent } from "./paragraph.js";
 import {
@@ -368,6 +368,7 @@ function renderVStack(
       : containingBlock;
 
   drawBackground(page, x, yTop, boxWidth, boxHeight, node.style.background, node.style.borderRadius);
+  drawBackgroundImage(page, x, yTop, boxWidth, boxHeight, node.style.backgroundImage);
   drawBorder(page, x, yTop, boxWidth, boxHeight, node.style.border, node.style.borderRadius);
   drawBorderSides(page, x, yTop, boxWidth, boxHeight, node.style.borderSides);
 
@@ -451,6 +452,7 @@ function renderHStack(
       : containingBlock;
 
   drawBackground(page, x, yTop, boxWidth, boxHeight, node.style.background, node.style.borderRadius);
+  drawBackgroundImage(page, x, yTop, boxWidth, boxHeight, node.style.backgroundImage);
   drawBorder(page, x, yTop, boxWidth, boxHeight, node.style.border, node.style.borderRadius);
   drawBorderSides(page, x, yTop, boxWidth, boxHeight, node.style.borderSides);
 
@@ -716,6 +718,42 @@ function drawBackground(
     color: toRgb(color),
     borderWidth: 0
   });
+}
+
+function drawBackgroundImage(
+  page: PDFPage,
+  x: number,
+  yTop: number,
+  width: number,
+  height: number,
+  backgroundImage: BackgroundImage | undefined
+): void {
+  if (!backgroundImage || backgroundImage.width <= 0 || backgroundImage.height <= 0) return;
+  if (![x, yTop, width, height, backgroundImage.width, backgroundImage.height].every(Number.isFinite)) return;
+  const repeat = backgroundImage.repeat ?? "no-repeat";
+  const offsetX = backgroundImage.offsetX ?? 0;
+  const offsetY = backgroundImage.offsetY ?? 0;
+  page.pushOperators(pushGraphicsState(), rectangle(x, yTop - height, width, height), clip(), endPath());
+  const startX = repeat === "repeat" || repeat === "repeat-x" ? tileStart(offsetX, backgroundImage.width) : offsetX;
+  const endX = repeat === "repeat" || repeat === "repeat-x" ? width : offsetX + 1;
+  const startY = repeat === "repeat" || repeat === "repeat-y" ? tileStart(offsetY, backgroundImage.height) : offsetY;
+  const endY = repeat === "repeat" || repeat === "repeat-y" ? height : offsetY + 1;
+  for (let tileY = startY; tileY < endY; tileY += backgroundImage.height) {
+    for (let tileX = startX; tileX < endX; tileX += backgroundImage.width) {
+      page.drawImage(backgroundImage.image, {
+        x: x + tileX,
+        y: yTop - tileY - backgroundImage.height,
+        width: backgroundImage.width,
+        height: backgroundImage.height
+      });
+    }
+  }
+  page.pushOperators(popGraphicsState());
+}
+
+function tileStart(offset: number, size: number): number {
+  while (offset > 0) offset -= size;
+  return offset;
 }
 
 function drawBorder(
