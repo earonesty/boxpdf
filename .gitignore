@@ -9,7 +9,6 @@ fixtures/*.pdf
 fixtures/png
 !fixtures/.gitkeep
 examples/*.pdf
-artifacts/**/*.pdf
 out/
 boxpdf-*.tgz
 /html/
