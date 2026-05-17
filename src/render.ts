@@ -12,7 +12,7 @@ import {
 } from "pdf-lib";
 import { edges, type BackgroundImage, type BorderSides, type Justify, type Node, type RGB } from "./types.js";
 import { fontLineHeight, fontLineMetrics, measureText } from "./text.js";
-import { layoutParagraph, measureParagraphIntrinsicWidthWithIndent } from "./paragraph.js";
+import { layoutParagraph, layoutParagraphWithFloats, measureParagraphIntrinsicWidthWithIndent } from "./paragraph.js";
 import {
   layoutText,
   measure,
@@ -181,9 +181,21 @@ function renderContent(
       return lineHeight * Math.max(1, lines.length);
     }
     case "paragraph": {
-      const indent = { paddingLeft: node.props.paddingLeft, textIndent: node.props.textIndent, wrap: node.props.wrap };
+      const indent = { paddingLeft: node.props.paddingLeft, textIndent: node.props.textIndent, wrap: node.props.wrap, floats: node.props.floats };
       const slotWidth = node.props.width ?? Math.min(measureParagraphIntrinsicWidthWithIndent(node.runs, indent), parentWidth);
-      const lines = layoutParagraph(node.runs, slotWidth, node.props.lineHeight, indent);
+      const layout = layoutParagraphWithFloats(node.runs, slotWidth, node.props.lineHeight, indent);
+      for (const float of layout.floats) {
+        const margin = edges(float.float.margin);
+        renderWithCurrent(
+          float.float.node,
+          page,
+          x + float.x + margin.left,
+          yTop - float.y - margin.top,
+          float.width - margin.left - margin.right,
+          containingBlock
+        );
+      }
+      const lines = layout.lines;
       let cursorY = yTop;
       for (const line of lines) {
         let drawX = x + line.xOffset;
@@ -237,7 +249,7 @@ function renderContent(
         }
         cursorY -= line.height;
       }
-      return lines.reduce((sum, line) => sum + line.height, 0);
+      return layout.height;
     }
     case "image":
       page.drawImage(node.image, {

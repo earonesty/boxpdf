@@ -55,7 +55,7 @@ export function measureContent(node: Node, parentWidth: number): Size {
       return { width: slotWidth, height: lineHeight * Math.max(1, usedLines) };
     }
     case "paragraph": {
-      const indent = { paddingLeft: node.props.paddingLeft, textIndent: node.props.textIndent, wrap: node.props.wrap };
+      const indent = { paddingLeft: node.props.paddingLeft, textIndent: node.props.textIndent, wrap: node.props.wrap, floats: node.props.floats };
       const slotWidth = node.props.width ?? Math.min(measureParagraphIntrinsicWidthWithIndent(node.runs, indent), parentWidth);
       const height = measureParagraphHeight(node.runs, slotWidth, node.props.lineHeight, indent);
       return { width: slotWidth, height };
@@ -151,7 +151,7 @@ export function nodeBaselineOffset(node: Node, parentWidth: number): number {
       return m.top + fontLineMetrics(node.props.font, node.props.size, lineHeight).ascent;
     }
     case "paragraph": {
-      const indent = { paddingLeft: node.props.paddingLeft, textIndent: node.props.textIndent, wrap: node.props.wrap };
+      const indent = { paddingLeft: node.props.paddingLeft, textIndent: node.props.textIndent, wrap: node.props.wrap, floats: node.props.floats };
       const slotWidth = node.props.width ?? Math.min(measureParagraphIntrinsicWidthWithIndent(node.runs, indent), parentWidth);
       const [line] = layoutParagraph(node.runs, slotWidth, node.props.lineHeight, indent);
       const baseline = line?.segments.reduce((max, segment) => Math.max(max, segment.ascent), 0) ?? 0;

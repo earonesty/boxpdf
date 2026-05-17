@@ -114,7 +114,8 @@ export function paragraph(options: ParagraphProps, ...runs: ParagraphItem[]): No
       margin: options.margin,
       paddingLeft: options.paddingLeft,
       textIndent: options.textIndent,
-      wrap: options.wrap
+      wrap: options.wrap,
+      floats: options.floats
     }
   };
 }

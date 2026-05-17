@@ -30,6 +30,14 @@ export interface InlineNodeRun {
 
 export type ParagraphItem = ParagraphRun | InlineNodeRun;
 
+export interface ParagraphFloat {
+  node: Node;
+  side: "left" | "right";
+  width?: number;
+  height?: number;
+  margin?: import("./types.js").EdgesInput;
+}
+
 export interface ParagraphProps {
   width?: number;
   align?: Align;
@@ -38,6 +46,7 @@ export interface ParagraphProps {
   paddingLeft?: number;
   textIndent?: number;
   wrap?: boolean;
+  floats?: ParagraphFloat[];
 }
 
 export interface ParagraphLineSegment {
@@ -58,6 +67,21 @@ export interface ParagraphLine {
   width: number;
   height: number;
   xOffset: number;
+}
+
+export interface ParagraphFloatLayout {
+  float: ParagraphFloat;
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+}
+
+export interface ParagraphLayout {
+  lines: ParagraphLine[];
+  floats: ParagraphFloatLayout[];
+  width: number;
+  height: number;
 }
 
 function isInlineRun(run: ParagraphItem): run is InlineNodeRun {
@@ -195,19 +219,39 @@ export function layoutParagraph(
   runs: ParagraphItem[],
   width: number,
   forcedLineHeight?: number,
-  options: Pick<ParagraphProps, "paddingLeft" | "textIndent" | "wrap"> = {}
+  options: Pick<ParagraphProps, "paddingLeft" | "textIndent" | "wrap" | "floats"> = {}
 ): ParagraphLine[] {
-  if (runs.length === 0) return [];
+  return layoutParagraphWithFloats(runs, width, forcedLineHeight, options).lines;
+}
 
+export function layoutParagraphWithFloats(
+  runs: ParagraphItem[],
+  width: number,
+  forcedLineHeight?: number,
+  options: Pick<ParagraphProps, "paddingLeft" | "textIndent" | "wrap" | "floats"> = {}
+): ParagraphLayout {
   const wrap = options.wrap ?? true;
   const fallbackLineHeight = runs.reduce((max, run) => Math.max(max, runLineHeight(run)), 0);
   const paddingLeft = options.paddingLeft ?? 0;
   const textIndent = options.textIndent ?? 0;
-  const lineOffset = (lineIndex: number): number => paddingLeft + (lineIndex === 0 ? textIndent : 0);
-  const lineWidth = (lineIndex: number): number => Math.max(0, width - Math.max(0, lineOffset(lineIndex)));
+  const floats = layoutFloats(options.floats ?? [], width);
+  if (runs.length === 0) {
+    const floatHeight = floats.reduce((max, float) => Math.max(max, float.y + float.height), 0);
+    return { lines: [], floats, width, height: floatHeight };
+  }
+  const lineOffset = (lineIndex: number, y: number, lineHeight: number): number => {
+    const floatInset = floatInsets(floats, y, lineHeight);
+    return paddingLeft + (lineIndex === 0 ? textIndent : 0) + floatInset.left;
+  };
+  const lineWidth = (lineIndex: number, y: number, lineHeight: number): number => {
+    const floatInset = floatInsets(floats, y, lineHeight);
+    const offset = paddingLeft + (lineIndex === 0 ? textIndent : 0) + floatInset.left;
+    return Math.max(0, width - Math.max(0, offset) - floatInset.right);
+  };
   const tokens = runs.flatMap(splitRun);
   const lines: ParagraphLine[] = [];
   let segments: ParagraphLineSegment[] = [];
+  let cursorY = 0;
 
   const pushLine = (): void => {
     const currentLineIndex = lines.length;
@@ -218,7 +262,11 @@ export function layoutParagraph(
     ) {
       segments.pop();
     }
-    lines.push(lineFromSegments(segments, forcedLineHeight, lineOffset(currentLineIndex), fallbackLineHeight));
+    const probe = lineFromSegments(segments, forcedLineHeight, 0, fallbackLineHeight);
+    const xOffset = lineOffset(currentLineIndex, cursorY, probe.height);
+    const line = lineFromSegments(segments, forcedLineHeight, xOffset, fallbackLineHeight);
+    lines.push(line);
+    cursorY += line.height;
     segments = [];
   };
 
@@ -227,7 +275,7 @@ export function layoutParagraph(
       pushLine();
       continue;
     }
-    const availableWidth = lineWidth(lines.length);
+    const availableWidth = lineWidth(lines.length, cursorY, fallbackLineHeight);
     if (isInlineRun(token)) {
       const inline = measureInlineRun(token);
       const segment: ParagraphLineSegment = {
@@ -253,12 +301,14 @@ export function layoutParagraph(
       if (/^\s+$/.test(token.text)) continue;
     }
 
-    const currentAvailableWidth = lineWidth(lines.length);
+    const currentAvailableWidth = lineWidth(lines.length, cursorY, fallbackLineHeight);
     if (wrap && measureSegments([tokenSegment]) > currentAvailableWidth && !/^\s+$/.test(token.text)) {
       const pieces = hardBreakRun(token, currentAvailableWidth);
       for (const piece of pieces) {
         const pieceSegment = segmentFromTextRun(piece);
-        if (segments.length > 0 && measureSegments([...segments, pieceSegment]) > lineWidth(lines.length)) pushLine();
+        if (segments.length > 0 && measureSegments([...segments, pieceSegment]) > lineWidth(lines.length, cursorY, fallbackLineHeight)) {
+          pushLine();
+        }
         segments.push(pieceSegment);
       }
       continue;
@@ -268,7 +318,48 @@ export function layoutParagraph(
   }
 
   if (segments.length > 0) pushLine();
-  return lines.length > 0 ? lines : [lineFromSegments([], forcedLineHeight, lineOffset(0), fallbackLineHeight)];
+  const resolvedLines = lines.length > 0 ? lines : [lineFromSegments([], forcedLineHeight, lineOffset(0, 0, fallbackLineHeight), fallbackLineHeight)];
+  const textHeight = resolvedLines.reduce((sum, line) => sum + line.height, 0);
+  const floatHeight = floats.reduce((max, float) => Math.max(max, float.y + float.height), 0);
+  return { lines: resolvedLines, floats, width, height: Math.max(textHeight, floatHeight) };
+}
+
+function layoutFloats(floats: ParagraphFloat[], paragraphWidth: number): ParagraphFloatLayout[] {
+  let leftY = 0;
+  let rightY = 0;
+  return floats.map((float) => {
+    const margin = edgeValues(float.margin);
+    const measured = measure(float.node, paragraphWidth);
+    const width = float.width ?? measured.width;
+    const height = float.height ?? measured.height;
+    const outerWidth = width + margin.left + margin.right;
+    const outerHeight = height + margin.top + margin.bottom;
+    if (float.side === "right") {
+      const y = rightY;
+      rightY += outerHeight;
+      return { float, width: outerWidth, height: outerHeight, x: paragraphWidth - outerWidth, y };
+    }
+    const y = leftY;
+    leftY += outerHeight;
+    return { float, width: outerWidth, height: outerHeight, x: 0, y };
+  });
+}
+
+function floatInsets(floats: ParagraphFloatLayout[], y: number, lineHeight: number): { left: number; right: number } {
+  let left = 0;
+  let right = 0;
+  for (const float of floats) {
+    if (y + lineHeight <= float.y || y >= float.y + float.height) continue;
+    if (float.float.side === "right") right += float.width;
+    else left += float.width;
+  }
+  return { left, right };
+}
+
+function edgeValues(input: import("./types.js").EdgesInput | undefined): { top: number; right: number; bottom: number; left: number } {
+  if (input === undefined) return { top: 0, right: 0, bottom: 0, left: 0 };
+  if (typeof input === "number") return { top: input, right: input, bottom: input, left: input };
+  return { top: input.top ?? 0, right: input.right ?? 0, bottom: input.bottom ?? 0, left: input.left ?? 0 };
 }
 
 function measureInlineRun(run: InlineNodeRun): { width: number; height: number } {
@@ -300,11 +391,11 @@ export function measureParagraphHeight(
   runs: ParagraphItem[],
   width: number,
   forcedLineHeight?: number,
-  options: Pick<ParagraphProps, "paddingLeft" | "textIndent" | "wrap"> = {}
+  options: Pick<ParagraphProps, "paddingLeft" | "textIndent" | "wrap" | "floats"> = {}
 ): number {
-  const lines = layoutParagraph(runs, width, forcedLineHeight, options);
-  if (lines.length === 0) {
-    return forcedLineHeight ?? runs.reduce((max, run) => Math.max(max, runLineHeight(run)), 0);
+  const layout = layoutParagraphWithFloats(runs, width, forcedLineHeight, options);
+  if (layout.lines.length === 0) {
+    return layout.height > 0 ? layout.height : forcedLineHeight ?? runs.reduce((max, run) => Math.max(max, runLineHeight(run)), 0);
   }
-  return lines.reduce((sum, line) => sum + line.height, 0);
+  return layout.height;
 }

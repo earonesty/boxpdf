@@ -3,7 +3,7 @@ import { PDFDocument, StandardFonts, type PDFFont } from "pdf-lib";
 import { ellipsize, fontLineHeight, fontLineMetrics, fontXHeight, measureText, wrapText } from "../src/text.js";
 import { inlineNode, linkRun, paragraph, run, vstack } from "../src/nodes.js";
 import { measure } from "../src/measure.js";
-import { layoutParagraph } from "../src/paragraph.js";
+import { layoutParagraph, layoutParagraphWithFloats, measureParagraphHeight } from "../src/paragraph.js";
 
 let font: PDFFont;
 
@@ -157,5 +157,39 @@ describe("paragraph", () => {
       "alpha beta gamma",
       "second line"
     ]);
+  });
+
+  it("wraps paragraph lines around floated nodes", () => {
+    const float = vstack({ width: 48, height: 24 });
+    const layout = layoutParagraphWithFloats(
+      [run("alpha beta gamma delta epsilon zeta eta theta", { size: 12, font })],
+      120,
+      12,
+      { floats: [{ node: float, side: "left", margin: { right: 6 } }] }
+    );
+    expect(layout.floats).toMatchObject([{ x: 0, y: 0, width: 54, height: 24 }]);
+    expect(layout.lines.length).toBeGreaterThan(2);
+    expect(layout.lines[0]!.xOffset).toBe(54);
+    expect(layout.lines[1]!.xOffset).toBe(54);
+    expect(layout.lines[2]!.xOffset).toBe(0);
+    expect(layout.height).toBeGreaterThanOrEqual(36);
+  });
+
+  it("wraps paragraph lines around right floated nodes", () => {
+    const float = vstack({ width: 36, height: 18 });
+    const layout = layoutParagraphWithFloats(
+      [run("alpha beta gamma delta epsilon", { size: 12, font })],
+      120,
+      12,
+      { floats: [{ node: float, side: "right", margin: { left: 6 } }] }
+    );
+    expect(layout.floats).toMatchObject([{ x: 78, y: 0, width: 42, height: 18 }]);
+    expect(layout.lines[0]!.xOffset).toBe(0);
+    expect(layout.lines[0]!.width).toBeLessThanOrEqual(78);
+  });
+
+  it("uses float height for paragraphs with only floats", () => {
+    const float = vstack({ width: 36, height: 18, margin: { bottom: 6 } });
+    expect(measureParagraphHeight([], 120, undefined, { floats: [{ node: float, side: "left" }] })).toBe(24);
   });
 });
