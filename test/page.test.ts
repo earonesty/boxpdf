@@ -59,6 +59,27 @@ describe("renderFlow default page size", () => {
     expect(page.getWidth()).toBe(612);
     expect(page.getHeight()).toBe(792);
   });
+
+  it("reuses measurements across pagination probes and rendering", async () => {
+    const pdf = await PDFDocument.create();
+    const node = vstack(
+      { gap: 2 },
+      ...Array.from({ length: 90 }, (_, i) => text(`row ${i}`, { size: 12, font }))
+    );
+    let cacheHits = 0;
+
+    await renderFlow(pdf, [node], {
+      margin: 36,
+      warnings: false,
+      profile: (event) => {
+        if (event.phase === "measure-detail" && event.measure?.phase === "measure-cache-hit") {
+          cacheHits += 1;
+        }
+      }
+    });
+
+    expect(cacheHits).toBeGreaterThan(0);
+  });
 });
 
 describe("renderFlow overflow warning", () => {

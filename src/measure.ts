@@ -17,8 +17,65 @@ export interface MainAxisLayout {
   shrank: boolean;
 }
 
+export interface MeasureProfileEvent {
+  phase:
+    | "measure-start"
+    | "measure-end"
+    | "measure-cache-hit"
+    | "resolve-main-start"
+    | "resolve-main-child-start"
+    | "resolve-main-child-end"
+    | "resolve-main-end";
+  nodeKind?: Node["kind"];
+  depth?: number;
+  parentWidth?: number;
+  width?: number;
+  height?: number;
+  axis?: MainAxis;
+  childCount?: number;
+  childIndex?: number;
+  availableMain?: number;
+  availableCross?: number;
+  durationMs?: number;
+}
+
+export type MeasureProfileCallback = (event: MeasureProfileEvent) => void;
+export type MeasureCache = WeakMap<Node, Map<number, Size>>;
+
+let currentMeasureProfile: MeasureProfileCallback | undefined;
+let currentMeasureCache: MeasureCache | undefined;
+let measureDepth = 0;
+
+export function createMeasureCache(): MeasureCache {
+  return new WeakMap();
+}
+
+export function withMeasureProfile<T>(
+  profile: MeasureProfileCallback | undefined,
+  fn: () => T,
+  cache?: MeasureCache
+): T {
+  const previous = currentMeasureProfile;
+  const previousCache = currentMeasureCache;
+  const previousDepth = measureDepth;
+  currentMeasureProfile = profile;
+  currentMeasureCache = cache ?? previousCache;
+  measureDepth = 0;
+  try {
+    return fn();
+  } finally {
+    currentMeasureProfile = previous;
+    currentMeasureCache = previousCache;
+    measureDepth = previousDepth;
+  }
+}
+
 function isAbsoluteBox(node: Node): boolean {
   return (node.kind === "vstack" || node.kind === "hstack") && node.style.position === "absolute";
+}
+
+function now(): number {
+  return typeof performance === "undefined" ? Date.now() : performance.now();
 }
 
 /**
@@ -28,12 +85,48 @@ function isAbsoluteBox(node: Node): boolean {
  * the result directly when summing child sizes.
  */
 export function measure(node: Node, parentWidth: number): Size {
-  const intrinsic = measureContent(node, parentWidth);
-  const m = nodeMargin(node);
-  return {
-    width: intrinsic.width + m.left + m.right,
-    height: intrinsic.height + m.top + m.bottom
-  };
+  const depth = measureDepth;
+  const startedAt = now();
+  const cached = currentMeasureCache?.get(node)?.get(parentWidth);
+  if (cached) {
+    currentMeasureProfile?.({
+      phase: "measure-cache-hit",
+      nodeKind: node.kind,
+      depth,
+      parentWidth,
+      width: cached.width,
+      height: cached.height
+    });
+    return cached;
+  }
+  currentMeasureProfile?.({ phase: "measure-start", nodeKind: node.kind, depth, parentWidth });
+  measureDepth += 1;
+  try {
+    const intrinsic = measureContent(node, parentWidth);
+    const m = nodeMargin(node);
+    const size = {
+      width: intrinsic.width + m.left + m.right,
+      height: intrinsic.height + m.top + m.bottom
+    };
+    currentMeasureProfile?.({
+      phase: "measure-end",
+      nodeKind: node.kind,
+      depth,
+      parentWidth,
+      width: size.width,
+      height: size.height,
+      durationMs: now() - startedAt
+    });
+    let widths = currentMeasureCache?.get(node);
+    if (currentMeasureCache && !widths) {
+      widths = new Map();
+      currentMeasureCache.set(node, widths);
+    }
+    widths?.set(parentWidth, size);
+    return size;
+  } finally {
+    measureDepth = depth;
+  }
 }
 
 /**
@@ -225,9 +318,56 @@ export function resolveMainAxis(
   children = children.filter((child) => !isAbsoluteBox(child));
   if (children.length === 0) return { children: [], sizes: [], shrank: false };
 
+  const startedAt = now();
   const parentWidth = axis === "horizontal" ? availableMain : availableCross;
-  const sizes = children.map((c) => measure(c, parentWidth));
+  currentMeasureProfile?.({
+    phase: "resolve-main-start",
+    axis,
+    childCount: children.length,
+    availableMain,
+    availableCross,
+    parentWidth,
+    depth: measureDepth
+  });
+  const sizes: Size[] = [];
+  for (let index = 0; index < children.length; index += 1) {
+    const child = children[index]!;
+    const childStartedAt = now();
+    currentMeasureProfile?.({
+      phase: "resolve-main-child-start",
+      axis,
+      childCount: children.length,
+      childIndex: index,
+      nodeKind: child.kind,
+      parentWidth,
+      depth: measureDepth
+    });
+    const size = measure(child, parentWidth);
+    sizes.push(size);
+    currentMeasureProfile?.({
+      phase: "resolve-main-child-end",
+      axis,
+      childCount: children.length,
+      childIndex: index,
+      nodeKind: child.kind,
+      parentWidth,
+      width: size.width,
+      height: size.height,
+      depth: measureDepth,
+      durationMs: now() - childStartedAt
+    });
+  }
   if (!Number.isFinite(availableMain)) {
+    currentMeasureProfile?.({
+      phase: "resolve-main-end",
+      axis,
+      childCount: children.length,
+      availableMain,
+      availableCross,
+      parentWidth,
+      depth: measureDepth,
+      durationMs: now() - startedAt
+    });
     return { children, sizes, shrank: false };
   }
   const baseMain = sizes.map((s) => (axis === "horizontal" ? s.width : s.height));
@@ -235,11 +375,31 @@ export function resolveMainAxis(
   const totalBase = baseMain.reduce((s, v) => s + v, 0);
   const overflow = totalBase + totalGap - availableMain;
   if (overflow <= 0.0001) {
+    currentMeasureProfile?.({
+      phase: "resolve-main-end",
+      axis,
+      childCount: children.length,
+      availableMain,
+      availableCross,
+      parentWidth,
+      depth: measureDepth,
+      durationMs: now() - startedAt
+    });
     return { children, sizes, shrank: false };
   }
 
   const shrinks = children.map(nodeShrink);
   if (shrinks.every((s) => s <= 0)) {
+    currentMeasureProfile?.({
+      phase: "resolve-main-end",
+      axis,
+      childCount: children.length,
+      availableMain,
+      availableCross,
+      parentWidth,
+      depth: measureDepth,
+      durationMs: now() - startedAt
+    });
     return { children, sizes, shrank: false };
   }
 
@@ -253,10 +413,32 @@ export function resolveMainAxis(
     shrank = true;
     return applyShrink(c, (baseMain[i] ?? 0) - r, axis);
   });
-  if (!shrank) return { children, sizes, shrank: false };
+  if (!shrank) {
+    currentMeasureProfile?.({
+      phase: "resolve-main-end",
+      axis,
+      childCount: children.length,
+      availableMain,
+      availableCross,
+      parentWidth,
+      depth: measureDepth,
+      durationMs: now() - startedAt
+    });
+    return { children, sizes, shrank: false };
+  }
   // Re-measure shrunken children so cross-axis (e.g. wrapped text height)
   // reflects the new slot.
   const newSizes = newChildren.map((c) => measure(c, parentWidth));
+  currentMeasureProfile?.({
+    phase: "resolve-main-end",
+    axis,
+    childCount: children.length,
+    availableMain,
+    availableCross,
+    parentWidth,
+    depth: measureDepth,
+    durationMs: now() - startedAt
+  });
   return { children: newChildren, sizes: newSizes, shrank: true };
 }
 

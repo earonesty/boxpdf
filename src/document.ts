@@ -1,5 +1,5 @@
 import { PDFDocument, type PDFPage } from "pdf-lib";
-import { measure } from "./measure.js";
+import { createMeasureCache, measure, withMeasureProfile, type MeasureProfileEvent } from "./measure.js";
 import { render, type RenderOptions } from "./render.js";
 import { edges, type EdgesInput, type Node } from "./types.js";
 
@@ -38,6 +38,31 @@ export interface PageOptions extends RenderOptions, DocumentMetadata {
    */
   warnings?: boolean;
 }
+
+export interface RenderFlowProfileEvent {
+  phase:
+    | "start"
+    | "header-footer-measured"
+    | "node-measure-start"
+    | "node-measure-end"
+    | "node-render-start"
+    | "node-render-end"
+    | "page-break"
+    | "split-start"
+    | "split-end"
+    | "measure-detail"
+    | "finish";
+  elapsedMs: number;
+  pageCount?: number;
+  pendingCount?: number;
+  nodeKind?: Node["kind"];
+  nodeIndex?: number;
+  width?: number;
+  height?: number;
+  measure?: MeasureProfileEvent;
+}
+
+export type RenderFlowProfileCallback = (event: RenderFlowProfileEvent) => void;
 
 /**
  * Inner content width of `size` after subtracting `margin`. Use this
@@ -213,6 +238,8 @@ export interface FlowOptions extends PageOptions {
   header?: (ctx: PageContext) => Node;
   /** Same shape as `header`, but for the bottom of every page. */
   footer?: (ctx: PageContext) => Node;
+  /** Optional low-level pagination profiler. Events are emitted synchronously as renderFlow progresses. */
+  profile?: RenderFlowProfileCallback;
 }
 
 /**
@@ -234,16 +261,36 @@ export async function renderFlow(
   const reserveBottom = options.reserveBottom ?? 0;
   const contentWidth = size.width - m.left - m.right;
   const warnings = options.warnings ?? true;
+  const startedAt = now();
+  const measureCache = createMeasureCache();
+  const profile = (event: Omit<RenderFlowProfileEvent, "elapsedMs">): void => {
+    options.profile?.({ ...event, elapsedMs: now() - startedAt });
+  };
+  const measureProfile = options.profile ? (measureEvent: MeasureProfileEvent) => profile({ phase: "measure-detail", measure: measureEvent }) : undefined;
+  const measureWithProfile = (node: Node, parentWidth: number) =>
+    withMeasureProfile(
+      measureProfile,
+      () => measure(node, parentWidth),
+      measureCache
+    );
+  const renderWithMeasureCache = (node: Node, targetPage: PDFPage, x: number, y: number, parentWidth: number) =>
+    withMeasureProfile(
+      measureProfile,
+      () => render(node, targetPage, x, y, parentWidth, { debug: options.debug }),
+      measureCache
+    );
 
   applyMetadata(pdf, options);
+  profile({ phase: "start", pendingCount: nodes.length, pageCount: 0 });
 
   const probeCtx: PageContext = { pageNumber: 1, totalPages: 1 };
   const headerHeight = options.header
-    ? measure(options.header(probeCtx), contentWidth).height
+    ? measureWithProfile(options.header(probeCtx), contentWidth).height
     : 0;
   const footerHeight = options.footer
-    ? measure(options.footer(probeCtx), contentWidth).height
+    ? measureWithProfile(options.footer(probeCtx), contentWidth).height
     : 0;
+  profile({ phase: "header-footer-measured", width: contentWidth, height: headerHeight + footerHeight });
 
   const headerGap = options.header ? 12 : 0;
   const footerGap = options.footer ? 12 : 0;
@@ -256,20 +303,38 @@ export async function renderFlow(
   let cursorY = contentTop;
 
   const pending = [...nodes];
+  let nodeIndex = 0;
   while (pending.length > 0) {
     const node = pending.shift()!;
-    const nodeSize = measure(node, contentWidth);
+    const currentIndex = nodeIndex;
+    nodeIndex += 1;
+    profile({ phase: "node-measure-start", nodeKind: node.kind, nodeIndex: currentIndex, pendingCount: pending.length, pageCount: pages.length });
+    const nodeSize = measureWithProfile(node, contentWidth);
+    profile({
+      phase: "node-measure-end",
+      nodeKind: node.kind,
+      nodeIndex: currentIndex,
+      pendingCount: pending.length,
+      pageCount: pages.length,
+      width: nodeSize.width,
+      height: nodeSize.height
+    });
     if (warnings) warnIfOverflowing(node, nodeSize.width, contentWidth, size, m);
     const remainingHeight = cursorY - contentBottom;
     if (nodeSize.height > remainingHeight) {
-      const split = splitForPage(node, remainingHeight, contentWidth);
+      profile({ phase: "split-start", nodeKind: node.kind, nodeIndex: currentIndex, pageCount: pages.length, width: contentWidth, height: remainingHeight });
+      const split = withMeasureProfile(measureProfile, () => splitForPage(node, remainingHeight, contentWidth), measureCache);
+      profile({ phase: "split-end", nodeKind: node.kind, nodeIndex: currentIndex, pageCount: pages.length, width: contentWidth, height: remainingHeight });
       if (split && cursorY !== contentTop) {
-        const beforeSize = measure(split.before, contentWidth);
-        render(split.before, page, m.left, cursorY, contentWidth, { debug: options.debug });
+        const beforeSize = measureWithProfile(split.before, contentWidth);
+        profile({ phase: "node-render-start", nodeKind: split.before.kind, nodeIndex: currentIndex, pageCount: pages.length, width: beforeSize.width, height: beforeSize.height });
+        renderWithMeasureCache(split.before, page, m.left, cursorY, contentWidth);
+        profile({ phase: "node-render-end", nodeKind: split.before.kind, nodeIndex: currentIndex, pageCount: pages.length, width: beforeSize.width, height: beforeSize.height });
         cursorY -= beforeSize.height;
         if (split.after) {
           page = pdf.addPage([size.width, size.height]);
           pages.push(page);
+          profile({ phase: "page-break", pageCount: pages.length, pendingCount: pending.length + 1 });
           cursorY = contentTop;
           pending.unshift(split.after);
         }
@@ -279,27 +344,35 @@ export async function renderFlow(
     if (cursorY - nodeSize.height < contentBottom && cursorY !== contentTop) {
       page = pdf.addPage([size.width, size.height]);
       pages.push(page);
+      profile({ phase: "page-break", nodeKind: node.kind, nodeIndex: currentIndex, pageCount: pages.length, pendingCount: pending.length + 1 });
       cursorY = contentTop;
       pending.unshift(node);
       continue;
     }
     const topRemainingHeight = cursorY - contentBottom;
     if (nodeSize.height > topRemainingHeight) {
-      const split = splitForPage(node, topRemainingHeight, contentWidth);
+      profile({ phase: "split-start", nodeKind: node.kind, nodeIndex: currentIndex, pageCount: pages.length, width: contentWidth, height: topRemainingHeight });
+      const split = withMeasureProfile(measureProfile, () => splitForPage(node, topRemainingHeight, contentWidth), measureCache);
+      profile({ phase: "split-end", nodeKind: node.kind, nodeIndex: currentIndex, pageCount: pages.length, width: contentWidth, height: topRemainingHeight });
       if (split) {
-        const beforeSize = measure(split.before, contentWidth);
-        render(split.before, page, m.left, cursorY, contentWidth, { debug: options.debug });
+        const beforeSize = measureWithProfile(split.before, contentWidth);
+        profile({ phase: "node-render-start", nodeKind: split.before.kind, nodeIndex: currentIndex, pageCount: pages.length, width: beforeSize.width, height: beforeSize.height });
+        renderWithMeasureCache(split.before, page, m.left, cursorY, contentWidth);
+        profile({ phase: "node-render-end", nodeKind: split.before.kind, nodeIndex: currentIndex, pageCount: pages.length, width: beforeSize.width, height: beforeSize.height });
         cursorY -= beforeSize.height;
         if (split.after) {
           page = pdf.addPage([size.width, size.height]);
           pages.push(page);
+          profile({ phase: "page-break", pageCount: pages.length, pendingCount: pending.length + 1 });
           cursorY = contentTop;
           pending.unshift(split.after);
         }
         continue;
       }
     }
-    render(node, page, m.left, cursorY, contentWidth, { debug: options.debug });
+    profile({ phase: "node-render-start", nodeKind: node.kind, nodeIndex: currentIndex, pageCount: pages.length, width: nodeSize.width, height: nodeSize.height });
+    renderWithMeasureCache(node, page, m.left, cursorY, contentWidth);
+    profile({ phase: "node-render-end", nodeKind: node.kind, nodeIndex: currentIndex, pageCount: pages.length, width: nodeSize.width, height: nodeSize.height });
     cursorY -= nodeSize.height;
   }
 
@@ -309,29 +382,32 @@ export async function renderFlow(
     pages.forEach((p, i) => {
       const ctx: PageContext = { pageNumber: i + 1, totalPages };
       if (options.header) {
-        render(
+        renderWithMeasureCache(
           options.header(ctx),
           p,
           m.left,
           size.height - m.top,
-          contentWidth,
-          { debug: options.debug }
+          contentWidth
         );
       }
       if (options.footer) {
-        render(
+        renderWithMeasureCache(
           options.footer(ctx),
           p,
           m.left,
           m.bottom + footerHeight,
-          contentWidth,
-          { debug: options.debug }
+          contentWidth
         );
       }
     });
   }
 
+  profile({ phase: "finish", pageCount: pages.length });
   return { pages };
+}
+
+function now(): number {
+  return typeof performance === "undefined" ? Date.now() : performance.now();
 }
 
 /**

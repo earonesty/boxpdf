@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeAll } from "vitest";
 import { PDFDocument, StandardFonts, type PDFFont } from "pdf-lib";
 import { hline, hstack, spacer, text, vstack } from "../src/nodes.js";
-import { measure } from "../src/measure.js";
+import { createMeasureCache, measure, withMeasureProfile, type MeasureProfileEvent } from "../src/measure.js";
 import { fontLineHeight } from "../src/text.js";
 
 let font: PDFFont;
@@ -80,5 +80,17 @@ describe("measure", () => {
   it("fixed width on a vstack overrides intrinsic", () => {
     const node = vstack({ width: 300 }, text("x", { size: 10, font: bold }));
     expect(measure(node, 100).width).toBe(300);
+  });
+
+  it("can memoize repeated measurements within an explicit cache scope", () => {
+    const node = vstack({}, text("x", { size: 10, font }));
+    const events: MeasureProfileEvent[] = [];
+    const cache = createMeasureCache();
+
+    withMeasureProfile((event) => events.push(event), () => {
+      expect(measure(node, 100)).toEqual(measure(node, 100));
+    }, cache);
+
+    expect(events.some((event) => event.phase === "measure-cache-hit" && event.nodeKind === "vstack")).toBe(true);
   });
 });
