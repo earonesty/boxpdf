@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">boxpdf logo mark</title>
+  <desc id="desc">A clean document icon with box-layout lines and a folded corner.</desc>
+  <rect width="512" height="512" rx="112" fill="#0f1419"/>
+  <path d="M150 96h150l62 62v258H150z" fill="#fff"/>
+  <path d="M300 96v70h62z" fill="#dbeafe"/>
+  <path d="M194 220h124" stroke="#2563eb" stroke-width="26" stroke-linecap="round"/>
+  <path d="M194 286h76" stroke="#0f1419" stroke-width="26" stroke-linecap="round"/>
+  <path d="M300 286h18" stroke="#0f1419" stroke-width="26" stroke-linecap="round"/>
+  <path d="M194 352h124" stroke="#0f1419" stroke-width="26" stroke-linecap="round"/>
+</svg>

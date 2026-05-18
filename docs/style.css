@@ -50,9 +50,17 @@ a:hover { text-decoration: underline; }
   border-bottom: 1px solid var(--line);
 }
 .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 700;
   font-size: 17px;
   color: var(--ink);
+}
+.brand img {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
 }
 .site nav { display: flex; gap: 22px; }
 .site nav a {
