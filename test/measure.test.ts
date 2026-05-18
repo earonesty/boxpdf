@@ -35,6 +35,16 @@ describe("measure", () => {
     expect(w.height).toBeGreaterThan(u.height);
   });
 
+  it("includes letterSpacing in text intrinsic width and wrapping", () => {
+    const compact = text("abcdef", { size: 12, font });
+    const spaced = text("abcdef", { size: 12, font, letterSpacing: 3 });
+    expect(measure(spaced, 500).width - measure(compact, 500).width).toBeCloseTo(15, 5);
+
+    const oneLine = measure(text("abcdef", { size: 12, font, width: 50, letterSpacing: 0 }), 500);
+    const wrapped = measure(text("abcdef", { size: 12, font, width: 50, letterSpacing: 10 }), 500);
+    expect(wrapped.height).toBeGreaterThan(oneLine.height);
+  });
+
   it("vstack sums child heights plus gaps", () => {
     const node = vstack(
       { gap: 5 },
@@ -80,6 +90,15 @@ describe("measure", () => {
   it("fixed width on a vstack overrides intrinsic", () => {
     const node = vstack({ width: 300 }, text("x", { size: 10, font: bold }));
     expect(measure(node, 100).width).toBe(300);
+  });
+
+  it("uses maxHeight as a vertical shrink constraint", () => {
+    const parent = vstack(
+      { maxHeight: 50 },
+      vstack({ height: 80, shrink: 1 })
+    );
+
+    expect(measure(parent, 100).height).toBe(50);
   });
 
   it("can memoize repeated measurements within an explicit cache scope", () => {

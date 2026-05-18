@@ -41,6 +41,15 @@ export function measureText(font: PDFFont, size: number, value: string): number 
   return font.widthOfTextAtSize(value, size);
 }
 
+export function measureTextSpaced(
+  font: PDFFont,
+  size: number,
+  value: string,
+  letterSpacing = 0
+): number {
+  return measureText(font, size, value) + letterSpacing * Math.max(0, value.length - 1);
+}
+
 type FontkitEmbedder = {
   font?: {
     unitsPerEm?: number;
@@ -58,10 +67,11 @@ export function wrapText(
   size: number,
   value: string,
   maxWidth: number,
-  options: { wrap?: boolean } = {}
+  options: { wrap?: boolean; letterSpacing?: number } = {}
 ): string[] {
   if (maxWidth <= 0) return [value];
   if (options.wrap === false) return value.split(/\r?\n/);
+  const letterSpacing = options.letterSpacing ?? 0;
   const lines: string[] = [];
   for (const paragraph of value.split(/\r?\n/)) {
     if (paragraph.length === 0) {
@@ -72,7 +82,7 @@ export function wrapText(
     let current = "";
     for (const word of words) {
       const candidate = current + word;
-      const width = measureText(font, size, candidate);
+      const width = measureTextSpaced(font, size, candidate, letterSpacing);
       if (width <= maxWidth) {
         current = candidate;
         continue;
@@ -80,10 +90,10 @@ export function wrapText(
       if (current.length > 0) {
         lines.push(current.replace(/\s+$/, ""));
         current = word.replace(/^\s+/, "");
-        if (measureText(font, size, current) <= maxWidth) continue;
+        if (measureTextSpaced(font, size, current, letterSpacing) <= maxWidth) continue;
       }
       // current is empty or the single word is too wide; hard-break by char
-      const hardBroken = hardBreak(font, size, current.length > 0 ? current : word, maxWidth);
+      const hardBroken = hardBreak(font, size, current.length > 0 ? current : word, maxWidth, letterSpacing);
       lines.push(...hardBroken.slice(0, -1));
       const tail = hardBroken[hardBroken.length - 1];
       current = tail ?? "";
@@ -93,12 +103,18 @@ export function wrapText(
   return lines.length === 0 ? [""] : lines;
 }
 
-function hardBreak(font: PDFFont, size: number, value: string, maxWidth: number): string[] {
+function hardBreak(
+  font: PDFFont,
+  size: number,
+  value: string,
+  maxWidth: number,
+  letterSpacing: number
+): string[] {
   const out: string[] = [];
   let current = "";
   for (const char of value) {
     const next = current + char;
-    if (measureText(font, size, next) > maxWidth && current.length > 0) {
+    if (measureTextSpaced(font, size, next, letterSpacing) > maxWidth && current.length > 0) {
       out.push(current);
       current = char;
     } else {
@@ -109,16 +125,22 @@ function hardBreak(font: PDFFont, size: number, value: string, maxWidth: number)
   return out;
 }
 
-export function ellipsize(font: PDFFont, size: number, value: string, maxWidth: number): string {
-  if (measureText(font, size, value) <= maxWidth) return value;
+export function ellipsize(
+  font: PDFFont,
+  size: number,
+  value: string,
+  maxWidth: number,
+  letterSpacing = 0
+): string {
+  if (measureTextSpaced(font, size, value, letterSpacing) <= maxWidth) return value;
   const ellipsis = "…";
-  const ellipsisWidth = measureText(font, size, ellipsis);
+  const ellipsisWidth = measureTextSpaced(font, size, ellipsis, letterSpacing);
   if (ellipsisWidth > maxWidth) return "";
   let lo = 0;
   let hi = value.length;
   while (lo < hi) {
     const mid = Math.floor((lo + hi + 1) / 2);
-    if (measureText(font, size, value.slice(0, mid)) + ellipsisWidth <= maxWidth) {
+    if (measureTextSpaced(font, size, value.slice(0, mid) + ellipsis, letterSpacing) <= maxWidth) {
       lo = mid;
     } else {
       hi = mid - 1;

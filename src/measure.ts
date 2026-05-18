@@ -1,5 +1,5 @@
 import { edges, type Node, type Size } from "./types.js";
-import { ellipsize, fontLineHeight, fontLineMetrics, measureText, wrapText } from "./text.js";
+import { ellipsize, fontLineHeight, fontLineMetrics, measureTextSpaced, wrapText } from "./text.js";
 import {
   layoutParagraph,
   measureParagraphHeight,
@@ -137,12 +137,13 @@ export function measureContent(node: Node, parentWidth: number): Size {
   switch (node.kind) {
     case "text": {
       const { props } = node;
-      const intrinsicWidth = measureText(props.font, props.size, node.text);
+      const letterSpacing = props.letterSpacing ?? 0;
+      const intrinsicWidth = measureTextSpaced(props.font, props.size, node.text, letterSpacing);
       const slotWidth = props.width ?? intrinsicWidth;
       const wrapWidth = props.width ?? parentWidth;
       const lineHeight = props.lineHeight ?? fontLineHeight(props.font, props.size);
       const lines = props.width
-        ? clampLines(wrapText(props.font, props.size, node.text, wrapWidth, { wrap: props.wrap }), props.maxLines)
+        ? clampLines(wrapText(props.font, props.size, node.text, wrapWidth, { wrap: props.wrap, letterSpacing }), props.maxLines)
         : node.text.split(/\r?\n/);
       const usedLines = props.maxLines ? Math.min(lines.length, props.maxLines) : lines.length;
       return { width: slotWidth, height: lineHeight * Math.max(1, usedLines) };
@@ -168,7 +169,8 @@ export function measureContent(node: Node, parentWidth: number): Size {
       const fixedWidth = node.style.width;
       const innerWidth = (fixedWidth ?? parentWidth) - inset.left - inset.right;
       const fixedHeight = node.style.height;
-      const availableHeight = fixedHeight === undefined ? Infinity : fixedHeight - inset.top - inset.bottom;
+      const constrainedHeight = fixedHeight ?? node.style.maxHeight;
+      const availableHeight = constrainedHeight === undefined ? Infinity : constrainedHeight - inset.top - inset.bottom;
       const children = stretchCrossAxisChildren(
         node.children.filter((child) => !isAbsoluteBox(child)),
         "vertical",
@@ -179,9 +181,12 @@ export function measureContent(node: Node, parentWidth: number): Size {
       const totalGap = node.gap * Math.max(0, layout.children.length - 1);
       const totalHeight = layout.sizes.reduce((s, sz) => s + sz.height, 0) + totalGap;
       const maxChildWidth = layout.sizes.reduce((m, s) => (s.width > m ? s.width : m), 0);
+      let height = fixedHeight ?? totalHeight + inset.top + inset.bottom;
+      if (node.style.maxHeight !== undefined) height = Math.min(height, node.style.maxHeight);
+      if (node.style.minHeight !== undefined) height = Math.max(height, node.style.minHeight);
       return {
         width: fixedWidth ?? maxChildWidth + inset.left + inset.right,
-        height: fixedHeight ?? totalHeight + inset.top + inset.bottom
+        height
       };
     }
     case "link":
@@ -192,6 +197,40 @@ export function measureContent(node: Node, parentWidth: number): Size {
       const inset = edges(node.style.padding);
       const fixedWidth = node.style.width;
       const innerWidth = (fixedWidth ?? parentWidth) - inset.left - inset.right;
+
+      if (node.wrap) {
+        // Greedy bin-packing into rows
+        const flowChildren = node.children.filter((child) => !isAbsoluteBox(child));
+        const childSizes = flowChildren.map((child) => measure(child, innerWidth));
+        const rows: number[][] = [];
+        let rowIndices: number[] = [];
+        let rowWidth = 0;
+        for (let i = 0; i < flowChildren.length; i++) {
+          const w = childSizes[i]!.width;
+          const addGap = rowIndices.length > 0 ? node.gap : 0;
+          if (rowIndices.length > 0 && rowWidth + addGap + w > innerWidth) {
+            rows.push(rowIndices);
+            rowIndices = [i];
+            rowWidth = w;
+          } else {
+            rowIndices.push(i);
+            rowWidth += addGap + w;
+          }
+        }
+        if (rowIndices.length > 0) rows.push(rowIndices);
+        const rowHeights = rows.map((indices) =>
+          indices.reduce((m, i) => Math.max(m, childSizes[i]!.height), 0)
+        );
+        const totalRowHeight = rowHeights.reduce((s, h) => s + h, 0) + node.gap * Math.max(0, rows.length - 1);
+        let height = node.style.height ?? totalRowHeight + inset.top + inset.bottom;
+        if (node.style.maxHeight !== undefined) height = Math.min(height, node.style.maxHeight);
+        if (node.style.minHeight !== undefined) height = Math.max(height, node.style.minHeight);
+        return {
+          width: fixedWidth ?? innerWidth + inset.left + inset.right,
+          height
+        };
+      }
+
       let children = node.children.filter((child) => !isAbsoluteBox(child));
       let layout = resolveMainAxis(children, "horizontal", innerWidth, innerWidth, node.gap);
       if (node.align === "stretch") {
@@ -206,9 +245,12 @@ export function measureContent(node: Node, parentWidth: number): Size {
         node.align === "baseline"
           ? measureBaselineStackHeight(layout.children, layout.sizes, innerWidth)
           : layout.sizes.reduce((m, s) => (s.height > m ? s.height : m), 0);
+      let height = node.style.height ?? maxChildHeight + inset.top + inset.bottom;
+      if (node.style.maxHeight !== undefined) height = Math.min(height, node.style.maxHeight);
+      if (node.style.minHeight !== undefined) height = Math.max(height, node.style.minHeight);
       return {
         width: fixedWidth ?? totalWidth + inset.left + inset.right,
-        height: node.style.height ?? maxChildHeight + inset.top + inset.bottom
+        height
       };
     }
   }
@@ -221,7 +263,32 @@ export function stretchCrossAxisChildren(
   align: "start" | "center" | "end" | "stretch" | "baseline"
 ): Node[] {
   if (align !== "stretch" || !Number.isFinite(availableCross)) return children;
-  return children.map((child) => applyCrossAxisStretch(child, axis, availableCross));
+  return children.map((child) => {
+    // If the child has alignSelf set to something other than stretch, skip stretching it
+    const selfAlign = nodeAlignSelf(child);
+    if (selfAlign !== undefined && selfAlign !== "stretch") return child;
+    return applyCrossAxisStretch(child, axis, availableCross);
+  });
+}
+
+export function nodeAlignSelf(node: Node): import("./types.js").CrossAxis | undefined {
+  switch (node.kind) {
+    case "vstack":
+    case "hstack":
+      return node.style.alignSelf;
+    case "text":
+      return node.props.alignSelf;
+    case "paragraph":
+      return node.props.alignSelf;
+    case "image":
+    case "imageBox":
+    case "spacer":
+    case "hline":
+    case "vline":
+    case "link":
+    case "svgPath":
+      return node.alignSelf;
+  }
 }
 
 function measureBaselineStackHeight(children: Node[], sizes: Size[], parentWidth: number): number {
@@ -547,7 +614,7 @@ function minTextWidth(node: Extract<Node, { kind: "text" }>): number {
   if (words.length === 0) return 0;
   let max = 0;
   for (const word of words) {
-    const w = measureText(props.font, props.size, word);
+    const w = measureTextSpaced(props.font, props.size, word, props.letterSpacing ?? 0);
     if (w > max) max = w;
   }
   return max;
@@ -660,16 +727,16 @@ export function layoutText(
   const { props, text } = node;
   if (!props.width) {
     if (props.maxLines && props.maxLines >= 1) {
-      return [ellipsize(props.font, props.size, text, slotWidth)];
+      return [ellipsize(props.font, props.size, text, slotWidth, props.letterSpacing ?? 0)];
     }
     return text.split(/\r?\n/);
   }
-  const all = wrapText(props.font, props.size, text, props.width, { wrap: props.wrap });
+  const all = wrapText(props.font, props.size, text, props.width, { wrap: props.wrap, letterSpacing: props.letterSpacing ?? 0 });
   if (!props.maxLines || all.length <= props.maxLines) return all;
   const kept = all.slice(0, props.maxLines);
   const last = kept[kept.length - 1];
   if (last !== undefined) {
-    kept[kept.length - 1] = ellipsize(props.font, props.size, last + "…", props.width);
+    kept[kept.length - 1] = ellipsize(props.font, props.size, last + "…", props.width, props.letterSpacing ?? 0);
   }
   return kept;
 }

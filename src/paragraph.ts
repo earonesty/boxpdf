@@ -1,6 +1,6 @@
 import type { PDFFont } from "pdf-lib";
-import type { Align, Node, RGB } from "./types.js";
-import { fontLineHeight, fontLineMetrics, fontXHeight, measureText } from "./text.js";
+import type { Align, CrossAxis, Node, RGB } from "./types.js";
+import { fontLineHeight, fontLineMetrics, fontXHeight, measureTextSpaced } from "./text.js";
 import { measure } from "./measure.js";
 
 export interface TextRunStyle {
@@ -10,6 +10,8 @@ export interface TextRunStyle {
   lineHeight?: number;
   underline?: boolean;
   strikethrough?: boolean;
+  letterSpacing?: number;
+  opacity?: number;
 }
 
 export interface ParagraphRun {
@@ -47,6 +49,7 @@ export interface ParagraphProps {
   textIndent?: number;
   wrap?: boolean;
   floats?: ParagraphFloat[];
+  alignSelf?: CrossAxis;
 }
 
 export interface ParagraphLineSegment {
@@ -115,9 +118,10 @@ function hardBreakRun(run: ParagraphRun, maxWidth: number): ParagraphRun[] {
   if (maxWidth <= 0) return [run];
   const out: ParagraphRun[] = [];
   let current = "";
+  const letterSpacing = run.style.letterSpacing ?? 0;
   for (const char of run.text) {
     const next = current + char;
-    if (current.length > 0 && measureText(run.style.font, run.style.size, next) > maxWidth) {
+    if (current.length > 0 && measureTextSpaced(run.style.font, run.style.size, next, letterSpacing) > maxWidth) {
       out.push({ ...run, text: current });
       current = char;
     } else {
@@ -135,7 +139,9 @@ function textStyleKey(style: TextRunStyle): string {
     style.lineHeight ?? "",
     style.underline ? "u" : "",
     style.strikethrough ? "s" : "",
-    color
+    color,
+    style.letterSpacing ?? "",
+    style.opacity ?? ""
   ].join("|");
 }
 
@@ -152,7 +158,7 @@ function segmentFromTextRun(run: ParagraphRun): ParagraphLineSegment {
     text: run.text,
     style: run.style,
     href: run.href,
-    width: measureText(run.style.font, run.style.size, run.text),
+    width: measureTextSpaced(run.style.font, run.style.size, run.text, run.style.letterSpacing ?? 0),
     height: lineHeight,
     ascent: metrics.ascent,
     descent: metrics.descent
@@ -171,7 +177,7 @@ function normalizeTextSegments(segments: ParagraphLineSegment[]): ParagraphLineS
       out[out.length - 1] = {
         ...previous,
         text,
-        width: measureText(style.font, style.size, text),
+        width: measureTextSpaced(style.font, style.size, text, style.letterSpacing ?? 0),
         height: lineHeight,
         ascent: metrics.ascent,
         descent: metrics.descent

@@ -38,6 +38,10 @@ export interface BoxStyle {
   width?: number;
   /** Fixed height; if omitted, the box sizes to its content. */
   height?: number;
+  /** Minimum height; the box will grow to at least this height. */
+  minHeight?: number;
+  /** Maximum height; the box will shrink to at most this height. */
+  maxHeight?: number;
   /** Inner spacing between the box's border and its children. */
   padding?: EdgesInput;
   /** Outer spacing around the box. */
@@ -76,6 +80,8 @@ export interface BoxStyle {
    * values. Boxes with the same `zIndex` keep document order. Default `0`.
    */
   zIndex?: number;
+  /** Cross-axis alignment override for this child within its parent stack. */
+  alignSelf?: CrossAxis;
   /** Flex grow weight (siblings divide remaining main-axis space proportionally). */
   grow?: number;
   /**
@@ -88,9 +94,16 @@ export interface BoxStyle {
   shrink?: number;
   /** Page fragmentation hint. `avoid` keeps the box atomic under renderFlow. */
   breakInside?: BreakInside;
+  /** Alpha transparency, 0 = fully transparent, 1 = fully opaque. */
+  opacity?: number;
 }
 
-export interface TextProps {
+export interface FlexItemStyle {
+  /** Cross-axis alignment override for this child within its parent stack. */
+  alignSelf?: CrossAxis;
+}
+
+export interface TextProps extends FlexItemStyle {
   size: number;
   font: PDFFont;
   color?: RGB;
@@ -125,6 +138,10 @@ export interface TextProps {
    * truncation, this for char-level wrap (monospace tables, hashes).
    */
   breakWords?: boolean;
+  /** Extra space added between each character in points. */
+  letterSpacing?: number;
+  /** Alpha transparency, 0 = fully transparent, 1 = fully opaque. */
+  opacity?: number;
 }
 
 export type Node =
@@ -144,6 +161,7 @@ export type Node =
       gap: number;
       justify: Justify;
       align: CrossAxis;
+      wrap?: boolean;
     }
   | {
       kind: "text";
@@ -161,6 +179,7 @@ export type Node =
       width: number;
       height: number;
       margin?: EdgesInput;
+      alignSelf?: CrossAxis;
     }
   | {
       kind: "imageBox";
@@ -172,12 +191,14 @@ export type Node =
       offsetX: number;
       offsetY: number;
       margin?: EdgesInput;
+      alignSelf?: CrossAxis;
     }
   | {
       kind: "spacer";
       size: number;
       grow?: number;
       shrink?: number;
+      alignSelf?: CrossAxis;
     }
   | {
       kind: "hline";
@@ -185,6 +206,7 @@ export type Node =
       thickness: number;
       width?: number;
       margin?: EdgesInput;
+      alignSelf?: CrossAxis;
     }
   | {
       kind: "vline";
@@ -192,12 +214,14 @@ export type Node =
       thickness: number;
       height?: number;
       margin?: EdgesInput;
+      alignSelf?: CrossAxis;
     }
   | {
       kind: "link";
       href: string;
       child: Node;
       margin?: EdgesInput;
+      alignSelf?: CrossAxis;
     }
   | {
       kind: "svgPath";
@@ -216,6 +240,7 @@ export type Node =
       /** Border / stroke width. */
       borderWidth?: number;
       margin?: EdgesInput;
+      alignSelf?: CrossAxis;
     };
 
 export interface Size {

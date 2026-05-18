@@ -59,6 +59,23 @@ describe("render", () => {
     expect(bytes.byteLength).toBeGreaterThan(100);
   });
 
+  it("wrapped hstack applies justify within each full-width row", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([240, 140]);
+    const drawText = vi.spyOn(page, "drawText");
+    const node = hstack(
+      { width: 100, wrap: true, justify: "end", gap: 0 },
+      text("A", { size: 12, font }),
+      text("B", { size: 12, font }),
+      text("C", { size: 12, font })
+    );
+
+    render(node, page, 20, 120, 200);
+
+    const first = drawText.mock.calls.find((call) => call[0] === "A");
+    expect(first?.[1]?.x).toBeGreaterThan(20);
+  });
+
   it("vstack with flex grow stretches a spacer to absorb extra height", async () => {
     const pdf = await PDFDocument.create();
     const page = pdf.addPage([200, 400]);
@@ -90,6 +107,21 @@ describe("render", () => {
     expect(drawRectangle).toHaveBeenCalledWith(
       expect.objectContaining({ x: 10, y: 80, width: 120, height: 20 })
     );
+  });
+
+  it("alignSelf overrides stretch for text children", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([200, 120]);
+    const drawText = vi.spyOn(page, "drawText");
+    const node = vstack(
+      { width: 120, align: "stretch" },
+      text("centered", { size: 10, font, alignSelf: "center" })
+    );
+
+    render(node, page, 10, 100, 200);
+
+    const call = drawText.mock.calls.find((entry) => entry[0] === "centered");
+    expect(call?.[1]?.x).toBeGreaterThan(10);
   });
 
   it("hstack align:stretch gives auto-height children the full cross-axis height", async () => {
@@ -160,6 +192,46 @@ describe("render", () => {
       )
     );
     expect(bytes.byteLength).toBeGreaterThan(200);
+  });
+
+  it("applies stack opacity to descendants and text decorations", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([240, 160]);
+    const drawText = vi.spyOn(page, "drawText");
+    const drawLine = vi.spyOn(page, "drawLine");
+    const drawRectangle = vi.spyOn(page, "drawRectangle");
+    const node = vstack(
+      {
+        width: 120,
+        opacity: 0.5,
+        background: hex("#eeeeee"),
+        border: { color: hex("#111111"), width: 1 }
+      },
+      text("Faded", { size: 12, font, underline: true, opacity: 0.5 })
+    );
+
+    render(node, page, 10, 140, 200);
+
+    expect(drawRectangle).toHaveBeenCalledWith(expect.objectContaining({ opacity: 0.5 }));
+    expect(drawRectangle).toHaveBeenCalledWith(expect.objectContaining({ borderOpacity: 0.5 }));
+    expect(drawText.mock.calls.find((call) => call[0] === "Faded")?.[1]?.opacity).toBe(0.25);
+    expect(drawLine.mock.calls[0]?.[0]?.opacity).toBe(0.25);
+  });
+
+  it("maxHeight constrains vertical shrink during render", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([200, 160]);
+    const drawRectangle = vi.spyOn(page, "drawRectangle");
+    const node = vstack(
+      { maxHeight: 50 },
+      vstack({ height: 80, shrink: 1, background: hex("#ddeeff") })
+    );
+
+    render(node, page, 10, 140, 200);
+
+    expect(drawRectangle).toHaveBeenCalledWith(
+      expect.objectContaining({ x: 10, y: 90, width: 0, height: 50 })
+    );
   });
 
   it("draws per-side borders inside the box bounds", async () => {
