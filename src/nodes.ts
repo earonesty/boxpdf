@@ -14,16 +14,21 @@ type StackOptions = BoxStyle & {
   gap?: number;
   justify?: Justify;
   align?: CrossAxis;
+  wrap?: boolean;
+};
+
+type FlexItemOptions = {
+  alignSelf?: CrossAxis;
 };
 
 export function vstack(options: StackOptions, ...children: Node[]): Node {
-  const { gap = 0, justify = "start", align = "start", ...style } = options;
+  const { gap = 0, justify = "start", align = "start", wrap: _wrap, ...style } = options;
   return { kind: "vstack", children, style, gap, justify, align };
 }
 
 export function hstack(options: StackOptions, ...children: Node[]): Node {
-  const { gap = 0, justify = "start", align = "start", ...style } = options;
-  return { kind: "hstack", children, style, gap, justify, align };
+  const { gap = 0, justify = "start", align = "start", wrap = false, ...style } = options;
+  return { kind: "hstack", children, style, gap, justify, align, wrap };
 }
 
 /** Convenience: a vstack with no styling, just to group children. */
@@ -45,7 +50,7 @@ export function keepTogether(
   return vstack({ gap, margin, breakInside: "avoid" }, ...children);
 }
 
-export interface TextOptions {
+export interface TextOptions extends FlexItemOptions {
   size: number;
   font: PDFFont;
   color?: RGB;
@@ -59,6 +64,8 @@ export interface TextOptions {
   strikethrough?: boolean;
   shrink?: number;
   breakWords?: boolean;
+  letterSpacing?: number;
+  opacity?: number;
 }
 
 export function text(content: string, options: TextOptions): Node {
@@ -75,7 +82,10 @@ export function text(content: string, options: TextOptions): Node {
     underline: options.underline,
     strikethrough: options.strikethrough,
     shrink: options.shrink,
-    breakWords: options.breakWords
+    breakWords: options.breakWords,
+    letterSpacing: options.letterSpacing,
+    opacity: options.opacity,
+    alignSelf: options.alignSelf
   };
   return { kind: "text", text: content, props };
 }
@@ -115,21 +125,23 @@ export function paragraph(options: ParagraphProps, ...runs: ParagraphItem[]): No
       paddingLeft: options.paddingLeft,
       textIndent: options.textIndent,
       wrap: options.wrap,
-      floats: options.floats
+      floats: options.floats,
+      alignSelf: options.alignSelf
     }
   };
 }
 
 export function image(
   pdfImage: PDFImage,
-  options: { width: number; height: number; margin?: EdgesInput }
+  options: { width: number; height: number; margin?: EdgesInput } & FlexItemOptions
 ): Node {
   return {
     kind: "image",
     image: pdfImage,
     width: options.width,
     height: options.height,
-    margin: options.margin
+    margin: options.margin,
+    alignSelf: options.alignSelf
   };
 }
 
@@ -140,7 +152,7 @@ export function imageFit(
     height: number;
     fit?: "contain" | "cover";
     margin?: EdgesInput;
-  }
+  } & FlexItemOptions
 ): Node {
   if (options.width <= 0 || options.height <= 0) {
     throw new Error("boxpdf imageFit: width and height must be positive");
@@ -166,7 +178,8 @@ export function imageFit(
     imageHeight: fittedHeight,
     offsetX: (options.width - fittedWidth) / 2,
     offsetY: (options.height - fittedHeight) / 2,
-    margin: options.margin
+    margin: options.margin,
+    alignSelf: options.alignSelf
   };
 }
 
@@ -181,36 +194,38 @@ export function aspectRatio(
   return { width: options.height * ratio, height: options.height };
 }
 
-export function spacer(size: number, options?: { grow?: number; shrink?: number }): Node {
-  return { kind: "spacer", size, grow: options?.grow, shrink: options?.shrink };
+export function spacer(size: number, options?: { grow?: number; shrink?: number } & FlexItemOptions): Node {
+  return { kind: "spacer", size, grow: options?.grow, shrink: options?.shrink, alignSelf: options?.alignSelf };
 }
 
 /** A flexible spacer that absorbs leftover space along the main axis. */
-export function flex(weight = 1): Node {
-  return { kind: "spacer", size: 0, grow: weight };
+export function flex(weight = 1, options?: FlexItemOptions): Node {
+  return { kind: "spacer", size: 0, grow: weight, alignSelf: options?.alignSelf };
 }
 
 export function hline(
-  options: { color: RGB; thickness?: number; width?: number; margin?: EdgesInput }
+  options: { color: RGB; thickness?: number; width?: number; margin?: EdgesInput } & FlexItemOptions
 ): Node {
   return {
     kind: "hline",
     color: options.color,
     thickness: options.thickness ?? 1,
     width: options.width,
-    margin: options.margin
+    margin: options.margin,
+    alignSelf: options.alignSelf
   };
 }
 
 export function vline(
-  options: { color: RGB; thickness?: number; height?: number; margin?: EdgesInput }
+  options: { color: RGB; thickness?: number; height?: number; margin?: EdgesInput } & FlexItemOptions
 ): Node {
   return {
     kind: "vline",
     color: options.color,
     thickness: options.thickness ?? 1,
     height: options.height,
-    margin: options.margin
+    margin: options.margin,
+    alignSelf: options.alignSelf
   };
 }
 
@@ -240,7 +255,7 @@ export function svgPath(options: {
   borderColor?: RGB;
   borderWidth?: number;
   margin?: EdgesInput;
-}): Node {
+} & FlexItemOptions): Node {
   return {
     kind: "svgPath",
     d: options.d,
@@ -250,7 +265,8 @@ export function svgPath(options: {
     color: options.color,
     borderColor: options.borderColor,
     borderWidth: options.borderWidth,
-    margin: options.margin
+    margin: options.margin,
+    alignSelf: options.alignSelf
   };
 }
 
@@ -265,8 +281,8 @@ export function svgPath(options: {
  *   )
  */
 export function link(
-  options: { href: string; margin?: EdgesInput },
+  options: { href: string; margin?: EdgesInput } & FlexItemOptions,
   child: Node
 ): Node {
-  return { kind: "link", href: options.href, child, margin: options.margin };
+  return { kind: "link", href: options.href, child, margin: options.margin, alignSelf: options.alignSelf };
 }

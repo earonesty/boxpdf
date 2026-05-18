@@ -8,10 +8,11 @@ import {
   pushGraphicsState,
   rectangle,
   rgb,
+  setCharacterSpacing,
   type PDFPage
 } from "pdf-lib";
 import { edges, type BackgroundImage, type BorderSides, type BoxStyle, type Justify, type Node, type RGB } from "./types.js";
-import { fontLineHeight, fontLineMetrics, measureText } from "./text.js";
+import { fontLineHeight, fontLineMetrics, measureTextSpaced } from "./text.js";
 import { layoutParagraph, layoutParagraphWithFloats, measureParagraphIntrinsicWidthWithIndent } from "./paragraph.js";
 import {
   layoutText,
@@ -20,6 +21,7 @@ import {
   nodeGrow,
   nodeMargin,
   nodeBaselineOffset,
+  nodeAlignSelf,
   resolveMainAxis,
   stretchCrossAxisChildren
 } from "./measure.js";
@@ -30,6 +32,7 @@ export interface RenderOptions {
 }
 
 let currentOptions: RenderOptions = {};
+let currentOpacity = 1;
 
 interface ContainingBlock {
   x: number;
@@ -44,6 +47,15 @@ function isAbsoluteBox(node: Node): node is Extract<Node, { kind: "vstack" | "hs
 
 function toRgb(color: RGB | undefined): ReturnType<typeof rgb> | undefined {
   return color ? rgb(color.r, color.g, color.b) : undefined;
+}
+
+function currentOpacityValue(): number | undefined {
+  return currentOpacity !== 1 ? currentOpacity : undefined;
+}
+
+function combinedOpacity(opacity: number | undefined): number | undefined {
+  const value = currentOpacity * (opacity ?? 1);
+  return value !== 1 ? value : undefined;
 }
 
 const DEBUG_STROKE: RGB = { r: 1, g: 0.2, b: 0.2 };
@@ -62,10 +74,12 @@ export function render(
   options: RenderOptions = {}
 ): number {
   currentOptions = options;
+  currentOpacity = 1;
   try {
     return renderWithCurrent(node, page, x, yTop, parentWidth);
   } finally {
     currentOptions = {};
+    currentOpacity = 1;
   }
 }
 
@@ -93,7 +107,23 @@ function renderWithCurrent(
   const innerX = x + m.left;
   const innerYTop = yTop - m.top;
   const innerParentWidth = parentWidth - m.left - m.right;
-  const consumed = renderContent(node, page, innerX, innerYTop, innerParentWidth, containingBlock);
+
+  // Handle opacity for stack nodes
+  const nodeOpacity = (node.kind === "vstack" || node.kind === "hstack") ? node.style.opacity : undefined;
+  const prevOpacity = currentOpacity;
+  if (nodeOpacity !== undefined) {
+    currentOpacity = currentOpacity * nodeOpacity;
+  }
+
+  let consumed: number;
+  try {
+    consumed = renderContent(node, page, innerX, innerYTop, innerParentWidth, containingBlock);
+  } finally {
+    if (nodeOpacity !== undefined) {
+      currentOpacity = prevOpacity;
+    }
+  }
+
   if (currentOptions.debug) {
     strokeDebugRect(page, innerX, innerYTop, parentWidth - m.left - m.right, consumed, DEBUG_STROKE);
   }
@@ -140,31 +170,37 @@ function renderContent(
       const { props } = node;
       const lines = layoutText(node, props.width ?? parentWidth);
       const lineHeight = props.lineHeight ?? fontLineHeight(props.font, props.size);
-      const slotWidth = props.width ?? measureText(props.font, props.size, node.text);
+      const slotWidth = props.width ?? measureTextSpaced(props.font, props.size, node.text, props.letterSpacing ?? 0);
       const decorationThickness = Math.max(0.5, props.size * 0.06);
       const decorationColor = toRgb(props.color);
+      const charSpacing = props.letterSpacing ?? 0;
+      const textOpacity = combinedOpacity(props.opacity);
       let cursorY = yTop;
       for (let i = 0; i < lines.length; i += 1) {
         const line = lines[i] ?? "";
-        const lineWidth = measureText(props.font, props.size, line);
+        const lineWidth = measureTextSpaced(props.font, props.size, line, charSpacing);
         let drawX = x;
         if (props.align === "center") drawX = x + (slotWidth - lineWidth) / 2;
         else if (props.align === "right") drawX = x + (slotWidth - lineWidth);
         const baseline = cursorY - fontLineMetrics(props.font, props.size, lineHeight).ascent;
+        if (charSpacing !== 0) page.pushOperators(setCharacterSpacing(charSpacing));
         page.drawText(line, {
           x: drawX,
           y: baseline,
           size: props.size,
           font: props.font,
-          color: toRgb(props.color)
+          color: toRgb(props.color),
+          opacity: textOpacity
         });
+        if (charSpacing !== 0) page.pushOperators(setCharacterSpacing(0));
         if (props.underline && line.length > 0) {
           const underlineY = baseline - Math.max(1, props.size * 0.12);
           page.drawLine({
             start: { x: drawX, y: underlineY },
             end: { x: drawX + lineWidth, y: underlineY },
             thickness: decorationThickness,
-            color: decorationColor
+            color: decorationColor,
+            opacity: textOpacity
           });
         }
         if (props.strikethrough && line.length > 0) {
@@ -173,7 +209,8 @@ function renderContent(
             start: { x: drawX, y: midY },
             end: { x: drawX + lineWidth, y: midY },
             thickness: decorationThickness,
-            color: decorationColor
+            color: decorationColor,
+            opacity: textOpacity
           });
         }
         cursorY -= lineHeight;
@@ -205,13 +242,18 @@ function renderContent(
         const baseline = cursorY - lineAscent;
         for (const segment of line.segments) {
           if (segment.kind === "text" && segment.text !== undefined && segment.style !== undefined) {
+            const segCharSpacing = segment.style.letterSpacing ?? 0;
+            const segOpacity = combinedOpacity(segment.style.opacity);
+            if (segCharSpacing !== 0) page.pushOperators(setCharacterSpacing(segCharSpacing));
             page.drawText(segment.text, {
               x: drawX,
               y: baseline,
               size: segment.style.size,
               font: segment.style.font,
-              color: toRgb(segment.style.color)
+              color: toRgb(segment.style.color),
+              opacity: segOpacity
             });
+            if (segCharSpacing !== 0) page.pushOperators(setCharacterSpacing(0));
             const decorationThickness = Math.max(0.5, segment.style.size * 0.06);
             const decorationColor = toRgb(segment.style.color);
             if (segment.style.underline && segment.text.length > 0) {
@@ -220,7 +262,8 @@ function renderContent(
                 start: { x: drawX, y: underlineY },
                 end: { x: drawX + segment.width, y: underlineY },
                 thickness: decorationThickness,
-                color: decorationColor
+                color: decorationColor,
+                opacity: segOpacity
               });
             }
             if (segment.style.strikethrough && segment.text.length > 0) {
@@ -229,7 +272,8 @@ function renderContent(
                 start: { x: drawX, y: midY },
                 end: { x: drawX + segment.width, y: midY },
                 thickness: decorationThickness,
-                color: decorationColor
+                color: decorationColor,
+                opacity: segOpacity
               });
             }
           } else if (segment.kind === "inline" && segment.node !== undefined) {
@@ -256,7 +300,8 @@ function renderContent(
         x,
         y: yTop - node.height,
         width: node.width,
-        height: node.height
+        height: node.height,
+        opacity: currentOpacityValue()
       });
       return node.height;
     case "imageBox": {
@@ -270,7 +315,8 @@ function renderContent(
         x: x + node.offsetX,
         y: yTop - node.offsetY - node.imageHeight,
         width: node.imageWidth,
-        height: node.imageHeight
+        height: node.imageHeight,
+        opacity: currentOpacityValue()
       });
       page.pushOperators(popGraphicsState());
       return node.height;
@@ -284,7 +330,8 @@ function renderContent(
         start: { x, y },
         end: { x: x + w, y },
         thickness: node.thickness,
-        color: toRgb(node.color)
+        color: toRgb(node.color),
+        opacity: currentOpacityValue()
       });
       return node.thickness;
     }
@@ -295,7 +342,8 @@ function renderContent(
         start: { x: lineX, y: yTop },
         end: { x: lineX, y: yTop - h },
         thickness: node.thickness,
-        color: toRgb(node.color)
+        color: toRgb(node.color),
+        opacity: currentOpacityValue()
       });
       return h;
     }
@@ -315,7 +363,9 @@ function renderContent(
         scale: node.scale,
         color: toRgb(node.color),
         borderColor: toRgb(node.borderColor),
-        borderWidth: node.borderWidth
+        borderWidth: node.borderWidth,
+        opacity: currentOpacityValue(),
+        borderOpacity: currentOpacityValue()
       });
       return node.height;
     }
@@ -366,7 +416,9 @@ function renderVStack(
   const inset = edges(node.style.padding);
   const intrinsic = measureContent(node, parentWidth);
   const boxWidth = node.style.width ?? intrinsic.width;
-  const boxHeight = node.style.height ?? intrinsic.height;
+  let boxHeight = node.style.height ?? intrinsic.height;
+  if (node.style.maxHeight !== undefined) boxHeight = Math.min(boxHeight, node.style.maxHeight);
+  if (node.style.minHeight !== undefined) boxHeight = Math.max(boxHeight, node.style.minHeight);
   const flowChildren = stretchCrossAxisChildren(
     node.children.filter((child) => !isAbsoluteBox(child)),
     "vertical",
@@ -392,7 +444,7 @@ function renderVStack(
   // Resolve shrink first so children that overflow the main axis get
   // re-sized before grow/justify positioning runs. When the vstack has no
   // fixed height, no overflow is possible so shrink is a no-op.
-  const availableMain = node.style.height === undefined ? Infinity : innerHeight;
+  const availableMain = node.style.height === undefined && node.style.maxHeight === undefined ? Infinity : innerHeight;
   const layout = resolveMainAxis(flowChildren, "vertical", availableMain, innerWidth, node.gap);
   const children = layout.children;
   const childSizes = layout.sizes;
@@ -418,7 +470,8 @@ function renderVStack(
       children.forEach((child, i) => {
         const slotHeight = childSizes[i]?.height ?? 0;
         const widthForChild = resolveCrossAxisWidth(child, childSizes[i]?.width ?? 0, innerWidth);
-        const childX = resolveCrossAxisX(node.align, innerX, innerWidth, widthForChild);
+        const effectiveAlign = nodeAlignSelf(child) ?? node.align;
+        const childX = resolveCrossAxisX(effectiveAlign, innerX, innerWidth, widthForChild);
         renderWithFixedHeight(child, page, childX, cursorY, widthForChild, slotHeight, childContainingBlock);
         cursorY -= slotHeight;
         if (i < children.length - 1) cursorY -= offsets.between;
@@ -429,7 +482,8 @@ function renderVStack(
         const baseHeight = childSizes[i]?.height ?? 0;
         const slotHeight = baseHeight + (extraPerChild[i] ?? 0);
         const widthForChild = resolveCrossAxisWidth(child, childSizes[i]?.width ?? 0, innerWidth);
-        const childX = resolveCrossAxisX(node.align, innerX, innerWidth, widthForChild);
+        const effectiveAlign = nodeAlignSelf(child) ?? node.align;
+        const childX = resolveCrossAxisX(effectiveAlign, innerX, innerWidth, widthForChild);
         renderWithFixedHeight(child, page, childX, cursorY, widthForChild, slotHeight, childContainingBlock);
         cursorY -= slotHeight;
       });
@@ -452,7 +506,9 @@ function renderHStack(
   const inset = edges(node.style.padding);
   const intrinsic = measureContent(node, parentWidth);
   const boxWidth = node.style.width ?? intrinsic.width;
-  const boxHeight = node.style.height ?? intrinsic.height;
+  let boxHeight = node.style.height ?? intrinsic.height;
+  if (node.style.maxHeight !== undefined) boxHeight = Math.min(boxHeight, node.style.maxHeight);
+  if (node.style.minHeight !== undefined) boxHeight = Math.max(boxHeight, node.style.minHeight);
   const flowChildren = stretchCrossAxisChildren(
     node.children.filter((child) => !isAbsoluteBox(child)),
     "horizontal",
@@ -493,6 +549,50 @@ function renderHStack(
 
   let cursorX = innerX;
   withBoxOverflowClip(page, node.style, x, yTop, boxWidth, boxHeight, () => {
+    if (node.wrap) {
+      // Greedy row bin-packing rendering
+      const flowChildren = node.children.filter((child) => !isAbsoluteBox(child));
+      const childSizesWrap = flowChildren.map((child) => measure(child, innerWidth));
+      const rows: Array<{ indices: number[]; rowHeight: number }> = [];
+      let rowIndices: number[] = [];
+      let rowWidth = 0;
+      for (let i = 0; i < flowChildren.length; i++) {
+        const w = childSizesWrap[i]!.width;
+        const addGap = rowIndices.length > 0 ? node.gap : 0;
+        if (rowIndices.length > 0 && rowWidth + addGap + w > innerWidth) {
+          const rowHeight = rowIndices.reduce((m, idx) => Math.max(m, childSizesWrap[idx]!.height), 0);
+          rows.push({ indices: rowIndices, rowHeight });
+          rowIndices = [i];
+          rowWidth = w;
+        } else {
+          rowIndices.push(i);
+          rowWidth += addGap + w;
+        }
+      }
+      if (rowIndices.length > 0) {
+        const rowHeight = rowIndices.reduce((m, idx) => Math.max(m, childSizesWrap[idx]!.height), 0);
+        rows.push({ indices: rowIndices, rowHeight });
+      }
+      let rowCursorY = innerYTop;
+      for (const row of rows) {
+        // Render each row as a synthetic ephemeral hstack
+        const rowChildren = row.indices.map((i) => flowChildren[i]!);
+        const syntheticRow: Extract<Node, { kind: "hstack" }> = {
+          kind: "hstack",
+          children: rowChildren,
+          style: { width: innerWidth, height: row.rowHeight },
+          gap: node.gap,
+          justify: node.justify,
+          align: node.align,
+          wrap: false
+        };
+        renderHStack(syntheticRow, page, innerX, rowCursorY, innerWidth, childContainingBlock);
+        rowCursorY -= row.rowHeight + node.gap;
+      }
+      renderAbsoluteChildren(absoluteChildren, page, childContainingBlock);
+      return;
+    }
+
     if (totalGrow === 0) {
       const offsets = computeMainAxisOffsets(
         node.justify,
@@ -504,8 +604,9 @@ function renderHStack(
       children.forEach((child, i) => {
         const slotWidth = childSizes[i]?.width ?? 0;
         const heightForChild = resolveCrossAxisHeight(child, childSizes[i]?.height ?? 0, innerHeight);
+        const effectiveAlign = nodeAlignSelf(child) ?? node.align;
         const childY = resolveCrossAxisY(
-          node.align,
+          effectiveAlign,
           innerYTop,
           innerHeight,
           heightForChild,
@@ -526,8 +627,9 @@ function renderHStack(
         const baseWidth = childSizes[i]?.width ?? 0;
         const slotWidth = baseWidth + (extraPerChild[i] ?? 0);
         const heightForChild = resolveCrossAxisHeight(child, childSizes[i]?.height ?? 0, innerHeight);
+        const effectiveAlign = nodeAlignSelf(child) ?? node.align;
         const childY = resolveCrossAxisY(
-          node.align,
+          effectiveAlign,
           innerYTop,
           innerHeight,
           heightForChild,
@@ -761,15 +863,17 @@ function drawBackground(
 ): void {
   if (!color) return;
   const yBottom = yTop - height;
+  const opacity = currentOpacityValue();
   if (!radius || radius <= 0) {
-    page.drawRectangle({ x, y: yBottom, width, height, color: toRgb(color) });
+    page.drawRectangle({ x, y: yBottom, width, height, color: toRgb(color), opacity });
     return;
   }
   page.drawSvgPath(roundedRectPath(width, height, radius), {
     x,
     y: yTop,
     color: toRgb(color),
-    borderWidth: 0
+    borderWidth: 0,
+    opacity
   });
 }
 
@@ -797,7 +901,8 @@ function drawBackgroundImage(
         x: x + tileX,
         y: yTop - tileY - backgroundImage.height,
         width: backgroundImage.width,
-        height: backgroundImage.height
+        height: backgroundImage.height,
+        opacity: currentOpacityValue()
       });
     }
   }
@@ -827,7 +932,8 @@ function drawBorder(
       width,
       height,
       borderColor: toRgb(border.color),
-      borderWidth: border.width
+      borderWidth: border.width,
+      borderOpacity: currentOpacityValue()
     });
     return;
   }
@@ -835,7 +941,8 @@ function drawBorder(
     x,
     y: yTop,
     borderColor: toRgb(border.color),
-    borderWidth: border.width
+    borderWidth: border.width,
+    borderOpacity: currentOpacityValue()
   });
 }
 
@@ -855,7 +962,8 @@ function drawBorderSides(
       start: { x, y },
       end: { x: x + width, y },
       thickness: borderSides.top.width,
-      color: toRgb(borderSides.top.color)
+      color: toRgb(borderSides.top.color),
+      opacity: currentOpacityValue()
     });
   }
   if (borderSides.right) {
@@ -864,7 +972,8 @@ function drawBorderSides(
       start: { x: lineX, y: yTop },
       end: { x: lineX, y: yBottom },
       thickness: borderSides.right.width,
-      color: toRgb(borderSides.right.color)
+      color: toRgb(borderSides.right.color),
+      opacity: currentOpacityValue()
     });
   }
   if (borderSides.bottom) {
@@ -873,7 +982,8 @@ function drawBorderSides(
       start: { x, y },
       end: { x: x + width, y },
       thickness: borderSides.bottom.width,
-      color: toRgb(borderSides.bottom.color)
+      color: toRgb(borderSides.bottom.color),
+      opacity: currentOpacityValue()
     });
   }
   if (borderSides.left) {
@@ -882,7 +992,8 @@ function drawBorderSides(
       start: { x: lineX, y: yTop },
       end: { x: lineX, y: yBottom },
       thickness: borderSides.left.width,
-      color: toRgb(borderSides.left.color)
+      color: toRgb(borderSides.left.color),
+      opacity: currentOpacityValue()
     });
   }
 }
