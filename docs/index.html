@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>boxpdf · declarative PDF layout for any JS runtime</title>
-<meta name="description" content="Tiny box-layout DSL over pdf-lib. Flexbox-lite for server-side PDF generation in Node, Cloudflare Workers, Deno, and browsers." />
+<title>boxpdf · open-source HTML and declarative PDF generation</title>
+<meta name="description" content="Open-source HTML-to-PDF and declarative PDF layout for JavaScript runtimes. Render Tailwind HTML or box-layout primitives without WASM, headless Chrome, or React." />
 <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
@@ -23,15 +23,25 @@
 
 <main>
   <section class="hero">
-    <h1>Declarative PDFs<br /><span class="muted">that run anywhere.</span></h1>
+    <p class="eyebrow">Open-source HTML-to-PDF for JavaScript runtimes</p>
+    <h1>Render HTML or code<br /><span class="muted">into PDFs that run anywhere.</span></h1>
     <p class="lede">
-      A tiny box-layout DSL over <a href="https://pdf-lib.js.org/" target="_blank" rel="noopener">pdf-lib</a>.
-      Flexbox-lite for server-side PDF generation in
+      <strong>boxpdf</strong> is a tiny OSS toolkit for server-side PDF generation:
+      render document-style <strong>HTML + Tailwind CSS</strong> with <code>boxpdf-html</code>,
+      or build layouts directly with a flexbox-lite DSL over
+      <a href="https://pdf-lib.js.org/" target="_blank" rel="noopener">pdf-lib</a>. Runs in
       <strong>Node</strong>, <strong>Cloudflare Workers</strong>, <strong>Deno</strong>,
       and the <strong>browser</strong>. No WASM. No headless browser. No React.
     </p>
+    <div class="hero-pills" aria-label="boxpdf launch highlights">
+      <span>HTML + Tailwind input</span>
+      <span>MIT open source</span>
+      <span>Edge-ready PDFs</span>
+      <span>Streaming output</span>
+    </div>
     <div class="cta-row">
       <a class="btn btn-primary" href="#install">Install</a>
+      <a class="btn btn-secondary" href="#tailwind">See HTML rendering</a>
       <a class="btn btn-secondary" href="#templates">See templates</a>
       <a class="btn btn-ghost" href="https://github.com/earonesty/boxpdf" target="_blank" rel="noopener">GitHub →</a>
     </div>
@@ -101,9 +111,9 @@ const bytes = await pdf.save(); // -&gt; Uint8Array</code></pre>
   </section>
 
   <section id="tailwind" class="block">
-    <h2>Tailwind HTML</h2>
+    <h2>HTML and Tailwind to PDF</h2>
     <p class="block-lede">
-      <code>boxpdf-html</code> can render document-style HTML from generated Tailwind CSS. Run Tailwind first, embed the CSS, then translate the HTML to boxpdf primitives.
+      <code>boxpdf-html</code> is the open-source HTML renderer for boxpdf. It turns document-style HTML and generated Tailwind CSS into boxpdf primitives, so you can ship PDF output without a browser runtime.
     </p>
     <div class="tailwind-example">
       <pre><code>&lt;div class="p-6 bg-[#f8fafc] text-gray-900"&gt;
