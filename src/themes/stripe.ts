@@ -1,6 +1,6 @@
 import type { PDFFont } from "pdf-lib";
 import { hex } from "../colors.js";
-import type { Theme } from "../theme.js";
+import { resolveThemeFonts, type Theme, type ThemeFonts } from "../theme.js";
 
 /**
  * Modern SaaS receipt/invoice aesthetic, modeled after Stripe's hosted
@@ -16,7 +16,10 @@ import type { Theme } from "../theme.js";
  * authentic experience embed Inter (open-source, SIL OFL) via
  * `embedFont`.
  */
-export function stripeTheme(font: PDFFont, bold: PDFFont): Theme {
+export function stripeTheme(fonts: ThemeFonts): Theme;
+export function stripeTheme(font: PDFFont, bold: PDFFont): Theme;
+export function stripeTheme(fontOrFonts: PDFFont | ThemeFonts, boldFont?: PDFFont): Theme {
+  const { font, bold } = resolveThemeFonts(fontOrFonts, boldFont);
   const ink = hex("#1a1a1a");
   const inkSoft = hex("#3c4257");
   const muted = hex("#697386");

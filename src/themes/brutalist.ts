@@ -1,6 +1,6 @@
 import type { PDFFont } from "pdf-lib";
 import { hex } from "../colors.js";
-import type { Theme } from "../theme.js";
+import { resolveThemeFonts, type Theme, type ThemeFonts } from "../theme.js";
 
 /**
  * Neobrutalist aesthetic: monospace everywhere, 2-pt solid black borders,
@@ -10,11 +10,17 @@ import type { Theme } from "../theme.js";
  * Best for: indie/dev-facing docs, dev portfolios, indie SaaS receipts,
  * "designed-on-purpose-to-look-rough" branding.
  *
- * Pair with `StandardFonts.Courier` + `StandardFonts.CourierBold`. The
+ * Pair with the Courier family — `standardFonts(pdf, "courier")`. The
  * theme assigns the same Courier font everywhere — there's no separate
  * sans — to commit to the look.
+ *
+ * @example
+ *   const theme = brutalistTheme(await standardFonts(pdf, "courier"));
  */
-export function brutalistTheme(mono: PDFFont, monoBold: PDFFont): Theme {
+export function brutalistTheme(fonts: ThemeFonts): Theme;
+export function brutalistTheme(mono: PDFFont, monoBold: PDFFont): Theme;
+export function brutalistTheme(monoOrFonts: PDFFont | ThemeFonts, monoBoldFont?: PDFFont): Theme {
+  const { font: mono, bold: monoBold } = resolveThemeFonts(monoOrFonts, monoBoldFont);
   const ink = hex("#000000");
   const inkSoft = hex("#000000");
   const muted = hex("#000000");

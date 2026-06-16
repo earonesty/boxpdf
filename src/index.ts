@@ -45,7 +45,13 @@ export type {
 export { measure, measureContent, resolveMainAxis } from "./measure.js";
 export type { MainAxis, MainAxisLayout, MeasureProfileEvent } from "./measure.js";
 export { render, type RenderOptions } from "./render.js";
-export { renderFlow, renderToPdf, PageSizes, pageInner, pageContent } from "./document.js";
+export { renderFlow, renderToPdf, flowToPdf, PageSizes, pageInner, pageContent } from "./document.js";
+
+// Re-export the pdf-lib symbols you need on the common path so a basic
+// document needs no direct `pdf-lib` import. pdf-lib is a peer dependency.
+export { PDFDocument, StandardFonts } from "pdf-lib";
+export type { PDFFont, PDFImage, PDFPage } from "pdf-lib";
+
 export { streamFlow, nodeAdapter } from "./stream.js";
 export type { StreamFlowOptions, StreamPageContext } from "./stream.js";
 export type {
@@ -61,13 +67,14 @@ export type {
 export { Colors, hex, rgb255 } from "./colors.js";
 export { formatCurrency } from "./format.js";
 export { defineStyles } from "./styles.js";
-export { embedFont, loadFont, loadImage, type AssetSource, type LoadFontOptions } from "./assets.js";
+export { embedFont, loadFont, loadImage, standardFonts, type AssetSource, type LoadFontOptions, type StandardFontSet, type StandardFontFamily } from "./assets.js";
 export type {
   Theme,
   ThemeColors,
   ThemeSpacing,
   ThemeRadii,
   ThemeType,
+  ThemeFonts,
   ThemedTextStyle
 } from "./theme.js";
 export { cleanTheme } from "./themes/clean.js";

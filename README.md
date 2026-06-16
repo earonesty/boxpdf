@@ -5,8 +5,34 @@ A box-layout DSL over [pdf-lib](https://pdf-lib.js.org/). Runs in Node 18+, Clou
 Live gallery: <https://earonesty.github.io/boxpdf/>
 
 ```ts
+import { cleanTheme, flowToPdf, hline, hstack, standardFonts, text, vstack } from "boxpdf";
+
+const bytes = await flowToPdf(async (pdf) => {
+  const { font, bold } = await standardFonts(pdf);
+  const theme = cleanTheme({ font, bold });
+
+  return [
+    vstack({ gap: 8 },
+      text("Receipt #18472", theme.type.h1),
+      text("May 14, 2026", theme.type.caption)
+    ),
+    hline(theme.hr),
+    hstack({ gap: 16, justify: "between", width: 515 },
+      text("Wool socks", theme.type.body),
+      text("$28.00", { ...theme.type.body, font: bold, align: "right", width: 80 })
+    )
+  ];
+});
+```
+
+No `pdf-lib` import, no manual `PDFDocument.create()` / `pdf.save()` bookkeeping. `flowToPdf` owns the document lifecycle and returns the bytes; `standardFonts` embeds the built-in Helvetica family (regular, bold, italic, bold-italic) in one call.
+
+<details>
+<summary>Prefer to manage the document yourself? The explicit path still works.</summary>
+
+```ts
 import { PDFDocument, StandardFonts } from "pdf-lib";
-import { cleanTheme, hline, hstack, renderFlow, text, vstack } from "boxpdf";
+import { cleanTheme, renderFlow, text, vstack } from "boxpdf";
 
 const pdf  = await PDFDocument.create();
 const font = await pdf.embedFont(StandardFonts.Helvetica);
@@ -17,16 +43,15 @@ await renderFlow(pdf, [
   vstack({ gap: 8 },
     text("Receipt #18472", theme.type.h1),
     text("May 14, 2026", theme.type.caption)
-  ),
-  hline(theme.hr),
-  hstack({ gap: 16, justify: "between", width: 515 },
-    text("Wool socks", theme.type.body),
-    text("$28.00", { ...theme.type.body, font: bold, align: "right", width: 80 })
   )
 ]);
 
 const bytes = await pdf.save();
 ```
+
+`renderFlow(pdf, nodes, options)` paginates into a document you own and returns `{ pages }` — reach for it when you need multiple render passes, the page objects, or custom `save()` options. `boxpdf` also re-exports `PDFDocument` and `StandardFonts`, so you never need a direct `pdf-lib` import.
+
+</details>
 
 ## Install
 
@@ -68,15 +93,22 @@ claude mcp add boxpdf -- npx -y boxpdf mcp
 ## Themes
 
 ```ts
-import { cleanTheme, stripeTheme, editorialTheme, brutalistTheme } from "boxpdf";
+import { cleanTheme, editorialTheme, standardFonts } from "boxpdf";
 
-const theme = cleanTheme(font, bold);
-// stripeTheme(font, bold)
-// editorialTheme(font, bold, italic)
-// brutalistTheme(courier, courierBold)
+const theme = cleanTheme(await standardFonts(pdf));            // Helvetica
+const serif = editorialTheme(await standardFonts(pdf, "times")); // serif + italic slot
 ```
 
-Every theme exposes the same shape: `colors`, `spacing`, `radii`, `type`, `card`, `hr`.
+Every theme factory accepts either a `{ font, bold, italic? }` object — which is exactly what `standardFonts(pdf)` and `embedInter(pdf)` return — or the legacy positional fonts:
+
+```ts
+cleanTheme({ font, bold })            // or cleanTheme(font, bold)
+stripeTheme({ font, bold })
+editorialTheme({ font, bold, italic }) // or editorialTheme(font, bold, italic)
+brutalistTheme({ font, bold })         // courier regular + bold
+```
+
+`standardFonts(pdf, family)` takes `"helvetica"` (default), `"times"`, or `"courier"` and returns `{ font, bold, italic, boldItalic }`. Every theme exposes the same shape: `colors`, `spacing`, `radii`, `type`, `card`, `hr`.
 
 ## API
 
@@ -122,6 +154,7 @@ Container `style`:
 
 ### Rendering
 
+- `flowToPdf(build, options?)`. The shortest path to bytes. Creates a `PDFDocument`, hands it to your `build(pdf)` callback (embed fonts/images there and return the top-level nodes), paginates with `renderFlow`, and returns the saved `Uint8Array`. Same `options` as `renderFlow`.
 - `renderFlow(pdf, nodes[], options)`. Paginates a sequence of top-level children. Top-level `vstack` nodes may fragment between children; `table()` fragments between rows and repeats headers on continuation pages. Use `keepTogether()` or `breakInside: "avoid"` for atomic blocks. Options: `size`, `margin`, `header?`, `footer?`, `reserveBottom?`, `title?`, `author?`, `subject?`, `keywords?`, `creator?`, `producer?`, `debug?`, `warnings?`, `profile?`. Headers and footers receive `{ pageNumber, totalPages }`. Defaults to LETTER (612×792). Pass `{ size: PageSizes.A4 }` for A4. When a top-level child's measured width exceeds the page content area, boxpdf emits a `console.warn`. Suppress with `warnings: false`.
 - `streamFlow(pdf, writable, asyncIterable, options)`. Incremental page-by-page rendering. Memory stays bounded regardless of page count. Writes PDF bytes to a `WritableStream<Uint8Array>` as each page closes. See the Streaming section below for the contract.
 - `renderToPdf(node, options)`. One-page convenience.
@@ -133,6 +166,7 @@ Pass `{ debug: true }` to outline content boxes in red and margin boxes in orang
 
 ### Helpers
 
+- `standardFonts(pdf, family?)`. Embed a built-in pdf-lib family (`"helvetica"` default, `"times"`, `"courier"`) and get `{ font, bold, italic, boldItalic }` back — ready to drop into any theme. No bytes embedded.
 - `loadFont(pdf, source, options?)`. Embed a TTF from URL, bytes, base64, or data URL.
 - `loadImage(pdf, source)`. Embed a PNG or JPEG (auto-detected).
 - `aspectRatio(ratio, { width })` / `aspectRatio(ratio, { height })`. Derive the missing dimension for fixed-ratio boxes or images.
@@ -267,21 +301,18 @@ Both the core and the `boxpdf/inter` subpath run on Workers without `nodejs_comp
 
 ```ts
 import { Hono } from "hono";
-import { PDFDocument, StandardFonts } from "pdf-lib";
-import { cleanTheme, renderFlow, text } from "boxpdf";
+import { cleanTheme, flowToPdf, standardFonts, text } from "boxpdf";
 
 const app = new Hono();
 
 app.get("/receipt.pdf", async (c) => {
-  const pdf  = await PDFDocument.create();
-  const font = await pdf.embedFont(StandardFonts.Helvetica);
-  const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
-  const t    = cleanTheme(font, bold);
-  await renderFlow(pdf, [
-    text("Thanks!", t.type.h1),
-    text("This PDF was generated at the edge.", t.type.body)
-  ]);
-  const bytes = await pdf.save();
+  const bytes = await flowToPdf(async (pdf) => {
+    const t = cleanTheme(await standardFonts(pdf));
+    return [
+      text("Thanks!", t.type.h1),
+      text("This PDF was generated at the edge.", t.type.body)
+    ];
+  });
   return new Response(bytes, { headers: { "content-type": "application/pdf" } });
 });
 

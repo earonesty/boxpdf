@@ -117,14 +117,14 @@ Install:
 npm install boxpdf pdf-lib
 \`\`\`
 
-Core workflow:
+Core workflow (shortest path):
 
-1. Create a pdf-lib PDFDocument.
-2. Embed one or more fonts.
-3. Pick a theme such as cleanTheme(font, bold).
-4. Build plain object nodes with vstack, hstack, text, image, hline, spacer, flex, link, and keepTogether.
-5. Render with renderFlow(pdf, nodes, options) for paginated documents or renderToPdf(node, options) for simple one-page output.
-6. Save the PDF bytes with pdf.save().
+1. Call flowToPdf(async (pdf) => { ... return nodes }) — it creates the document and returns the saved Uint8Array.
+2. Inside the callback, embed fonts with standardFonts(pdf) (built-in Helvetica/Times/Courier, returns { font, bold, italic, boldItalic }) or loadFont(pdf, source) for custom TTFs.
+3. Pick a theme such as cleanTheme(await standardFonts(pdf)) — theme factories accept a { font, bold, italic? } object or positional fonts.
+4. Build plain object nodes with vstack, hstack, text, image, hline, spacer, flex, link, and keepTogether; return them from the callback.
+
+Explicit path (manage the document yourself): create a PDFDocument (boxpdf re-exports PDFDocument and StandardFonts, so no direct pdf-lib import is needed), embed fonts, build nodes, call renderFlow(pdf, nodes, options), then pdf.save(). Use renderToPdf(node, options) for simple one-page output.
 
 Important APIs:
 
@@ -143,10 +143,12 @@ Important APIs:
 - position: "relative" / "absolute" on vstack/hstack styles supports top/right/bottom/left overlays and zIndex paint order.
 - borderSides: per-side box border strokes with top/right/bottom/left { color, width }.
 - aspectRatio(ratio, { width } | { height }): derive the missing dimension.
+- flowToPdf(build, options): create a document, build nodes in the callback, paginate, and return saved Uint8Array. The shortest path to bytes.
 - renderFlow(pdf, nodes, options): paginated rendering with margins, headers, footers, metadata, debug overlays, top-level vstack fragmentation, and table row fragmentation with repeated headers.
-- renderToPdf(node, options): convenience helper that returns Uint8Array.
+- renderToPdf(node, options): convenience helper that returns Uint8Array for one-page output.
+- standardFonts(pdf, family?): embed a built-in pdf-lib family (helvetica/times/courier) and get { font, bold, italic, boldItalic }.
 - measure(node, parentWidth): measure without drawing.
-- cleanTheme, stripeTheme, editorialTheme, brutalistTheme: shared tokenized themes.
+- cleanTheme, stripeTheme, editorialTheme, brutalistTheme: shared tokenized themes; each accepts { font, bold, italic? } or positional fonts.
 - formatCurrency, defineStyles, hex, rgb255: helpers.
 
 Use explicit widths for wrapping text and table columns. Set shrink on overflowing stack children when they should give up space and rewrap.
