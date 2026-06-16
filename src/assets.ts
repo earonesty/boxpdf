@@ -1,6 +1,57 @@
-import type { PDFDocument, PDFFont, PDFImage } from "pdf-lib";
+import { StandardFonts, type PDFDocument, type PDFFont, type PDFImage } from "pdf-lib";
 
 export type AssetSource = string | Uint8Array | ArrayBuffer;
+
+/** The four faces of one of pdf-lib's built-in (zero-dependency) font families. */
+export interface StandardFontSet {
+  /** Regular weight, used by body text. */
+  font: PDFFont;
+  /** Bold weight, used by headings and emphasis. */
+  bold: PDFFont;
+  /** Italic / oblique weight. */
+  italic: PDFFont;
+  /** Bold italic / bold oblique weight. */
+  boldItalic: PDFFont;
+}
+
+/** A built-in pdf-lib font family. No bytes are embedded — these ship with every PDF reader. */
+export type StandardFontFamily = "helvetica" | "times" | "courier";
+
+const STANDARD_FONT_FAMILIES: Record<StandardFontFamily, [StandardFonts, StandardFonts, StandardFonts, StandardFonts]> = {
+  helvetica: [StandardFonts.Helvetica, StandardFonts.HelveticaBold, StandardFonts.HelveticaOblique, StandardFonts.HelveticaBoldOblique],
+  times: [StandardFonts.TimesRoman, StandardFonts.TimesRomanBold, StandardFonts.TimesRomanItalic, StandardFonts.TimesRomanBoldItalic],
+  courier: [StandardFonts.Courier, StandardFonts.CourierBold, StandardFonts.CourierOblique, StandardFonts.CourierBoldOblique]
+};
+
+/**
+ * Embed one of pdf-lib's 14 built-in font families and return all four faces
+ * ready to drop into a theme. No font files are downloaded or bundled — these
+ * are the standard PDF fonts every reader already has.
+ *
+ * This is the fastest way to get going: the regular + bold pair feeds any
+ * theme factory directly.
+ *
+ * @example
+ *   import { cleanTheme, standardFonts } from "boxpdf";
+ *
+ *   const fonts = await standardFonts(pdf);          // Helvetica family
+ *   const theme = cleanTheme(fonts);                 // or cleanTheme(fonts.font, fonts.bold)
+ *
+ *   // Serif for editorial documents:
+ *   const theme = editorialTheme(await standardFonts(pdf, "times"));
+ */
+export async function standardFonts(
+  pdf: PDFDocument,
+  family: StandardFontFamily = "helvetica"
+): Promise<StandardFontSet> {
+  const [regular, bold, italic, boldItalic] = STANDARD_FONT_FAMILIES[family];
+  return {
+    font: await pdf.embedFont(regular),
+    bold: await pdf.embedFont(bold),
+    italic: await pdf.embedFont(italic),
+    boldItalic: await pdf.embedFont(boldItalic)
+  };
+}
 
 const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47];
 const JPEG_MAGIC = [0xff, 0xd8, 0xff];

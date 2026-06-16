@@ -1,6 +1,6 @@
 import type { PDFFont } from "pdf-lib";
 import { hex } from "../colors.js";
-import type { Theme } from "../theme.js";
+import { resolveThemeFonts, type Theme, type ThemeFonts } from "../theme.js";
 
 /**
  * Classic book / magazine typography: serif body, warm off-white surface,
@@ -10,15 +10,21 @@ import type { Theme } from "../theme.js";
  * Best for: resumes, cover letters, white papers, reading-heavy reports,
  * literary or formal documents.
  *
- * Pair with `StandardFonts.TimesRoman` + `TimesRomanBold`, optionally
- * also `TimesRomanItalic` for the italic slot (used by captions and any
- * `text({ font: theme.italic, ... })` in your templates).
+ * Pair with the Times family — `standardFonts(pdf, "times")` fills the
+ * italic slot (used by captions and any `text({ font: theme.italic, ... })`
+ * in your templates) automatically.
+ *
+ * @example
+ *   const theme = editorialTheme(await standardFonts(pdf, "times"));
  */
+export function editorialTheme(fonts: ThemeFonts): Theme;
+export function editorialTheme(font: PDFFont, bold: PDFFont, italic?: PDFFont): Theme;
 export function editorialTheme(
-  font: PDFFont,
-  bold: PDFFont,
-  italic?: PDFFont
+  fontOrFonts: PDFFont | ThemeFonts,
+  boldFont?: PDFFont,
+  italicFont?: PDFFont
 ): Theme {
+  const { font, bold, italic } = resolveThemeFonts(fontOrFonts, boldFont, italicFont);
   const ink = hex("#1c1611");
   const inkSoft = hex("#3d3327");
   const muted = hex("#7a6e63");

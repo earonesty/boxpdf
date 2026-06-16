@@ -1,6 +1,6 @@
 import type { PDFFont } from "pdf-lib";
 import { hex } from "../colors.js";
-import type { Theme } from "../theme.js";
+import { resolveThemeFonts, type Theme, type ThemeFonts } from "../theme.js";
 
 /**
  * A modern, monochrome theme inspired by the Stripe / Linear / Notion
@@ -11,20 +11,19 @@ import type { Theme } from "../theme.js";
  * library doesn't ship a default TTF on purpose (keeps bundle size honest).
  *
  * @example
- *   import { PDFDocument, StandardFonts } from "pdf-lib";
- *   import { cleanTheme, renderFlow, text, vstack } from "boxpdf";
+ *   import { cleanTheme, standardFonts, text, vstack } from "boxpdf";
  *
- *   const pdf = await PDFDocument.create();
- *   const font = await pdf.embedFont(StandardFonts.Helvetica);
- *   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
- *   const theme = cleanTheme(font, bold);
+ *   const theme = cleanTheme(await standardFonts(pdf));
  *
  *   vstack(theme.card,
  *     text("Statement", theme.type.h1),
  *     text("April 2026",  theme.type.caption)
  *   );
  */
-export function cleanTheme(font: PDFFont, bold: PDFFont): Theme {
+export function cleanTheme(fonts: ThemeFonts): Theme;
+export function cleanTheme(font: PDFFont, bold: PDFFont): Theme;
+export function cleanTheme(fontOrFonts: PDFFont | ThemeFonts, boldFont?: PDFFont): Theme {
+  const { font, bold } = resolveThemeFonts(fontOrFonts, boldFont);
   const ink = hex("#0f1419");
   const inkSoft = hex("#374151");
   const muted = hex("#6b7280");

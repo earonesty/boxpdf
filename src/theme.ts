@@ -83,6 +83,42 @@ export interface Theme {
 }
 
 /**
+ * The fonts a theme needs. Pass this object to any theme factory instead of
+ * positional `(font, bold, italic?)` arguments — it plugs straight into the
+ * result of `standardFonts(pdf)` or `embedInter(pdf)`:
+ *
+ * @example
+ *   const theme = cleanTheme(await standardFonts(pdf));
+ *   const theme = editorialTheme(await standardFonts(pdf, "times"));
+ */
+export interface ThemeFonts {
+  font: PDFFont;
+  bold: PDFFont;
+  italic?: PDFFont;
+}
+
+/**
+ * Normalize a theme factory's font arguments. Accepts either a single
+ * {@link ThemeFonts} object (the preferred form) or the legacy positional
+ * `(font, bold, italic?)` arguments, so both call styles keep working.
+ */
+export function resolveThemeFonts(
+  fontOrFonts: PDFFont | ThemeFonts,
+  bold?: PDFFont,
+  italic?: PDFFont
+): ThemeFonts {
+  if (isThemeFonts(fontOrFonts)) return fontOrFonts;
+  if (!bold) {
+    throw new Error("Theme factory needs a bold font: pass `(font, bold)` or `{ font, bold }`.");
+  }
+  return { font: fontOrFonts, bold, italic };
+}
+
+function isThemeFonts(value: PDFFont | ThemeFonts): value is ThemeFonts {
+  return typeof value === "object" && value !== null && "font" in value && "bold" in value;
+}
+
+/**
  * Helper TextProps converter — themes return ready-to-spread `TextOptions`,
  * but internally TextProps requires `align` to be present. This is just for
  * library-side use when composing themed text manually.

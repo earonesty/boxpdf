@@ -411,6 +411,41 @@ function now(): number {
 }
 
 /**
+ * One-call convenience around the full `renderFlow` lifecycle: create a
+ * `PDFDocument`, let you build the nodes against it (so fonts and images embed
+ * into the same document), paginate them, and return the saved bytes.
+ *
+ * The `build` callback receives the fresh document — embed fonts there and
+ * return the top-level nodes. This is the shortest path from "nothing" to a
+ * `Uint8Array`, with no pdf-lib import required:
+ *
+ * @example
+ *   import { cleanTheme, flowToPdf, standardFonts, text, vstack } from "boxpdf";
+ *
+ *   const bytes = await flowToPdf(async (pdf) => {
+ *     const theme = cleanTheme(await standardFonts(pdf));
+ *     return [
+ *       vstack({ gap: 8 },
+ *         text("Receipt #18472", theme.type.h1),
+ *         text("May 14, 2026", theme.type.caption)
+ *       )
+ *     ];
+ *   });
+ *
+ * For full control over the document (multiple render passes, custom save
+ * options, returning the `PDFDocument` itself) call `renderFlow` directly.
+ */
+export async function flowToPdf(
+  build: (pdf: PDFDocument) => Node[] | Promise<Node[]>,
+  options: FlowOptions = {}
+): Promise<Uint8Array> {
+  const pdf = await PDFDocument.create({ updateMetadata: options.producer === undefined });
+  const nodes = await build(pdf);
+  await renderFlow(pdf, nodes, options);
+  return pdf.save();
+}
+
+/**
  * Convenience: create a new PDFDocument, render a single node onto one page,
  * and return the saved bytes. Use `renderFlow` when you need pagination.
  */
