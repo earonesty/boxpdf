@@ -107,7 +107,15 @@ export function resolveThemeFonts(
   bold?: PDFFont,
   italic?: PDFFont
 ): ThemeFonts {
-  if (isThemeFonts(fontOrFonts)) return fontOrFonts;
+  if (isThemeFonts(fontOrFonts)) {
+    // The object form satisfies the structural check via the presence of the
+    // keys, but a JS caller can still pass `{ font, bold: undefined }`. Hold it
+    // to the same contract as the positional form.
+    if (!fontOrFonts.font || !fontOrFonts.bold) {
+      throw new Error("Theme factory needs both a regular and bold font: pass `{ font, bold }` (or `(font, bold)`).");
+    }
+    return fontOrFonts;
+  }
   if (!bold) {
     throw new Error("Theme factory needs a bold font: pass `(font, bold)` or `{ font, bold }`.");
   }

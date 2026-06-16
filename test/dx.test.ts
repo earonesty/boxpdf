@@ -59,6 +59,13 @@ describe("theme font overloads", () => {
     // @ts-expect-error intentionally calling with a missing bold argument
     expect(() => cleanTheme(font)).toThrow(/bold font/);
   });
+
+  it("throws when the object form carries an undefined bold (JS caller)", async () => {
+    const pdf = await PDFDocument.create();
+    const font = await pdf.embedFont(StandardFonts.Helvetica);
+    // @ts-expect-error intentionally passing an object with undefined bold
+    expect(() => cleanTheme({ font, bold: undefined })).toThrow(/bold font/);
+  });
 });
 
 describe("flowToPdf", () => {

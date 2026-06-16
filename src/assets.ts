@@ -24,9 +24,10 @@ const STANDARD_FONT_FAMILIES: Record<StandardFontFamily, [StandardFonts, Standar
 };
 
 /**
- * Embed one of pdf-lib's 14 built-in font families and return all four faces
- * ready to drop into a theme. No font files are downloaded or bundled — these
- * are the standard PDF fonts every reader already has.
+ * Embed one of pdf-lib's three built-in standard font families — Helvetica,
+ * Times, or Courier (four faces each, drawn from the 14 standard PDF fonts) —
+ * and return all four faces ready to drop into a theme. No font files are
+ * downloaded or bundled; these are the standard PDF fonts every reader has.
  *
  * This is the fastest way to get going: the regular + bold pair feeds any
  * theme factory directly.
