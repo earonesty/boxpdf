@@ -396,6 +396,38 @@ describe("render", () => {
     expect(pages.length).toBeGreaterThan(1);
   });
 
+  it("moves a fragmentable stack when its first child cannot fit", async () => {
+    const pdf = await PDFDocument.create();
+    const phases: string[] = [];
+    const filler = spacer(100);
+    const photoCard = vstack(
+      { gap: 4 },
+      vstack(
+        { height: 100, background: hex("#eeeeee") },
+        text("photo", { size: 10, font })
+      ),
+      text("caption", { size: 10, font })
+    );
+
+    const { pages } = await renderFlow(pdf, [filler, photoCard], {
+      size: { width: 240, height: 220 },
+      margin: 20,
+      profile: (event) => {
+        if (["split-start", "node-render-start", "page-break"].includes(event.phase)) {
+          phases.push(event.phase);
+        }
+      }
+    });
+
+    expect(pages).toHaveLength(2);
+    expect(phases).toEqual([
+      "node-render-start",
+      "split-start",
+      "page-break",
+      "node-render-start"
+    ]);
+  });
+
   it("fragments tables between rows and repeats the header", async () => {
     const drawText = vi.spyOn(PDFPage.prototype, "drawText");
     try {
@@ -430,6 +462,39 @@ describe("render", () => {
     } finally {
       drawText.mockRestore();
     }
+  });
+
+  it("moves a table when its first row cannot fit", async () => {
+    const pdf = await PDFDocument.create();
+    const phases: string[] = [];
+    const node = table({
+      width: 180,
+      columns: [{ width: "1fr" }],
+      header: [text("Item", { size: 10, font: bold })],
+      rows: [
+        [vstack({ height: 70 }, text("Row 1", { size: 10, font }))],
+        [vstack({ height: 40 }, text("Row 2", { size: 10, font }))]
+      ],
+      cellPadding: 0
+    });
+
+    const { pages } = await renderFlow(pdf, [spacer(145), node], {
+      size: { width: 240, height: 260 },
+      margin: 20,
+      profile: (event) => {
+        if (["split-start", "node-render-start", "page-break"].includes(event.phase)) {
+          phases.push(event.phase);
+        }
+      }
+    });
+
+    expect(pages).toHaveLength(2);
+    expect(phases).toEqual([
+      "node-render-start",
+      "split-start",
+      "page-break",
+      "node-render-start"
+    ]);
   });
 
   it("hline takes parent width when no width supplied", async () => {

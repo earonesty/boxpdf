@@ -157,7 +157,7 @@ function splitNormalStack(
   let splitAt = 0;
   for (let i = 0; i < node.children.length; i += 1) {
     const candidate = cloneStackWithChildren(node, node.children.slice(0, i + 1));
-    if (measure(candidate, contentWidth).height <= availableHeight || i === 0) {
+    if (measure(candidate, contentWidth).height <= availableHeight) {
       splitAt = i + 1;
       continue;
     }
@@ -186,7 +186,7 @@ function splitTableStack(
   let splitAt = 0;
   for (let i = 0; i < body.length; i += 1) {
     const candidate = cloneStackWithChildren(node, [...header, ...body.slice(0, i + 1)]);
-    if (measure(candidate, contentWidth).height <= availableHeight || i === 0) {
+    if (measure(candidate, contentWidth).height <= availableHeight) {
       splitAt = i + 1;
       continue;
     }
