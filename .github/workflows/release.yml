@@ -20,27 +20,22 @@ jobs:
       id-token: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up pnpm
         # `version` is omitted on purpose — the action reads `packageManager`
         # from package.json. Specifying both causes ERR_PNPM_BAD_PM_VERSION.
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
         with:
           run_install: false
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        # Node 24 includes an npm version new enough for OIDC trusted publishing.
+        uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "24"
           cache: pnpm
           registry-url: "https://registry.npmjs.org"
-
-      - name: Upgrade npm
-        # OIDC-based trusted publishing requires npm >= 11.5.1. Node 20's
-        # bundled npm is 10.x, while npm 12 requires Node 22. Pin the major so
-        # npm upgrades cannot silently make the Node 20 release job invalid.
-        run: npm install -g npm@11
 
       - name: Install
         run: pnpm install --frozen-lockfile
@@ -63,6 +58,6 @@ jobs:
           NPM_CONFIG_PROVENANCE: "true"
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
