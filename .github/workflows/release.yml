@@ -38,9 +38,9 @@ jobs:
 
       - name: Upgrade npm
         # OIDC-based trusted publishing requires npm >= 11.5.1. Node 20's
-        # bundled npm is 10.x, which silently falls back to anonymous PUTs
-        # and yields a confusing 404 "not in this registry."
-        run: npm install -g npm@latest
+        # bundled npm is 10.x, while npm 12 requires Node 22. Pin the major so
+        # npm upgrades cannot silently make the Node 20 release job invalid.
+        run: npm install -g npm@11
 
       - name: Install
         run: pnpm install --frozen-lockfile
