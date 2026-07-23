@@ -34,6 +34,9 @@ export interface RenderOptions {
 
 let currentOptions: RenderOptions = {};
 let currentOpacity = 1;
+type Matrix = { a: number; b: number; c: number; d: number; e: number; f: number };
+const IDENTITY_MATRIX: Matrix = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
+let currentPaintMatrix: Matrix = IDENTITY_MATRIX;
 
 interface ContainingBlock {
   x: number;
@@ -59,7 +62,124 @@ function combinedOpacity(opacity: number | undefined): number | undefined {
   return value !== 1 ? value : undefined;
 }
 
-function withBoxRotation<T>(
+function multiplyMatrix(left: Matrix, right: Matrix): Matrix {
+  return {
+    a: left.a * right.a + left.c * right.b,
+    b: left.b * right.a + left.d * right.b,
+    c: left.a * right.c + left.c * right.d,
+    d: left.b * right.c + left.d * right.d,
+    e: left.a * right.e + left.c * right.f + left.e,
+    f: left.b * right.e + left.d * right.f + left.f
+  };
+}
+
+function translationMatrix(x: number, y: number): Matrix {
+  return { a: 1, b: 0, c: 0, d: 1, e: x, f: y };
+}
+
+function resolveRelative(value: { length: number; percent: number }, size: number): number {
+  return value.length + value.percent * size;
+}
+
+function stackBoxSize(
+  node: Node,
+  parentWidth: number,
+): { width: number; height: number } | undefined {
+  if (node.kind !== "vstack" && node.kind !== "hstack") return undefined;
+  const intrinsic = measureContent(node, parentWidth);
+  const width = node.style.width ?? intrinsic.width;
+  let height = node.style.height ?? intrinsic.height;
+  if (node.style.maxHeight !== undefined) height = Math.min(height, node.style.maxHeight);
+  if (node.style.minHeight !== undefined) height = Math.max(height, node.style.minHeight);
+  return { width, height };
+}
+
+function transformOperationMatrix(
+  operation: NonNullable<BoxStyle["transform"]>[number],
+  width: number,
+  height: number
+): Matrix {
+  switch (operation.kind) {
+    case "translate":
+      return translationMatrix(resolveRelative(operation.x, width), resolveRelative(operation.y, height));
+    case "scale":
+      return { a: operation.x, b: 0, c: 0, d: operation.y, e: 0, f: 0 };
+    case "rotate": {
+      const radians = (operation.degrees * Math.PI) / 180;
+      const cosine = Math.cos(radians);
+      const sine = Math.sin(radians);
+      return { a: cosine, b: sine, c: -sine, d: cosine, e: 0, f: 0 };
+    }
+    case "skew":
+      return {
+        a: 1,
+        b: Math.tan((operation.yDegrees * Math.PI) / 180),
+        c: Math.tan((operation.xDegrees * Math.PI) / 180),
+        d: 1,
+        e: 0,
+        f: 0
+      };
+    case "matrix":
+      return {
+        a: operation.a,
+        b: operation.b,
+        c: operation.c,
+        d: operation.d,
+        e: operation.e,
+        f: operation.f
+      };
+  }
+}
+
+function boxPaintMatrix(node: Node, x: number, yTop: number, parentWidth: number): Matrix | undefined {
+  if (node.kind !== "vstack" && node.kind !== "hstack") return undefined;
+  const operations = [
+    ...(node.style.rotate !== undefined ? [{ kind: "rotate" as const, degrees: node.style.rotate }] : []),
+    ...(node.style.transform ?? [])
+  ];
+  if (operations.length === 0) return undefined;
+  const size = stackBoxSize(node, parentWidth);
+  if (!size) return undefined;
+  let local = IDENTITY_MATRIX;
+  for (const operation of operations) {
+    const next = transformOperationMatrix(operation, size.width, size.height);
+    if (!Object.values(next).every(Number.isFinite)) return undefined;
+    local = multiplyMatrix(local, next);
+  }
+  const origin = node.style.transformOrigin ?? {
+    x: { length: 0, percent: 0.5 },
+    y: { length: 0, percent: 0.5 }
+  };
+  const originX = resolveRelative(origin.x, size.width);
+  const originY = resolveRelative(origin.y, size.height);
+  local = multiplyMatrix(
+    multiplyMatrix(translationMatrix(originX, originY), local),
+    translationMatrix(-originX, -originY)
+  );
+
+  // Convert the local CSS coordinate system (positive Y downward) into the
+  // absolute PDF coordinate system (positive Y upward).
+  return {
+    a: local.a,
+    b: -local.b,
+    c: -local.c,
+    d: local.d,
+    e: x - local.a * x + local.c * yTop + local.e,
+    f: yTop + local.b * x - local.d * yTop - local.f
+  };
+}
+
+function nodePaintMatrixAtLayout(node: Node, x: number, yTop: number, parentWidth: number): Matrix | undefined {
+  const margin = nodeMargin(node);
+  return boxPaintMatrix(
+    node,
+    x + margin.left,
+    yTop - margin.top,
+    parentWidth - margin.left - margin.right
+  );
+}
+
+function withBoxTransform<T>(
   node: Node,
   page: PDFPage,
   x: number,
@@ -67,34 +187,20 @@ function withBoxRotation<T>(
   parentWidth: number,
   draw: () => T
 ): T {
-  if (node.kind !== "vstack" && node.kind !== "hstack") return draw();
-  const degrees = node.style.rotate;
-  if (degrees === undefined || !Number.isFinite(degrees) || degrees % 360 === 0) return draw();
-
-  const intrinsic = measureContent(node, parentWidth);
-  const width = node.style.width ?? intrinsic.width;
-  let height = node.style.height ?? intrinsic.height;
-  if (node.style.maxHeight !== undefined) height = Math.min(height, node.style.maxHeight);
-  if (node.style.minHeight !== undefined) height = Math.max(height, node.style.minHeight);
-
-  const pivotX = x + width / 2;
-  const pivotY = yTop - height / 2;
-  // CSS positive angles rotate clockwise. PDF coordinates point upward, so
-  // the equivalent PDF matrix uses the negative angle.
-  const radians = (-degrees * Math.PI) / 180;
-  const cosine = Math.cos(radians);
-  const sine = Math.sin(radians);
-  const translateX = pivotX - cosine * pivotX + sine * pivotY;
-  const translateY = pivotY - sine * pivotX - cosine * pivotY;
+  const matrix = boxPaintMatrix(node, x, yTop, parentWidth);
+  if (!matrix) return draw();
+  const previousPaintMatrix = currentPaintMatrix;
+  currentPaintMatrix = multiplyMatrix(currentPaintMatrix, matrix);
 
   page.pushOperators(
     pushGraphicsState(),
-    concatTransformationMatrix(cosine, sine, -sine, cosine, translateX, translateY)
+    concatTransformationMatrix(matrix.a, matrix.b, matrix.c, matrix.d, matrix.e, matrix.f)
   );
   try {
     return draw();
   } finally {
     page.pushOperators(popGraphicsState());
+    currentPaintMatrix = previousPaintMatrix;
   }
 }
 
@@ -115,11 +221,13 @@ export function render(
 ): number {
   currentOptions = options;
   currentOpacity = 1;
+  currentPaintMatrix = IDENTITY_MATRIX;
   try {
     return renderWithCurrent(node, page, x, yTop, parentWidth);
   } finally {
     currentOptions = {};
     currentOpacity = 1;
+    currentPaintMatrix = IDENTITY_MATRIX;
   }
 }
 
@@ -157,7 +265,7 @@ function renderWithCurrent(
 
   let consumed: number;
   try {
-    consumed = withBoxRotation(node, page, innerX, innerYTop, innerParentWidth, () =>
+    consumed = withBoxTransform(node, page, innerX, innerYTop, innerParentWidth, () =>
       renderContent(node, page, innerX, innerYTop, innerParentWidth, containingBlock)
     );
   } finally {
@@ -283,6 +391,7 @@ function renderContent(
         const lineAscent = line.segments.reduce((max, segment) => Math.max(max, segment.ascent), 0);
         const baseline = cursorY - lineAscent;
         for (const segment of line.segments) {
+          let segmentPaintMatrix: Matrix | undefined;
           if (segment.kind === "text" && segment.text !== undefined && segment.style !== undefined) {
             const segCharSpacing = segment.style.letterSpacing ?? 0;
             const segOpacity = combinedOpacity(segment.style.opacity);
@@ -319,6 +428,12 @@ function renderContent(
               });
             }
           } else if (segment.kind === "inline" && segment.node !== undefined) {
+            segmentPaintMatrix = nodePaintMatrixAtLayout(
+              segment.node,
+              drawX,
+              baseline + segment.ascent,
+              segment.width
+            );
             renderWithCurrent(
               segment.node,
               page,
@@ -329,7 +444,15 @@ function renderContent(
             );
           }
           if (segment.href) {
-            attachLinkAnnotation(page, drawX, baseline - segment.descent, segment.width, segment.height, segment.href);
+            attachLinkAnnotation(
+              page,
+              drawX,
+              baseline - segment.descent,
+              segment.width,
+              segment.height,
+              segment.href,
+              segmentPaintMatrix
+            );
           }
           drawX += segment.width;
         }
@@ -391,8 +514,17 @@ function renderContent(
     }
     case "link": {
       const childSize = measure(node.child, parentWidth);
+      const childPaintMatrix = nodePaintMatrixAtLayout(node.child, x, yTop, parentWidth);
       const consumed = renderWithCurrent(node.child, page, x, yTop, parentWidth, containingBlock);
-      attachLinkAnnotation(page, x, yTop - childSize.height, childSize.width, childSize.height, node.href);
+      attachLinkAnnotation(
+        page,
+        x,
+        yTop - childSize.height,
+        childSize.width,
+        childSize.height,
+        node.href,
+        childPaintMatrix
+      );
       return consumed;
     }
     case "svgPath": {
@@ -424,13 +556,25 @@ function attachLinkAnnotation(
   yBottom: number,
   width: number,
   height: number,
-  href: string
+  href: string,
+  nodePaintMatrix?: Matrix
 ): void {
+  const matrix = nodePaintMatrix
+    ? multiplyMatrix(currentPaintMatrix, nodePaintMatrix)
+    : currentPaintMatrix;
+  const corners = [
+    transformPoint(matrix, x, yBottom),
+    transformPoint(matrix, x + width, yBottom),
+    transformPoint(matrix, x, yBottom + height),
+    transformPoint(matrix, x + width, yBottom + height)
+  ];
+  const xs = corners.map((point) => point.x);
+  const ys = corners.map((point) => point.y);
   const pdf = page.doc;
   const annotation = pdf.context.obj({
     Type: "Annot",
     Subtype: "Link",
-    Rect: [x, yBottom, x + width, yBottom + height],
+    Rect: [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)],
     Border: [0, 0, 0],
     A: {
       Type: "Action",
@@ -445,6 +589,13 @@ function attachLinkAnnotation(
   } else {
     page.node.set(annotsKey, pdf.context.obj([annotation]));
   }
+}
+
+function transformPoint(matrix: Matrix, x: number, y: number): { x: number; y: number } {
+  return {
+    x: matrix.a * x + matrix.c * y + matrix.e,
+    y: matrix.b * x + matrix.d * y + matrix.f
+  };
 }
 
 function renderVStack(

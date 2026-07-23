@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeAll, vi } from "vitest";
-import { PDFDocument, PDFPage, StandardFonts, type PDFFont } from "pdf-lib";
+import { PDFArray, PDFDict, PDFDocument, PDFName, PDFNumber, PDFPage, StandardFonts, type PDFFont } from "pdf-lib";
 import { hex } from "../src/colors.js";
-import { hline, hstack, imageFit, keepTogether, spacer, text, vstack } from "../src/nodes.js";
+import { hline, hstack, imageFit, keepTogether, link, spacer, text, vstack } from "../src/nodes.js";
 import { render } from "../src/render.js";
 import { renderFlow, renderToPdf } from "../src/document.js";
 import { measure } from "../src/measure.js";
@@ -210,6 +210,110 @@ describe("render", () => {
     expect(operators).toContain("q");
     expect(operators).toContain("Q");
     expect(operators.some((operator) => operator.includes("-1 1") && operator.endsWith("-50 190 cm"))).toBe(true);
+  });
+
+  it("composes ordered affine transforms with percentage translation and a custom origin", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([240, 160]);
+    const pushOperatorsSpy = vi.spyOn(page, "pushOperators");
+    const node = vstack(
+      {
+        width: 100,
+        height: 40,
+        transformOrigin: {
+          x: { length: 0, percent: 0 },
+          y: { length: 0, percent: 0 }
+        },
+        transform: [
+          {
+            kind: "translate",
+            x: { length: 10, percent: 0 },
+            y: { length: 0, percent: 0.5 }
+          },
+          { kind: "scale", x: 2, y: 0.5 }
+        ]
+      },
+      text("Transformed", { size: 12, font })
+    );
+
+    expect(render(node, page, 20, 140, 200)).toBe(40);
+    const operators = pushOperatorsSpy.mock.calls.flat().map((operator) => operator.toString());
+    expect(operators).toContain("2 0 0 0.5 -10 50 cm");
+  });
+
+  it("supports matrix and skew operations", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([240, 200]);
+    const pushOperatorsSpy = vi.spyOn(page, "pushOperators");
+    const origin = {
+      x: { length: 0, percent: 0 },
+      y: { length: 0, percent: 0 }
+    };
+    render(
+      vstack({
+        width: 40,
+        height: 20,
+        transformOrigin: origin,
+        transform: [{ kind: "matrix", a: 1, b: 0.25, c: 0.5, d: 1, e: 7, f: 9 }]
+      }),
+      page,
+      10,
+      180,
+      100
+    );
+    render(
+      vstack({
+        width: 40,
+        height: 20,
+        transformOrigin: origin,
+        transform: [{ kind: "skew", xDegrees: 45, yDegrees: 0 }]
+      }),
+      page,
+      10,
+      120,
+      100
+    );
+
+    const matrices = pushOperatorsSpy.mock.calls
+      .flat()
+      .map((operator) => operator.toString())
+      .filter((operator) => operator.endsWith(" cm"));
+    expect(matrices[0]).toBe("1 -0.25 -0.5 1 97 -6.5 cm");
+    expect(matrices[1]).toBe("1 0 -0.9999999999999999 1 119.99999999999999 0 cm");
+  });
+
+  it("transforms link annotation bounds with the painted box", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([260, 180]);
+    const child = vstack(
+      {
+        width: 100,
+        height: 40,
+        transformOrigin: {
+          x: { length: 0, percent: 0 },
+          y: { length: 0, percent: 0 }
+        },
+        transform: [
+          {
+            kind: "translate",
+            x: { length: 10, percent: 0 },
+            y: { length: 20, percent: 0 }
+          },
+          { kind: "scale", x: 2, y: 1 }
+        ]
+      },
+      text("Clickable", { size: 12, font })
+    );
+
+    render(link({ href: "https://example.com" }, child), page, 20, 140, 200);
+
+    const annots = page.node.lookup(PDFName.of("Annots"), PDFArray);
+    const annotation = annots.lookup(0, PDFDict);
+    const rect = annotation
+      .lookup(PDFName.of("Rect"), PDFArray)
+      .asArray()
+      .map((entry) => (entry as PDFNumber).asNumber());
+    expect(rect).toEqual([30, 80, 230, 120]);
   });
 
   it("applies stack opacity to descendants and text decorations", async () => {

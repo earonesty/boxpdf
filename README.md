@@ -134,6 +134,8 @@ Container `style`:
 | `top` / `right` / `bottom` / `left` | number | Absolute offsets in points. |
 | `zIndex` | number | Paint order for positioned boxes; higher values render later. |
 | `rotate` | number | Clockwise paint rotation in degrees around the box center; layout is unchanged. |
+| `transform` | `BoxTransform[]` | Ordered paint transforms: `translate`, `scale`, `rotate`, `skew`, and `matrix`. |
+| `transformOrigin` | `{ x, y }` | Pivot using `{ length, percent }` components; defaults to the box center. |
 | `grow` | number | Flex grow weight along the parent's main axis. |
 | `shrink` | number | Flex shrink weight. |
 | `breakInside` | `"auto"` \| `"avoid"` | Fragmentation hint under `renderFlow`; `avoid` keeps the box atomic. |
