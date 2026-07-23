@@ -27,6 +27,15 @@ export type BackgroundImage = {
 };
 export type BreakInside = "auto" | "avoid";
 export type Overflow = "visible" | "hidden";
+/** A point length plus a fraction of the transformed box dimension. */
+export type RelativeLength = { length: number; percent: number };
+export type BoxTransform =
+  | { kind: "translate"; x: RelativeLength; y: RelativeLength }
+  | { kind: "scale"; x: number; y: number }
+  | { kind: "rotate"; degrees: number }
+  | { kind: "skew"; xDegrees: number; yDegrees: number }
+  | { kind: "matrix"; a: number; b: number; c: number; d: number; e: number; f: number };
+export type TransformOrigin = { x: RelativeLength; y: RelativeLength };
 export type Fragmentation = {
   kind: "table";
   headerCount: number;
@@ -96,6 +105,21 @@ export interface BoxStyle {
   breakInside?: BreakInside;
   /** Alpha transparency, 0 = fully transparent, 1 = fully opaque. */
   opacity?: number;
+  /**
+   * Clockwise paint rotation in degrees around the box center. Rotation does
+   * not affect layout, measurement, or pagination.
+   */
+  rotate?: number;
+  /**
+   * Ordered CSS-style paint transforms. Functions are composed from left to
+   * right and do not affect layout, measurement, or pagination.
+   */
+  transform?: BoxTransform[];
+  /**
+   * Transform pivot as point lengths plus fractions of the border-box size.
+   * Defaults to the box center.
+   */
+  transformOrigin?: TransformOrigin;
 }
 
 export interface FlexItemStyle {
