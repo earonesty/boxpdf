@@ -194,6 +194,24 @@ describe("render", () => {
     expect(bytes.byteLength).toBeGreaterThan(200);
   });
 
+  it("rotates a stack around its center without changing layout size", async () => {
+    const pdf = await PDFDocument.create();
+    const page = pdf.addPage([240, 160]);
+    const pushOperatorsSpy = vi.spyOn(page, "pushOperators");
+    const node = vstack(
+      { width: 100, height: 40, rotate: 90, background: hex("#eeeeee") },
+      text("Rotated", { size: 12, font })
+    );
+
+    expect(measure(node, 200)).toMatchObject({ width: 100, height: 40 });
+    expect(render(node, page, 20, 140, 200)).toBe(40);
+
+    const operators = pushOperatorsSpy.mock.calls.flat().map((operator) => operator.toString());
+    expect(operators).toContain("q");
+    expect(operators).toContain("Q");
+    expect(operators.some((operator) => operator.includes("-1 1") && operator.endsWith("-50 190 cm"))).toBe(true);
+  });
+
   it("applies stack opacity to descendants and text decorations", async () => {
     const pdf = await PDFDocument.create();
     const page = pdf.addPage([240, 160]);

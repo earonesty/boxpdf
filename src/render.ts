@@ -3,6 +3,7 @@ import {
   PDFName,
   PDFString,
   clip,
+  concatTransformationMatrix,
   endPath,
   popGraphicsState,
   pushGraphicsState,
@@ -56,6 +57,45 @@ function currentOpacityValue(): number | undefined {
 function combinedOpacity(opacity: number | undefined): number | undefined {
   const value = currentOpacity * (opacity ?? 1);
   return value !== 1 ? value : undefined;
+}
+
+function withBoxRotation<T>(
+  node: Node,
+  page: PDFPage,
+  x: number,
+  yTop: number,
+  parentWidth: number,
+  draw: () => T
+): T {
+  if (node.kind !== "vstack" && node.kind !== "hstack") return draw();
+  const degrees = node.style.rotate;
+  if (degrees === undefined || !Number.isFinite(degrees) || degrees % 360 === 0) return draw();
+
+  const intrinsic = measureContent(node, parentWidth);
+  const width = node.style.width ?? intrinsic.width;
+  let height = node.style.height ?? intrinsic.height;
+  if (node.style.maxHeight !== undefined) height = Math.min(height, node.style.maxHeight);
+  if (node.style.minHeight !== undefined) height = Math.max(height, node.style.minHeight);
+
+  const pivotX = x + width / 2;
+  const pivotY = yTop - height / 2;
+  // CSS positive angles rotate clockwise. PDF coordinates point upward, so
+  // the equivalent PDF matrix uses the negative angle.
+  const radians = (-degrees * Math.PI) / 180;
+  const cosine = Math.cos(radians);
+  const sine = Math.sin(radians);
+  const translateX = pivotX - cosine * pivotX + sine * pivotY;
+  const translateY = pivotY - sine * pivotX - cosine * pivotY;
+
+  page.pushOperators(
+    pushGraphicsState(),
+    concatTransformationMatrix(cosine, sine, -sine, cosine, translateX, translateY)
+  );
+  try {
+    return draw();
+  } finally {
+    page.pushOperators(popGraphicsState());
+  }
 }
 
 const DEBUG_STROKE: RGB = { r: 1, g: 0.2, b: 0.2 };
@@ -117,7 +157,9 @@ function renderWithCurrent(
 
   let consumed: number;
   try {
-    consumed = renderContent(node, page, innerX, innerYTop, innerParentWidth, containingBlock);
+    consumed = withBoxRotation(node, page, innerX, innerYTop, innerParentWidth, () =>
+      renderContent(node, page, innerX, innerYTop, innerParentWidth, containingBlock)
+    );
   } finally {
     if (nodeOpacity !== undefined) {
       currentOpacity = prevOpacity;

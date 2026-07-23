@@ -96,6 +96,11 @@ export interface BoxStyle {
   breakInside?: BreakInside;
   /** Alpha transparency, 0 = fully transparent, 1 = fully opaque. */
   opacity?: number;
+  /**
+   * Clockwise paint rotation in degrees around the box center. Rotation does
+   * not affect layout, measurement, or pagination.
+   */
+  rotate?: number;
 }
 
 export interface FlexItemStyle {

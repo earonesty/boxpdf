@@ -55,6 +55,7 @@
   "scripts": {
     "build": "tsup",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "example": "tsx examples/index.ts",
@@ -73,6 +74,7 @@
   "devDependencies": {
     "@react-pdf/renderer": "^4.5.1",
     "@types/node": "^22.19.19",
+    "@vitest/coverage-v8": "4.1.6",
     "pdf-lib": "^1.17.1",
     "react": "^19.2.6",
     "tsup": "^8.5.1",
