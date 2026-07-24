@@ -59,6 +59,7 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
+    "visual:check:stream": "tsx scripts/check-stream-visuals.ts",
     "example": "tsx examples/index.ts",
     "gallery": "tsx scripts/build-gallery.ts",
     "prepublishOnly": "pnpm run typecheck && pnpm run test && pnpm run build"
