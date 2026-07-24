@@ -45,6 +45,9 @@ const concat = (parts: Uint8Array[]): Uint8Array => {
 const header = (): Uint8Array =>
   concat([ascii("%PDF-2.0\n"), new Uint8Array([0x25, 0xff, 0xff, 0xff, 0xff, 0x0a])]);
 
+const activeEncryptedSaves = new WeakSet<PDFDocument>();
+const activeEncryptionPreparations = new WeakSet<PDFDocument>();
+
 interface XrefEntry {
   kind: "uncompressed" | "compressed";
   ref: PDFRef;
@@ -163,38 +166,61 @@ export async function prepareEncryption(
   encryptionOptions: PdfEncryptionOptions,
   random: RandomSource = webCryptoRandomSource
 ): Promise<PreparedEncryption> {
-  preflight(pdf);
+  if (activeEncryptionPreparations.has(pdf)) {
+    throw new PdfEncryptionError(
+      "CONCURRENT_SAVE_UNSUPPORTED",
+      "Concurrent encrypted serialization of the same PDFDocument is not supported"
+    );
+  }
+  activeEncryptionPreparations.add(pdf);
+
   const context = pdf.context;
   const previousId = context.trailerInfo.ID;
-  const material = await createR6Material(encryptionOptions, random);
-  const encryptDict = encryptionDictionary(pdf, material);
-  const encryptionRef = context.register(encryptDict);
-  const id = context.obj([
-    PDFHexString.of(toHex(material.firstFileId)),
-    PDFHexString.of(toHex(material.secondFileId))
-  ]);
-  context.trailerInfo.Encrypt = encryptionRef;
-  context.trailerInfo.ID = id;
-
+  let material: Awaited<ReturnType<typeof createR6Material>> | undefined;
+  let encryptionRef: PDFRef | undefined;
+  let installed = false;
   let cleaned = false;
-  return {
-    encryption: {
-      fileKeyCryptoKey: material.fileKeyCryptoKey,
-      dictionaryRef: encryptionRef,
-      encryptMetadata: material.encryptMetadata,
-      metadataRef: metadataRef(pdf),
-      random
-    },
-    cleanup(): void {
-      if (cleaned) return;
-      cleaned = true;
-      context.delete(encryptionRef);
+
+  const cleanup = (): void => {
+    if (cleaned) return;
+    cleaned = true;
+    activeEncryptionPreparations.delete(pdf);
+    if (encryptionRef !== undefined) context.delete(encryptionRef);
+    if (installed) {
       delete context.trailerInfo.Encrypt;
       if (previousId === undefined) delete context.trailerInfo.ID;
       else context.trailerInfo.ID = previousId;
-      material.fileKey.fill(0);
     }
+    material?.fileKey.fill(0);
   };
+
+  try {
+    preflight(pdf);
+    material = await createR6Material(encryptionOptions, random);
+    const encryptDict = encryptionDictionary(pdf, material);
+    encryptionRef = context.register(encryptDict);
+    const id = context.obj([
+      PDFHexString.of(toHex(material.firstFileId)),
+      PDFHexString.of(toHex(material.secondFileId))
+    ]);
+    installed = true;
+    context.trailerInfo.Encrypt = encryptionRef;
+    context.trailerInfo.ID = id;
+
+    return {
+      encryption: {
+        fileKeyCryptoKey: material.fileKeyCryptoKey,
+        dictionaryRef: encryptionRef,
+        encryptMetadata: material.encryptMetadata,
+        metadataRef: metadataRef(pdf),
+        random
+      },
+      cleanup
+    };
+  } catch (cause) {
+    cleanup();
+    throw cause;
+  }
 }
 
 export async function saveEncryptedPdf(
@@ -207,19 +233,37 @@ export async function saveEncryptedPdf(
     useObjectStreams = true,
     addDefaultPage = true,
     objectsPerTick: _objectsPerTick = 50,
-    updateFieldAppearances: _updateFieldAppearances = true
+    updateFieldAppearances = true
   } = options;
 
-  if (addDefaultPage && pdf.getPageCount() === 0) pdf.addPage();
-  await pdf.flush();
-  const prepared = await prepareEncryption(pdf, encryptionOptions, random);
+  if (activeEncryptedSaves.has(pdf)) {
+    throw new PdfEncryptionError(
+      "CONCURRENT_SAVE_UNSUPPORTED",
+      "Concurrent encrypted saves of the same PDFDocument are not supported"
+    );
+  }
+  activeEncryptedSaves.add(pdf);
+
+  let prepared: PreparedEncryption | undefined;
 
   try {
+    if (addDefaultPage && pdf.getPageCount() === 0) pdf.addPage();
+    if (updateFieldAppearances) {
+      const formCache = (pdf as unknown as {
+        formCache?: {
+          getValue(): { updateFieldAppearances(): void } | undefined;
+        };
+      }).formCache;
+      formCache?.getValue()?.updateFieldAppearances();
+    }
+    await pdf.flush();
+    prepared = await prepareEncryption(pdf, encryptionOptions, random);
     return useObjectStreams
       ? await writeWithObjectStreams(pdf, prepared.encryption)
       : await writeWithClassicXref(pdf, prepared.encryption);
   } finally {
-    prepared.cleanup();
+    prepared?.cleanup();
+    activeEncryptedSaves.delete(pdf);
   }
 }
 

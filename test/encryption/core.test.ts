@@ -31,6 +31,21 @@ class CounterRandom implements RandomSource {
   }
 }
 
+class FailingAfterFileKeyRandom implements RandomSource {
+  fileKey: Uint8Array | undefined;
+  private calls = 0;
+
+  fill(target: Uint8Array): void {
+    this.calls += 1;
+    if (this.calls === 1) {
+      target.fill(0xa5);
+      this.fileKey = target;
+      return;
+    }
+    throw new Error("injected random failure");
+  }
+}
+
 describe("Web Crypto PDF adapters", () => {
   it("dispatches SHA-256, SHA-384, and SHA-512", async () => {
     const abc = new TextEncoder().encode("abc");
@@ -156,5 +171,16 @@ describe("R6 permissions and material", () => {
         new CounterRandom()
       )
     ).rejects.toMatchObject({ code: "OWNER_PASSWORD_NOT_DISTINCT" });
+  });
+
+  it("clears the file key when material derivation fails", async () => {
+    const random = new FailingAfterFileKeyRandom();
+    await expect(
+      createR6Material(
+        { password: "test-user", ownerPassword: "test-owner" },
+        random
+      )
+    ).rejects.toThrow(/injected random failure/);
+    expect(random.fileKey).toEqual(new Uint8Array(32));
   });
 });

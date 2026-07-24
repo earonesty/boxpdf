@@ -345,4 +345,24 @@ describe("streamFlow encryption", () => {
     expect(aborted).toBe(true);
     expect(pdf.context.trailerInfo.Encrypt).toBeUndefined();
   });
+
+  it("releases encryption state when header setup throws", async () => {
+    const { pdf } = await newDocWithFonts();
+    await pdf.flush();
+    const objectCount = pdf.context.enumerateIndirectObjects().length;
+    const { writable } = collector();
+
+    await expect(
+      streamFlow(pdf, writable, [], {
+        encryption: { password: "stream-user" },
+        header() {
+          throw new Error("header setup failure");
+        }
+      })
+    ).rejects.toThrow(/header setup failure/);
+
+    expect(pdf.context.trailerInfo.Encrypt).toBeUndefined();
+    expect(pdf.context.trailerInfo.ID).toBeUndefined();
+    expect(pdf.context.enumerateIndirectObjects()).toHaveLength(objectCount);
+  });
 });

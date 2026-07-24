@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   PDFDocument,
   PDFName,
@@ -86,6 +86,36 @@ describe("encrypted buffered writer", () => {
     expect(first).not.toEqual(second);
     expect(pdf.context.trailerInfo.Encrypt).toBeUndefined();
     await expect(pdf.save()).resolves.toBeInstanceOf(Uint8Array);
+  });
+
+  it("rejects concurrent encrypted saves and releases the guard afterward", async () => {
+    const pdf = await documentWithText();
+    const first = savePdf(pdf, { encryption: { password: "user" } });
+    await expect(
+      savePdf(pdf, { encryption: { password: "user" } })
+    ).rejects.toMatchObject({ code: "CONCURRENT_SAVE_UNSUPPORTED" });
+    await expect(first).resolves.toBeInstanceOf(Uint8Array);
+    await expect(
+      savePdf(pdf, { encryption: { password: "user" } })
+    ).resolves.toBeInstanceOf(Uint8Array);
+  });
+
+  it("honors pdf-lib's updateFieldAppearances save option", async () => {
+    const pdf = await documentWithText();
+    const form = pdf.getForm();
+    const update = vi.spyOn(form, "updateFieldAppearances");
+
+    await savePdf(pdf, {
+      updateFieldAppearances: false,
+      encryption: { password: "user" }
+    });
+    expect(update).not.toHaveBeenCalled();
+
+    await savePdf(pdf, {
+      updateFieldAppearances: true,
+      encryption: { password: "user" }
+    });
+    expect(update).toHaveBeenCalledOnce();
   });
 
   it("rejects signed and already-encrypted contexts before writing", async () => {

@@ -188,9 +188,10 @@ them to create, transport, or manage an owner credential. Distinct prepared
 owner/user bytes are required only when the caller supplied `ownerPassword`;
 the generated credential is independently random.
 
-`SaveOptions.updateFieldAppearances` is forwarded for API parity only; this
-design does not add form support. `addDefaultPage` and `objectsPerTick` retain
-pdf-lib defaults. `useObjectStreams` defaults to `true`.
+`SaveOptions.updateFieldAppearances` retains pdf-lib's default-true behavior
+for forms already opened through `getForm()`. `addDefaultPage` and
+`objectsPerTick` retain pdf-lib defaults. `useObjectStreams` defaults to
+`true`.
 
 ### Functions and lifecycle
 
@@ -803,6 +804,7 @@ export type PdfEncryptionErrorCode =
   | "WEB_CRYPTO_UNAVAILABLE"
   | "SIGNED_PDF_UNSUPPORTED"
   | "ENCRYPTED_INPUT_UNSUPPORTED"
+  | "CONCURRENT_SAVE_UNSUPPORTED"
   | "UNSUPPORTED_PDF_OBJECT"
   | "ENCRYPTION_SERIALIZATION_FAILED";
 

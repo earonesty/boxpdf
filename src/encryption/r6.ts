@@ -71,7 +71,7 @@ function randomBytes(random: RandomSource, length: number): Uint8Array {
   return bytes;
 }
 
-function generatedOwnerPassword(random: RandomSource): Uint8Array {
+function generatedOwnerPassword(random: RandomSource): string {
   const bytes = randomBytes(random, 32);
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
   let bits = 0;
@@ -87,7 +87,7 @@ function generatedOwnerPassword(random: RandomSource): Uint8Array {
   }
   if (bitCount > 0) result += alphabet[(bits << (6 - bitCount)) & 63]!;
   bytes.fill(0);
-  return new TextEncoder().encode(result);
+  return result;
 }
 
 export interface R6Material {
@@ -109,26 +109,31 @@ export async function createR6Material(
   random: RandomSource = webCryptoRandomSource
 ): Promise<R6Material> {
   const userPassword = preparePassword(options.password, "password");
-  const ownerPassword = options.ownerPassword === undefined
-    ? generatedOwnerPassword(random)
-    : preparePassword(options.ownerPassword, "ownerPassword");
-  if (options.ownerPassword !== undefined && equalBytes(userPassword, ownerPassword)) {
-    throw new PdfEncryptionError(
-      "OWNER_PASSWORD_NOT_DISTINCT",
-      "ownerPassword must differ from password after SASLprep"
-    );
-  }
-
-  const fileKey = randomBytes(random, 32);
-  const userValidationSalt = randomBytes(random, 8);
-  const userKeySalt = randomBytes(random, 8);
-  const ownerValidationSalt = randomBytes(random, 8);
-  const ownerKeySalt = randomBytes(random, 8);
-  const permissionsTail = randomBytes(random, 4);
-  const firstFileId = randomBytes(random, 16);
-  const secondFileId = randomBytes(random, 16);
+  let ownerPassword: Uint8Array | undefined;
+  let fileKey: Uint8Array | undefined;
+  let permissionsTail: Uint8Array | undefined;
 
   try {
+    ownerPassword = preparePassword(
+      options.ownerPassword ?? generatedOwnerPassword(random),
+      "ownerPassword"
+    );
+    if (options.ownerPassword !== undefined && equalBytes(userPassword, ownerPassword)) {
+      throw new PdfEncryptionError(
+        "OWNER_PASSWORD_NOT_DISTINCT",
+        "ownerPassword must differ from password after SASLprep"
+      );
+    }
+
+    fileKey = randomBytes(random, 32);
+    const userValidationSalt = randomBytes(random, 8);
+    const userKeySalt = randomBytes(random, 8);
+    const ownerValidationSalt = randomBytes(random, 8);
+    const ownerKeySalt = randomBytes(random, 8);
+    permissionsTail = randomBytes(random, 4);
+    const firstFileId = randomBytes(random, 16);
+    const secondFileId = randomBytes(random, 16);
+
     const userValidationHash = await r6Hash(userPassword, userValidationSalt);
     const U = concat(userValidationHash, userValidationSalt, userKeySalt);
     const userKey = await importAesCbcKey(await r6Hash(userPassword, userKeySalt));
@@ -159,9 +164,12 @@ export async function createR6Material(
       firstFileId,
       secondFileId
     };
+  } catch (cause) {
+    fileKey?.fill(0);
+    throw cause;
   } finally {
     userPassword.fill(0);
-    ownerPassword.fill(0);
-    permissionsTail.fill(0);
+    ownerPassword?.fill(0);
+    permissionsTail?.fill(0);
   }
 }

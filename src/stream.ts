@@ -108,165 +108,167 @@ export async function streamFlow(
   let encryptedFrame:
     | typeof import("./encryption/serialize.js").frameEncryptedObject
     | undefined;
-  if (options.encryption) {
-    const [{ prepareEncryption }, serializer] = await Promise.all([
-      import("./encryption/writer.js"),
-      import("./encryption/serialize.js")
-    ]);
-    preparedEncryption = await prepareEncryption(pdf, options.encryption);
-    encryption = preparedEncryption.encryption;
-    encryptedFrame = serializer.frameEncryptedObject;
-  }
-
-  // Pre-measure header/footer. Constant across pages — same approximation
-  // as renderFlow.
-  const probeCtx = throwingCtx(1);
-  const headerHeight = options.header
-    ? measure(options.header(probeCtx), contentWidth).height
-    : 0;
-  const footerHeight = options.footer
-    ? measure(options.footer(probeCtx), contentWidth).height
-    : 0;
-  const headerGap = options.header ? 12 : 0;
-  const footerGap = options.footer ? 12 : 0;
-  const contentTop = size.height - m.top - headerHeight - headerGap;
-  const contentBottom = m.bottom + footerHeight + footerGap + reserveBottom;
-
-  // Identify the two refs that mutate during streaming and must be
-  // written LAST, not now. Everything else in the foundation snapshot is
-  // stable (fonts, images already embedded).
-  const catalogRef = ctx.trailerInfo.Root as PDFRef;
-  const pagesDictRef = pdf.catalog.get(PDFName.of("Pages")) as PDFRef;
-  const deferredKeys = new Set<string>([refKey(catalogRef), refKey(pagesDictRef)]);
-
-  // Foundation snapshot — anything currently in the context that isn't
-  // /Pages or /Catalog is a stable resource to be written now.
-  const initialEntries = ctx.enumerateIndirectObjects() as [PDFRef, PDFObject][];
-  const initialKeys = new Set(initialEntries.map(([r]) => refKey(r)));
-  const handledKeys = new Set<string>(); // refs we've already written OR queued in the buffer
-
-  // Track pdf-lib's lazy-embed pool sizes (.fonts and .images) so we can
-  // detect mid-stream embeds even when they haven't been flushed into
-  // indirectObjects yet. pdf-lib exposes these as private fields; we
-  // cross-cast to read them. If the cast ever fails (future pdf-lib
-  // refactor), detection silently no-ops — the contract is still
-  // documented; this is just an extra safety net.
-  const pdfInternals = pdf as unknown as {
-    fonts?: { length: number }[];
-    images?: { length: number }[];
-  };
-  const initialFontCount = Array.isArray(pdfInternals.fonts) ? pdfInternals.fonts.length : 0;
-  const initialImageCount = Array.isArray(pdfInternals.images) ? pdfInternals.images.length : 0;
-
-  function checkMidStreamEmbed(): void {
-    const fc = Array.isArray(pdfInternals.fonts) ? pdfInternals.fonts.length : initialFontCount;
-    const ic = Array.isArray(pdfInternals.images) ? pdfInternals.images.length : initialImageCount;
-    if (fc > initialFontCount) {
-      throw new Error(
-        `[boxpdf streamFlow] a font was embedded after streamFlow began. ` +
-          `Embed all fonts and images BEFORE calling streamFlow.`
-      );
-    }
-    if (ic > initialImageCount) {
-      throw new Error(
-        `[boxpdf streamFlow] an image was embedded after streamFlow began. ` +
-          `Embed all fonts and images BEFORE calling streamFlow.`
-      );
-    }
-  }
-
-  // Collect xref entries in our own data structure so we can sort by
-  // object number before building the PDFCrossRefStream (pdf-lib requires
-  // ascending order). We write objects to the stream as we go, then
-  // build + emit the xref at the very end.
-  type Entry =
-    | { kind: "uncompressed"; objNum: number; offset: number }
-    | { kind: "compressed"; objNum: number; objStmObjNum: number; index: number };
-  const xrefEntries: Entry[] = [];
-
-  const writer = writable.getWriter();
-  let offset = 0;
-
-  // Buffer of compressible (non-PDFStream) dicts waiting to be packed
-  // into the next PDFObjectStream.
-  const compressibleBuffer: [PDFRef, PDFObject][] = [];
-
-  async function writeBytes(bytes: Uint8Array): Promise<void> {
-    await writer.ready;
-    await writer.write(bytes);
-    offset += bytes.length;
-  }
-
-  async function writeObject(ref: PDFRef, obj: PDFObject, recordXref: boolean, freeAfter: boolean): Promise<void> {
-    const bytes = encryption
-      ? await encryptedFrame!(
-          ref,
-          obj,
-          encryption,
-          ref !== encryption.dictionaryRef
-        )
-      : frameObject(ref, obj);
-    if (recordXref) {
-      xrefEntries.push({ kind: "uncompressed", objNum: ref.objectNumber, offset });
-    }
-    await writeBytes(bytes);
-    handledKeys.add(refKey(ref));
-    if (freeAfter) ctx.delete(ref);
-  }
-
-  async function flushCompressibleBuffer(): Promise<void> {
-    if (compressibleBuffer.length === 0) return;
-    const chunk = compressibleBuffer.slice();
-    compressibleBuffer.length = 0;
-    const objStmRef = ctx.nextRef() as PDFRef;
-    const objStm = PDFObjectStream.withContextAndObjects(ctx, chunk, true);
-    for (let i = 0; i < chunk.length; i++) {
-      const [r] = chunk[i]!;
-      xrefEntries.push({
-        kind: "compressed",
-        objNum: r.objectNumber,
-        objStmObjNum: objStmRef.objectNumber,
-        index: i
-      });
-      // Already in handledKeys from the buffer step; keep ctx entry alive
-      // for pdf-lib's bookkeeping (page tree traversals etc).
-    }
-    await writeObject(objStmRef, objStm, true, /*freeAfter=*/ true);
-  }
-
-  async function bufferOrFlushCompressible(ref: PDFRef, obj: PDFObject): Promise<void> {
-    if (objectsPerStream <= 1) {
-      await writeObject(ref, obj, /*recordXref=*/ true, /*freeAfter=*/ false);
-      return;
-    }
-    compressibleBuffer.push([ref, obj]);
-    handledKeys.add(refKey(ref));
-    if (compressibleBuffer.length >= objectsPerStream) {
-      await flushCompressibleBuffer();
-    }
-  }
-
-  async function serializeRef(ref: PDFRef, obj: PDFObject): Promise<void> {
-    const key = refKey(ref);
-    if (handledKeys.has(key)) return;
-    if (deferredKeys.has(key)) return; // /Pages and /Catalog written at end
-    if (
-      ref === encryption?.dictionaryRef ||
-      obj instanceof PDFStream ||
-      obj instanceof PDFInvalidObject ||
-      ref.generationNumber !== 0
-    ) {
-      // Free PDFStream objects (content streams, image XObjects, font byte
-      // streams) — these are the memory-heavy ones. Keep dicts so
-      // pdf-lib's page tree bookkeeping survives.
-      const freeAfter = obj instanceof PDFStream;
-      await writeObject(ref, obj, true, freeAfter);
-    } else {
-      await bufferOrFlushCompressible(ref, obj);
-    }
-  }
+  let writer: WritableStreamDefaultWriter<Uint8Array> | undefined;
 
   try {
+    if (options.encryption) {
+      const [{ prepareEncryption }, serializer] = await Promise.all([
+        import("./encryption/writer.js"),
+        import("./encryption/serialize.js")
+      ]);
+      preparedEncryption = await prepareEncryption(pdf, options.encryption);
+      encryption = preparedEncryption.encryption;
+      encryptedFrame = serializer.frameEncryptedObject;
+    }
+
+    // Pre-measure header/footer. Constant across pages — same approximation
+    // as renderFlow.
+    const probeCtx = throwingCtx(1);
+    const headerHeight = options.header
+      ? measure(options.header(probeCtx), contentWidth).height
+      : 0;
+    const footerHeight = options.footer
+      ? measure(options.footer(probeCtx), contentWidth).height
+      : 0;
+    const headerGap = options.header ? 12 : 0;
+    const footerGap = options.footer ? 12 : 0;
+    const contentTop = size.height - m.top - headerHeight - headerGap;
+    const contentBottom = m.bottom + footerHeight + footerGap + reserveBottom;
+
+    // Identify the two refs that mutate during streaming and must be
+    // written LAST, not now. Everything else in the foundation snapshot is
+    // stable (fonts, images already embedded).
+    const catalogRef = ctx.trailerInfo.Root as PDFRef;
+    const pagesDictRef = pdf.catalog.get(PDFName.of("Pages")) as PDFRef;
+    const deferredKeys = new Set<string>([refKey(catalogRef), refKey(pagesDictRef)]);
+
+    // Foundation snapshot — anything currently in the context that isn't
+    // /Pages or /Catalog is a stable resource to be written now.
+    const initialEntries = ctx.enumerateIndirectObjects() as [PDFRef, PDFObject][];
+    const initialKeys = new Set(initialEntries.map(([r]) => refKey(r)));
+    const handledKeys = new Set<string>(); // refs we've already written OR queued in the buffer
+
+    // Track pdf-lib's lazy-embed pool sizes (.fonts and .images) so we can
+    // detect mid-stream embeds even when they haven't been flushed into
+    // indirectObjects yet. pdf-lib exposes these as private fields; we
+    // cross-cast to read them. If the cast ever fails (future pdf-lib
+    // refactor), detection silently no-ops — the contract is still
+    // documented; this is just an extra safety net.
+    const pdfInternals = pdf as unknown as {
+      fonts?: { length: number }[];
+      images?: { length: number }[];
+    };
+    const initialFontCount = Array.isArray(pdfInternals.fonts) ? pdfInternals.fonts.length : 0;
+    const initialImageCount = Array.isArray(pdfInternals.images) ? pdfInternals.images.length : 0;
+
+    function checkMidStreamEmbed(): void {
+      const fc = Array.isArray(pdfInternals.fonts) ? pdfInternals.fonts.length : initialFontCount;
+      const ic = Array.isArray(pdfInternals.images) ? pdfInternals.images.length : initialImageCount;
+      if (fc > initialFontCount) {
+        throw new Error(
+          `[boxpdf streamFlow] a font was embedded after streamFlow began. ` +
+            `Embed all fonts and images BEFORE calling streamFlow.`
+        );
+      }
+      if (ic > initialImageCount) {
+        throw new Error(
+          `[boxpdf streamFlow] an image was embedded after streamFlow began. ` +
+            `Embed all fonts and images BEFORE calling streamFlow.`
+        );
+      }
+    }
+
+    // Collect xref entries in our own data structure so we can sort by
+    // object number before building the PDFCrossRefStream (pdf-lib requires
+    // ascending order). We write objects to the stream as we go, then
+    // build + emit the xref at the very end.
+    type Entry =
+      | { kind: "uncompressed"; objNum: number; offset: number }
+      | { kind: "compressed"; objNum: number; objStmObjNum: number; index: number };
+    const xrefEntries: Entry[] = [];
+
+    writer = writable.getWriter();
+    let offset = 0;
+
+    // Buffer of compressible (non-PDFStream) dicts waiting to be packed
+    // into the next PDFObjectStream.
+    const compressibleBuffer: [PDFRef, PDFObject][] = [];
+
+    async function writeBytes(bytes: Uint8Array): Promise<void> {
+      await writer!.ready;
+      await writer!.write(bytes);
+      offset += bytes.length;
+    }
+
+    async function writeObject(ref: PDFRef, obj: PDFObject, recordXref: boolean, freeAfter: boolean): Promise<void> {
+      const bytes = encryption
+        ? await encryptedFrame!(
+            ref,
+            obj,
+            encryption,
+            ref !== encryption.dictionaryRef
+          )
+        : frameObject(ref, obj);
+      if (recordXref) {
+        xrefEntries.push({ kind: "uncompressed", objNum: ref.objectNumber, offset });
+      }
+      await writeBytes(bytes);
+      handledKeys.add(refKey(ref));
+      if (freeAfter) ctx.delete(ref);
+    }
+
+    async function flushCompressibleBuffer(): Promise<void> {
+      if (compressibleBuffer.length === 0) return;
+      const chunk = compressibleBuffer.slice();
+      compressibleBuffer.length = 0;
+      const objStmRef = ctx.nextRef() as PDFRef;
+      const objStm = PDFObjectStream.withContextAndObjects(ctx, chunk, true);
+      for (let i = 0; i < chunk.length; i++) {
+        const [r] = chunk[i]!;
+        xrefEntries.push({
+          kind: "compressed",
+          objNum: r.objectNumber,
+          objStmObjNum: objStmRef.objectNumber,
+          index: i
+        });
+        // Already in handledKeys from the buffer step; keep ctx entry alive
+        // for pdf-lib's bookkeeping (page tree traversals etc).
+      }
+      await writeObject(objStmRef, objStm, true, /*freeAfter=*/ true);
+    }
+
+    async function bufferOrFlushCompressible(ref: PDFRef, obj: PDFObject): Promise<void> {
+      if (objectsPerStream <= 1) {
+        await writeObject(ref, obj, /*recordXref=*/ true, /*freeAfter=*/ false);
+        return;
+      }
+      compressibleBuffer.push([ref, obj]);
+      handledKeys.add(refKey(ref));
+      if (compressibleBuffer.length >= objectsPerStream) {
+        await flushCompressibleBuffer();
+      }
+    }
+
+    async function serializeRef(ref: PDFRef, obj: PDFObject): Promise<void> {
+      const key = refKey(ref);
+      if (handledKeys.has(key)) return;
+      if (deferredKeys.has(key)) return; // /Pages and /Catalog written at end
+      if (
+        ref === encryption?.dictionaryRef ||
+        obj instanceof PDFStream ||
+        obj instanceof PDFInvalidObject ||
+        ref.generationNumber !== 0
+      ) {
+        // Free PDFStream objects (content streams, image XObjects, font byte
+        // streams) — these are the memory-heavy ones. Keep dicts so
+        // pdf-lib's page tree bookkeeping survives.
+        const freeAfter = obj instanceof PDFStream;
+        await writeObject(ref, obj, true, freeAfter);
+      } else {
+        await bufferOrFlushCompressible(ref, obj);
+      }
+    }
+
     // 1. Header
     await writeBytes(headerBytes(encryption !== undefined));
 
@@ -415,18 +417,22 @@ export async function streamFlow(
     await writer.close();
     return { pageCount };
   } catch (err) {
-    try {
-      await writer.abort(err as Error);
-    } catch {
-      /* writer may already be in errored state */
+    if (writer) {
+      try {
+        await writer.abort(err as Error);
+      } catch {
+        /* writer may already be in errored state */
+      }
     }
     throw err;
   } finally {
     preparedEncryption?.cleanup();
-    try {
-      writer.releaseLock();
-    } catch {
-      /* ignore */
+    if (writer) {
+      try {
+        writer.releaseLock();
+      } catch {
+        /* ignore */
+      }
     }
   }
 }
