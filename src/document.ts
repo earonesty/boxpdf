@@ -203,7 +203,7 @@ function splitTableStack(
   return { before, after };
 }
 
-function splitForPage(
+export function splitForPage(
   node: Node,
   availableHeight: number,
   contentWidth: number

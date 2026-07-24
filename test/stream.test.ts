@@ -5,10 +5,12 @@ import {
   PageSizes,
   hline,
   hstack,
+  hex,
   link,
   nodeAdapter,
   pageInner,
   streamFlow,
+  table,
   text,
   vstack,
   type Node
@@ -119,6 +121,54 @@ describe("streamFlow basics", () => {
     });
     expect(pageCount).toBe(1);
     expect(bytes().byteLength).toBeGreaterThan(500);
+  });
+
+  it("fragments a top-level vstack between children", async () => {
+    const { pdf, font } = await newDocWithFonts();
+    const blocks = Array.from({ length: 6 }, (_, index) =>
+      vstack(
+        { height: 54, padding: 6, border: { color: hex("#dddddd"), width: 1 } },
+        text(`Fragment ${index + 1}`, { size: 10, font })
+      )
+    );
+    const { writable, bytes } = collector();
+    const { pageCount } = await streamFlow(pdf, writable, [vstack({ gap: 4 }, ...blocks)], {
+      size: { width: 240, height: 220 },
+      margin: 20
+    });
+
+    expect(pageCount).toBeGreaterThan(1);
+    expect((await PDFDocument.load(bytes())).getPageCount()).toBe(pageCount);
+  });
+
+  it("fragments tables between rows", async () => {
+    const { pdf, font, bold } = await newDocWithFonts();
+    const node = table({
+      width: 180,
+      columns: [{ width: "1fr" }, { width: 50 }],
+      header: [
+        text("Item", { size: 10, font: bold }),
+        text("Qty", { size: 10, font: bold })
+      ],
+      rows: Array.from({ length: 10 }, (_, index) => [
+        vstack(
+          { padding: { top: 5, bottom: 5 } },
+          text(`Row ${index + 1}`, { size: 10, font })
+        ),
+        text(String(index + 1), { size: 10, font })
+      ]),
+      rowDivider: { color: hex("#dddddd"), thickness: 1 },
+      headerDivider: { color: hex("#111111"), thickness: 1 },
+      columnGap: 0
+    });
+    const { writable, bytes } = collector();
+    const { pageCount } = await streamFlow(pdf, writable, [node], {
+      size: { width: 240, height: 220 },
+      margin: 20
+    });
+
+    expect(pageCount).toBeGreaterThan(1);
+    expect((await PDFDocument.load(bytes())).getPageCount()).toBe(pageCount);
   });
 });
 

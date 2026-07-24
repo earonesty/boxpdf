@@ -28,6 +28,7 @@ import { render } from "./render.js";
 import { edges, type EdgesInput, type Node } from "./types.js";
 import {
   PageSizes,
+  splitForPage,
   type PageSize,
   type DocumentMetadata
 } from "./document.js";
@@ -333,27 +334,64 @@ export async function streamFlow(
       currentPage = undefined;
     };
 
-    for await (const node of nodes) {
-      checkMidStreamEmbed();
+    for await (const input of nodes) {
+      const pending = [input];
+      while (pending.length > 0) {
+        checkMidStreamEmbed();
+        const node = pending.shift()!;
+        const nodeSize = measure(node, contentWidth);
+        if (warnings && nodeSize.width > contentWidth + 0.5) {
+          console.warn(
+            `[boxpdf] top-level ${node.kind} measured ${nodeSize.width.toFixed(1)}pt — ` +
+              `exceeds page content area ${contentWidth.toFixed(1)}pt`
+          );
+        }
 
-      const nodeSize = measure(node, contentWidth);
-      if (warnings && nodeSize.width > contentWidth + 0.5) {
-        console.warn(
-          `[boxpdf] top-level ${node.kind} measured ${nodeSize.width.toFixed(1)}pt — ` +
-            `exceeds page content area ${contentWidth.toFixed(1)}pt`
-        );
+        if (!currentPage) startPage();
+        const remainingHeight = cursorY - contentBottom;
+        if (nodeSize.height > remainingHeight) {
+          const split = splitForPage(node, remainingHeight, contentWidth);
+          if (split && cursorY !== contentTop) {
+            const beforeSize = measure(split.before, contentWidth);
+            render(split.before, currentPage!, m.left, cursorY, contentWidth, {
+              debug: options.debug
+            });
+            cursorY -= beforeSize.height;
+            await closePage();
+            startPage();
+            if (split.after) pending.unshift(split.after);
+            continue;
+          }
+        }
+
+        if (cursorY - nodeSize.height < contentBottom && cursorY !== contentTop) {
+          await closePage();
+          startPage();
+          pending.unshift(node);
+          continue;
+        }
+
+        const topRemainingHeight = cursorY - contentBottom;
+        if (nodeSize.height > topRemainingHeight) {
+          const split = splitForPage(node, topRemainingHeight, contentWidth);
+          if (split) {
+            const beforeSize = measure(split.before, contentWidth);
+            render(split.before, currentPage!, m.left, cursorY, contentWidth, {
+              debug: options.debug
+            });
+            cursorY -= beforeSize.height;
+            await closePage();
+            startPage();
+            if (split.after) pending.unshift(split.after);
+            continue;
+          }
+        }
+
+        render(node, currentPage!, m.left, cursorY, contentWidth, {
+          debug: options.debug
+        });
+        cursorY -= nodeSize.height;
       }
-
-      if (!currentPage) startPage();
-      else if (cursorY - nodeSize.height < contentBottom) {
-        await closePage();
-        startPage();
-      }
-
-      render(node, currentPage!, m.left, cursorY, contentWidth, {
-        debug: options.debug
-      });
-      cursorY -= nodeSize.height;
     }
 
     if (currentPage) await closePage();

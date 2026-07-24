@@ -14,10 +14,13 @@ import {
   PageSizes,
   hline,
   hstack,
+  hex,
   pageInner,
   renderFlow,
   streamFlow,
+  table,
   text,
+  vstack,
   type Node,
   type StreamFlowOptions
 } from "../src/index.js";
@@ -78,6 +81,48 @@ const scenarios: Scenario[] = [
         footer: ({ pageNumber }) => text(`Page ${pageNumber}`, { font, size: 8, width, align: "right" })
       };
       return { pdf, nodes, options };
+    }
+  },
+  {
+    name: "fragmented-stack",
+    async build() {
+      const pdf = await PDFDocument.create({ updateMetadata: false });
+      const font = await pdf.embedFont(StandardFonts.Helvetica);
+      const nodes = [
+        vstack(
+          { gap: 4, padding: 6, border: { width: 1, color: hex("#444444") } },
+          ...Array.from({ length: 14 }, (_, index) =>
+            vstack(
+              { height: 42, padding: 5, background: index % 2 === 0 ? hex("#eeeeee") : hex("#ffffff") },
+              text(`Fragment ${index + 1}`, { font, size: 10 })
+            )
+          )
+        )
+      ];
+      return { pdf, nodes, options: { size: { width: 260, height: 240 }, margin: 20 } };
+    }
+  },
+  {
+    name: "fragmented-table",
+    async build() {
+      const pdf = await PDFDocument.create({ updateMetadata: false });
+      const font = await pdf.embedFont(StandardFonts.Helvetica);
+      const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+      const nodes = [
+        table({
+          width: 220,
+          columns: [{ width: "1fr" }, { width: 48 }],
+          header: [text("Item", { font: bold, size: 10 }), text("Qty", { font: bold, size: 10 })],
+          rows: Array.from({ length: 18 }, (_, index) => [
+            vstack({ padding: { top: 5, bottom: 5 } }, text(`Row ${index + 1}`, { font, size: 10 })),
+            text(String(index + 1), { font, size: 10, align: "right" })
+          ]),
+          rowDivider: { color: hex("#cccccc"), thickness: 1 },
+          headerDivider: { color: hex("#222222"), thickness: 1 },
+          columnGap: 0
+        })
+      ];
+      return { pdf, nodes, options: { size: { width: 260, height: 240 }, margin: 20 } };
     }
   }
 ];
