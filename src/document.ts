@@ -1,7 +1,9 @@
-import { PDFDocument, type PDFPage } from "pdf-lib";
+import { PDFDocument, type PDFPage, type SaveOptions } from "pdf-lib";
 import { createMeasureCache, measure, withMeasureProfile, type MeasureProfileEvent } from "./measure.js";
 import { render, type RenderOptions } from "./render.js";
 import { edges, type EdgesInput, type Node } from "./types.js";
+import { savePdf } from "./save.js";
+import type { PdfEncryptionOptions } from "./encryption/types.js";
 
 export interface PageSize {
   width: number;
@@ -242,6 +244,20 @@ export interface FlowOptions extends PageOptions {
   profile?: RenderFlowProfileCallback;
 }
 
+export interface FlowToPdfOptions extends FlowOptions {
+  encryption?: PdfEncryptionOptions;
+  save?: Omit<SaveOptions, "useObjectStreams"> & {
+    useObjectStreams?: boolean;
+  };
+}
+
+export interface RenderToPdfOptions extends PageOptions {
+  encryption?: PdfEncryptionOptions;
+  save?: Omit<SaveOptions, "useObjectStreams"> & {
+    useObjectStreams?: boolean;
+  };
+}
+
 /**
  * Render a sequence of top-level nodes onto one or more pages, breaking to a
  * new page when the next node would overflow. Each child is rendered atomically
@@ -437,12 +453,13 @@ function now(): number {
  */
 export async function flowToPdf(
   build: (pdf: PDFDocument) => Node[] | Promise<Node[]>,
-  options: FlowOptions = {}
+  options: FlowToPdfOptions = {}
 ): Promise<Uint8Array> {
   const pdf = await PDFDocument.create({ updateMetadata: options.producer === undefined });
   const nodes = await build(pdf);
-  await renderFlow(pdf, nodes, options);
-  return pdf.save();
+  const { encryption, save, ...flowOptions } = options;
+  await renderFlow(pdf, nodes, flowOptions);
+  return savePdf(pdf, { ...save, encryption });
 }
 
 /**
@@ -451,7 +468,7 @@ export async function flowToPdf(
  */
 export async function renderToPdf(
   node: Node,
-  options: PageOptions = {}
+  options: RenderToPdfOptions = {}
 ): Promise<Uint8Array> {
   const size = options.size ?? PageSizes.Letter;
   const m = edges(options.margin);
@@ -465,7 +482,7 @@ export async function renderToPdf(
     warnIfOverflowing(node, nodeSize.width, contentWidth, size, m);
   }
   render(node, page, m.left, size.height - m.top, contentWidth, { debug: options.debug });
-  return pdf.save();
+  return savePdf(pdf, { ...options.save, encryption: options.encryption });
 }
 
 export { PDFDocument };
