@@ -105,4 +105,3 @@ export async function aesCbcEncryptNoPadding(
   const paddedCiphertext = await aesCbcEncrypt(key, iv, plaintext);
   return paddedCiphertext.slice(0, plaintext.length);
 }
-

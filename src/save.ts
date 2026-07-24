@@ -14,4 +14,3 @@ export async function savePdf(
   const { saveEncryptedPdf } = await import("./encryption/writer.js");
   return saveEncryptedPdf(pdf, { ...saveOptions, encryption });
 }
-

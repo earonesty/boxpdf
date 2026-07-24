@@ -39,4 +39,3 @@ export function clearPermissionsBlock(
   result.set(randomTail, 12);
   return result;
 }
-

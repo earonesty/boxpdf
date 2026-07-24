@@ -158,4 +158,3 @@ describe("R6 permissions and material", () => {
     ).rejects.toMatchObject({ code: "OWNER_PASSWORD_NOT_DISTINCT" });
   });
 });
-

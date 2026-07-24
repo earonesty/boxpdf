@@ -83,4 +83,3 @@ export function equalBytes(left: Uint8Array, right: Uint8Array): boolean {
   }
   return difference === 0;
 }
-

@@ -129,4 +129,3 @@ try {
 } finally {
   await rm(directory, { recursive: true, force: true });
 }
-

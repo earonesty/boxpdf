@@ -38,4 +38,3 @@ export class PdfEncryptionError extends Error {
 export interface RandomSource {
   fill(target: Uint8Array): void;
 }
-
