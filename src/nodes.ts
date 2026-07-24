@@ -37,6 +37,18 @@ export function group(...children: Node[]): Node {
 }
 
 /**
+ * Mark a bounded vstack fragment as part of one logical streamed stack.
+ * Consecutive fragments with the same id retain the same gap and box
+ * decoration semantics as a single vstack containing all children.
+ */
+export function flowContinuation(node: Node, id: string, final = false): Node {
+  if (node.kind !== "vstack") {
+    throw new Error("flowContinuation requires a vstack node");
+  }
+  return { ...node, fragmentation: { kind: "continuation", id, final } };
+}
+
+/**
  * Wraps children so that, under `renderFlow`, they paginate as one atomic
  * unit — if the combined height won't fit on the current page, the whole
  * group is pushed to the next page intact. Use it to keep

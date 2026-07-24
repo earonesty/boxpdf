@@ -36,11 +36,21 @@ export type BoxTransform =
   | { kind: "skew"; xDegrees: number; yDegrees: number }
   | { kind: "matrix"; a: number; b: number; c: number; d: number; e: number; f: number };
 export type TransformOrigin = { x: RelativeLength; y: RelativeLength };
-export type Fragmentation = {
-  kind: "table";
-  headerCount: number;
-  footerCount: number;
-};
+export type Fragmentation =
+  | {
+      kind: "table";
+      headerCount: number;
+      footerCount: number;
+    }
+  | {
+      /**
+       * One bounded fragment of a logical vstack supplied incrementally.
+       * Consecutive fragments with the same id are merged before pagination.
+       */
+      kind: "continuation";
+      id: string;
+      final: boolean;
+    };
 
 export interface BoxStyle {
   /** Fixed width; if omitted, the box sizes to its content. */

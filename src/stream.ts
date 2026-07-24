@@ -36,6 +36,10 @@ import type { PdfEncryptionOptions } from "./encryption/types.js";
 import type { EncryptionContext } from "./encryption/serialize.js";
 import type { PreparedEncryption } from "./encryption/writer.js";
 
+type ContinuationNode = Extract<Node, { kind: "vstack" }> & {
+  fragmentation: { kind: "continuation"; id: string; final: boolean };
+};
+
 export interface StreamPageContext {
   /** Current page number, 1-indexed. */
   pageNumber: number;
@@ -334,8 +338,7 @@ export async function streamFlow(
       currentPage = undefined;
     };
 
-    for await (const input of nodes) {
-      const pending = [input];
+    const processNodes = async (pending: Node[]): Promise<void> => {
       while (pending.length > 0) {
         checkMidStreamEmbed();
         const node = pending.shift()!;
@@ -392,6 +395,70 @@ export async function streamFlow(
         });
         cursorY -= nodeSize.height;
       }
+    };
+
+    const flushContinuationPages = async (
+      initial: ContinuationNode
+    ): Promise<ContinuationNode> => {
+      let node = initial;
+      while (true) {
+        if (!currentPage) startPage();
+        const remainingHeight = cursorY - contentBottom;
+        if (measure(node, contentWidth).height <= remainingHeight) return node;
+        const split = splitForPage(node, remainingHeight, contentWidth);
+        if (!split) {
+          if (cursorY !== contentTop) {
+            await closePage();
+            startPage();
+            continue;
+          }
+          return node;
+        }
+        const beforeSize = measure(split.before, contentWidth);
+        render(split.before, currentPage!, m.left, cursorY, contentWidth, {
+          debug: options.debug
+        });
+        cursorY -= beforeSize.height;
+        await closePage();
+        startPage();
+        if (!split.after || !isContinuation(split.after)) {
+          throw new Error("[boxpdf streamFlow] invalid continuation split");
+        }
+        node = split.after;
+      }
+    };
+
+    let continuation: ContinuationNode | undefined;
+    for await (const input of nodes) {
+      if (isContinuation(input)) {
+        if (continuation && continuation.fragmentation?.id !== input.fragmentation.id) {
+          throw new Error(
+            `[boxpdf streamFlow] continuation "${continuation.fragmentation?.id}" ` +
+              `was interrupted by "${input.fragmentation.id}"`
+          );
+        }
+        continuation = continuation ? mergeContinuations(continuation, input) : input;
+        if (input.fragmentation.final) {
+          await processNodes([continuation]);
+          continuation = undefined;
+        } else {
+          continuation = await flushContinuationPages(continuation);
+        }
+        continue;
+      }
+      if (continuation) {
+        throw new Error(
+          `[boxpdf streamFlow] continuation "${continuation.fragmentation?.id}" ` +
+            "ended without a final fragment"
+        );
+      }
+      await processNodes([input]);
+    }
+    if (continuation) {
+      throw new Error(
+        `[boxpdf streamFlow] continuation "${continuation.fragmentation?.id}" ` +
+          "ended without a final fragment"
+      );
     }
 
     if (currentPage) await closePage();
@@ -473,6 +540,39 @@ export async function streamFlow(
       }
     }
   }
+}
+
+function isContinuation(
+  node: Node
+): node is ContinuationNode {
+  return node.kind === "vstack" && node.fragmentation?.kind === "continuation";
+}
+
+function mergeContinuations(
+  left: ContinuationNode,
+  right: ContinuationNode
+): ContinuationNode {
+  if (!isContinuation(left) || !isContinuation(right) || left.fragmentation.id !== right.fragmentation.id) {
+    throw new Error("[boxpdf streamFlow] cannot merge unrelated continuations");
+  }
+  const children = [...left.children];
+  const first = right.children[0];
+  const last = children[children.length - 1];
+  if (last && first && isContinuation(last) && isContinuation(first) && last.fragmentation.id === first.fragmentation.id) {
+    children[children.length - 1] = mergeContinuations(last, first);
+    children.push(...right.children.slice(1));
+  } else {
+    children.push(...right.children);
+  }
+  return {
+    ...left,
+    children,
+    fragmentation: {
+      kind: "continuation",
+      id: left.fragmentation.id,
+      final: right.fragmentation.final
+    }
+  };
 }
 
 /**

@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import {
   PageSizes,
+  flowContinuation,
   hline,
   hstack,
   hex,
@@ -27,10 +28,60 @@ import {
 
 interface Scenario {
   name: string;
-  build(): Promise<{ pdf: PDFDocument; nodes: Node[]; options: StreamFlowOptions }>;
+  build(mode: "buffered" | "streamed"): Promise<{ pdf: PDFDocument; nodes: Node[]; options: StreamFlowOptions }>;
 }
 
 const scenarios: Scenario[] = [
+  {
+    name: "continued-stack",
+    async build(mode) {
+      const pdf = await PDFDocument.create({ updateMetadata: false });
+      const font = await pdf.embedFont(StandardFonts.Helvetica);
+      const children = Array.from({ length: 16 }, (_, index) =>
+        vstack(
+          { height: 38, padding: 4, background: index % 2 === 0 ? hex("#edf2f7") : hex("#ffffff") },
+          text(`Continued child ${index + 1}`, { font, size: 9 })
+        )
+      );
+      const style = { gap: 5, padding: 7, border: { width: 1, color: hex("#334455") } };
+      const nodes =
+        mode === "buffered"
+          ? [vstack(style, ...children)]
+          : children.map((child, index) =>
+              flowContinuation(vstack(style, child), "continued-stack", index === children.length - 1)
+            );
+      return { pdf, nodes, options: { size: { width: 280, height: 250 }, margin: 20 } };
+    }
+  },
+  {
+    name: "nested-continuations",
+    async build(mode) {
+      const pdf = await PDFDocument.create({ updateMetadata: false });
+      const font = await pdf.embedFont(StandardFonts.Helvetica);
+      const children = Array.from({ length: 16 }, (_, index) =>
+        vstack(
+          { height: 38, padding: 4, background: index % 2 === 0 ? hex("#edf2f7") : hex("#ffffff") },
+          text(`Continued child ${index + 1}`, { font, size: 9 })
+        )
+      );
+      const outerStyle = { gap: 5, padding: 7, border: { width: 1, color: hex("#334455") } };
+      const innerStyle = { gap: 3, padding: 5, border: { width: 1, color: hex("#99aabb") } };
+      const nodes =
+        mode === "buffered"
+          ? [vstack(outerStyle, vstack(innerStyle, ...children))]
+          : children.map((child, index) =>
+              flowContinuation(
+                vstack(
+                  outerStyle,
+                  flowContinuation(vstack(innerStyle, child), "inner", index === children.length - 1)
+                ),
+                "outer",
+                index === children.length - 1
+              )
+            );
+      return { pdf, nodes, options: { size: { width: 280, height: 250 }, margin: 20 } };
+    }
+  },
   {
     name: "multi-page-flow",
     async build() {
@@ -134,12 +185,12 @@ async function main(): Promise<void> {
       const scenarioDir = join(root, scenario.name);
       mkdirSync(scenarioDir, { recursive: true });
 
-      const buffered = await scenario.build();
+      const buffered = await scenario.build("buffered");
       await renderFlow(buffered.pdf, buffered.nodes, buffered.options);
       const bufferedPdf = join(scenarioDir, "render-flow.pdf");
       writeFileSync(bufferedPdf, await buffered.pdf.save());
 
-      const streamed = await scenario.build();
+      const streamed = await scenario.build("streamed");
       const chunks: Uint8Array[] = [];
       const writable = new WritableStream<Uint8Array>({
         write(chunk) {

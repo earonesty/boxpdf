@@ -3,6 +3,7 @@ import { PassThrough } from "node:stream";
 import { PDFDocument, StandardFonts, type PDFFont } from "pdf-lib";
 import {
   PageSizes,
+  flowContinuation,
   hline,
   hstack,
   hex,
@@ -169,6 +170,41 @@ describe("streamFlow basics", () => {
 
     expect(pageCount).toBeGreaterThan(1);
     expect((await PDFDocument.load(bytes())).getPageCount()).toBe(pageCount);
+  });
+
+  it("merges bounded continuation fragments before pagination", async () => {
+    const { pdf, font } = await newDocWithFonts();
+    const fragments = Array.from({ length: 12 }, (_, index) =>
+      flowContinuation(
+        vstack(
+          { gap: 4, padding: 6, border: { width: 1, color: hex("#444444") } },
+          vstack({ height: 42 }, text(`Fragment ${index + 1}`, { font, size: 10 }))
+        ),
+        "report",
+        index === 11
+      )
+    );
+    const { writable, bytes } = collector();
+    const { pageCount } = await streamFlow(pdf, writable, fragments, {
+      size: { width: 240, height: 220 },
+      margin: 20
+    });
+
+    expect(pageCount).toBeGreaterThan(1);
+    expect((await PDFDocument.load(bytes())).getPageCount()).toBe(pageCount);
+  });
+
+  it("rejects a continuation without a final fragment", async () => {
+    const { pdf, font } = await newDocWithFonts();
+    const { writable } = collector();
+    await expect(
+      streamFlow(
+        pdf,
+        writable,
+        [flowContinuation(vstack({}, text("unfinished", { font, size: 10 })), "unfinished")],
+        { margin: 20 }
+      )
+    ).rejects.toThrow(/without a final fragment/);
   });
 });
 
