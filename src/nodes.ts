@@ -45,7 +45,15 @@ export function flowContinuation(node: Node, id: string, final = false): Node {
   if (node.kind !== "vstack") {
     throw new Error("flowContinuation requires a vstack node");
   }
-  return { ...node, fragmentation: { kind: "continuation", id, final } };
+  const table =
+    node.fragmentation?.kind === "table"
+      ? {
+          headerCount: node.fragmentation.headerCount,
+          footerCount: node.fragmentation.footerCount,
+          rowDivider: node.fragmentation.rowDivider
+        }
+      : undefined;
+  return { ...node, fragmentation: { kind: "continuation", id, final, table } };
 }
 
 /**

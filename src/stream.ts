@@ -556,6 +556,27 @@ function mergeContinuations(
     throw new Error("[boxpdf streamFlow] cannot merge unrelated continuations");
   }
   const children = [...left.children];
+  if (left.fragmentation.table && right.fragmentation.table) {
+    const rightHeaderCount = right.fragmentation.table.headerCount;
+    if (
+      left.fragmentation.table.rowDivider &&
+      left.children.length > left.fragmentation.table.headerCount &&
+      right.children.length > rightHeaderCount
+    ) {
+      children.push(left.fragmentation.table.rowDivider);
+    }
+    children.push(...right.children.slice(rightHeaderCount));
+    return {
+      ...left,
+      children,
+      fragmentation: {
+        kind: "continuation",
+        id: left.fragmentation.id,
+        final: right.fragmentation.final,
+        table: left.fragmentation.table
+      }
+    };
+  }
   const first = right.children[0];
   const last = children[children.length - 1];
   if (last && first && isContinuation(last) && isContinuation(first) && last.fragmentation.id === first.fragmentation.id) {
@@ -570,7 +591,8 @@ function mergeContinuations(
     fragmentation: {
       kind: "continuation",
       id: left.fragmentation.id,
-      final: right.fragmentation.final
+      final: right.fragmentation.final,
+      table: left.fragmentation.table
     }
   };
 }

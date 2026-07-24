@@ -358,7 +358,12 @@ export function table(options: TableOptions): Node {
     ...children
   );
   if (node.kind === "vstack") {
-    node.fragmentation = { kind: "table", headerCount, footerCount };
+    node.fragmentation = {
+      kind: "table",
+      headerCount,
+      footerCount,
+      rowDivider: borderCollapse === "collapse" ? undefined : dividerNode(rowDivider)
+    };
   }
   return node;
 }

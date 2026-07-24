@@ -41,6 +41,7 @@ export type Fragmentation =
       kind: "table";
       headerCount: number;
       footerCount: number;
+      rowDivider?: Node;
     }
   | {
       /**
@@ -50,6 +51,12 @@ export type Fragmentation =
       kind: "continuation";
       id: string;
       final: boolean;
+      /** Preserve table row fragmentation while table chunks are merged. */
+      table?: {
+        headerCount: number;
+        footerCount: number;
+        rowDivider?: Node;
+      };
     };
 
 export interface BoxStyle {

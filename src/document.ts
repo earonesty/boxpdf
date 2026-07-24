@@ -178,11 +178,17 @@ function splitTableStack(
   contentWidth: number
 ): { before: Node; after?: Node } | undefined {
   const meta = node.fragmentation;
-  if (meta?.kind !== "table") return undefined;
-  const header = node.children.slice(0, meta.headerCount);
-  const footerStart = node.children.length - meta.footerCount;
-  const footer = meta.footerCount > 0 ? node.children.slice(footerStart) : [];
-  const body = node.children.slice(meta.headerCount, footerStart);
+  const tableMeta =
+    meta?.kind === "table"
+      ? meta
+      : meta?.kind === "continuation"
+        ? meta.table
+        : undefined;
+  if (!tableMeta) return undefined;
+  const header = node.children.slice(0, tableMeta.headerCount);
+  const footerStart = node.children.length - tableMeta.footerCount;
+  const footer = tableMeta.footerCount > 0 ? node.children.slice(footerStart) : [];
+  const body = node.children.slice(tableMeta.headerCount, footerStart);
   if (body.length <= 1) return undefined;
 
   let splitAt = 0;
@@ -209,7 +215,10 @@ export function splitForPage(
   contentWidth: number
 ): { before: Node; after?: Node } | undefined {
   if (!isFragmentableStack(node)) return undefined;
-  if (node.fragmentation?.kind === "table") {
+  if (
+    node.fragmentation?.kind === "table" ||
+    (node.fragmentation?.kind === "continuation" && node.fragmentation.table)
+  ) {
     return splitTableStack(node, availableHeight, contentWidth);
   }
   return splitNormalStack(node, availableHeight, contentWidth);

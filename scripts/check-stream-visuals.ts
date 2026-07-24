@@ -154,6 +154,40 @@ const scenarios: Scenario[] = [
     }
   },
   {
+    name: "continued-table",
+    async build(mode) {
+      const pdf = await PDFDocument.create({ updateMetadata: false });
+      const font = await pdf.embedFont(StandardFonts.Helvetica);
+      const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
+      const rows = Array.from({ length: 24 }, (_, index) => [
+        vstack({ padding: { top: 4, bottom: 4 } }, text(`Chunked row ${index + 1}`, { font, size: 9 })),
+        text(String(index + 1), { font, size: 9, align: "right" })
+      ]);
+      const makeTable = (tableRows: Node[][]) =>
+        table({
+          width: 220,
+          columns: [{ width: "1fr" }, { width: 48 }],
+          header: [text("Item", { font: bold, size: 9 }), text("Qty", { font: bold, size: 9 })],
+          rows: tableRows,
+          rowDivider: { color: hex("#cccccc"), thickness: 1 },
+          headerDivider: { color: hex("#222222"), thickness: 1 },
+          columnGap: 0
+        });
+      const chunkCount = Math.ceil(rows.length / 4);
+      const nodes =
+        mode === "buffered"
+          ? [makeTable(rows)]
+          : Array.from({ length: chunkCount }, (_, index) =>
+              flowContinuation(
+                makeTable(rows.slice(index * 4, index * 4 + 4)),
+                "continued-table",
+                index === chunkCount - 1
+              )
+            );
+      return { pdf, nodes, options: { size: { width: 260, height: 240 }, margin: 20 } };
+    }
+  },
+  {
     name: "fragmented-table",
     async build() {
       const pdf = await PDFDocument.create({ updateMetadata: false });

@@ -206,6 +206,33 @@ describe("streamFlow basics", () => {
       )
     ).rejects.toThrow(/without a final fragment/);
   });
+
+  it("merges table continuations while retaining row fragmentation", async () => {
+    const { pdf, font, bold } = await newDocWithFonts();
+    const makeChunk = (start: number, final: boolean) =>
+      flowContinuation(
+        table({
+          width: 180,
+          columns: [{ width: "1fr" }],
+          header: [text("Header", { font: bold, size: 10 })],
+          rows: Array.from({ length: 4 }, (_, index) => [
+            vstack({ height: 28 }, text(`Row ${start + index}`, { font, size: 9 }))
+          ])
+        }),
+        "table",
+        final
+      );
+    const { writable, bytes } = collector();
+    const { pageCount } = await streamFlow(
+      pdf,
+      writable,
+      [makeChunk(1, false), makeChunk(5, false), makeChunk(9, true)],
+      { size: { width: 220, height: 180 }, margin: 20 }
+    );
+
+    expect(pageCount).toBeGreaterThan(1);
+    expect((await PDFDocument.load(bytes())).getPageCount()).toBe(pageCount);
+  });
 });
 
 describe("streamFlow headers and footers", () => {
