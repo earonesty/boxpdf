@@ -24,11 +24,13 @@ not a substitute for the specification.
 - **Decision:** encrypted `flowToPdf`, `renderToPdf`, `savePdf`, and
   `streamFlow` output use the same security-handler and object-serialization
   code.
-- **Decision:** no new runtime dependency is planned. Cryptographic primitives
-  and RFC 4013 preparation are self-contained, security-reviewed internal
-  modules with specification and known-answer tests. Their audit surface,
-  browser bundle cost, and CPU/memory performance are explicit release costs,
-  not reasons to abbreviate the implementations.
+- **Decision:** no new runtime dependency is planned. Production AES and SHA-2
+  operations use the runtime's standard `globalThis.crypto.subtle` Web Crypto
+  implementation; BoxPDF does not ship its own AES or SHA-2 implementation.
+  RFC 4013 preparation remains a self-contained, security-reviewed internal
+  module with specification and known-answer tests. Web Crypto adapter
+  semantics, runtime availability, Unicode-table bundle cost, and CPU/memory
+  performance are explicit release costs.
 - **Decision:** output uses a `%PDF-2.0` header. The encryption dictionary is a
   standalone indirect object and the catalog is not put in an object stream.
 
@@ -427,15 +429,53 @@ Generate independently with `globalThis.crypto.getRandomValues`:
 - two 16-byte file identifiers;
 - a fresh 16-byte IV for every encrypted string and stream.
 
-**VERIFY (runtime):** establish the exact minimum Node version for
-`globalThis.crypto.getRandomValues` in both the shipped ESM and CJS builds,
-without flags or polyfills, and verify the same global API in supported
-browsers, Workers, and Deno. Node 18 is a candidate minimum, not an approved
-fact. If either Node 18 module format lacks the required global Web Crypto
-surface, raise BoxPDF's minimum Node version; do not add a Node-specific
-`crypto` import or conditional fallback. Absence or failure of
-`crypto.getRandomValues` is fatal (`SECURE_RANDOM_UNAVAILABLE`); there is no
-`Math.random`, timestamp, counter, process API, or Node-only fallback.
+**VERIFY (runtime):** establish the exact minimum Node version for the required
+`globalThis.crypto` surface in both the shipped ESM and CJS builds, without
+flags or polyfills, and verify the same global API in supported browsers,
+Workers, and Deno. The required surface is `getRandomValues`,
+`subtle.importKey`, `subtle.digest`, and `subtle.encrypt` with AES-CBC and
+SHA-256/384/512. Node 18 is a candidate minimum, not an approved fact. If either
+Node 18 module format lacks that surface, raise BoxPDF's minimum Node version;
+do not add a Node-specific `crypto` import or conditional fallback. Absence or
+failure of `crypto.getRandomValues` is fatal
+(`SECURE_RANDOM_UNAVAILABLE`); absence of the required `subtle` surface is
+fatal (`WEB_CRYPTO_UNAVAILABLE`). There is no `Math.random`, timestamp,
+counter, process API, or Node-only fallback.
+
+### Web Crypto operations
+
+Production hashing and block-cipher operations use only
+`globalThis.crypto.subtle`; `node:crypto`, third-party crypto packages, and
+BoxPDF-owned AES/SHA-2 implementations are forbidden. SHA-256, SHA-384, and
+SHA-512 map directly to `subtle.digest`. AES-128 and AES-256 keys are imported
+as raw `AES-CBC` keys with only the usages required by the production path.
+Reusable keys, including the file key used for object encryption, are imported
+once per save rather than once per object.
+
+Web Crypto AES-CBC always applies PKCS#7 padding. That behavior is exactly what
+AESV3 string and stream encryption requires. The R6 algorithms also require
+AES-CBC encryption without padding, but every such BoxPDF input is an exact
+multiple of the 16-byte AES block size. Define the internal operation
+`aesCbcEncryptNoPadding(key, iv, plaintext)` as:
+
+1. reject an input whose length is not a multiple of 16;
+2. encrypt it with Web Crypto `AES-CBC`, which appends one complete PKCS#7
+   padding block;
+3. return exactly the first `plaintext.length` ciphertext bytes, discarding the
+   final ciphertext block produced solely from padding.
+
+In CBC encryption, an appended plaintext block cannot affect ciphertext blocks
+that precede it, so this produces the specified no-padding ciphertext without a
+custom cipher implementation. Fixed NIST vectors and R6 known answers must test
+the adapter directly. This truncation rule is encryption-only; production code
+must not present truncated ciphertext to `subtle.decrypt` or generalize the
+adapter to decryption.
+
+Web Crypto does not expose AES-ECB. `Perms` needs only one AES-256-ECB encrypted
+block. For a single plaintext block, AES-CBC with an all-zero IV produces the
+same first ciphertext block as AES-ECB. Therefore `Perms` uses
+`aesCbcEncryptNoPadding(fileKey, zeroIv, clearBlock)`. A named vector test must
+establish this equivalence. No general ECB API is added.
 
 ### Algorithm 2.B hash
 
@@ -533,9 +573,10 @@ decrypt-and-validate unit test before any fixture is trusted.
 For each eligible string value and stream payload:
 
 1. obtain 16 fresh random IV bytes;
-2. PKCS#7-pad plaintext to an AES block boundary (always append padding, so an
-   already aligned or empty value receives a full 16-byte block);
-3. AES-256-CBC encrypt using the 32-byte `fileKey`;
+2. pass the unpadded plaintext to Web Crypto AES-256-CBC using the imported
+   32-byte `fileKey`; Web Crypto applies PKCS#7 padding, including the required
+   full padding block for an already aligned or empty value;
+3. do not pre-pad the plaintext or truncate this ciphertext;
 4. serialize `IV || ciphertext`.
 
 For `/V 5`, `/R 6`, the object key is the file key itself. Object number and
@@ -671,8 +712,7 @@ against the minimum and current 1.17.x versions.
 ```text
 src/
   encryption/
-    aes.ts                 AES-128/256 block, CBC, ECB, PKCS#7
-    sha2.ts                SHA-256/384/512
+    web-crypto.ts          digest/AES-CBC adapters and runtime validation
     saslprep.ts            RFC 3454/4013 Unicode-3.2 preparation
     saslprep-tables.ts     generated, reviewed range tables
     r6.ts                  Algorithm 2.B, U/O/UE/OE/Perms
@@ -687,8 +727,7 @@ src/
   index.ts                 value/type exports
 test/
   encryption/
-    aes.test.ts
-    sha2.test.ts
+    web-crypto.test.ts
     saslprep.test.ts
     r6.test.ts
     permissions.test.ts
@@ -720,15 +759,14 @@ the `PdfPermissions`, `PdfEncryptionOptions`, `SavePdfOptions`,
 The existing `StreamFlowOptions` export incorporates its new encryption field.
 Runtime and declaration export inventories must agree in ESM and CJS. No new
 package subpath or `tsup` entry is needed. `tsup.config.ts` remains ES2022
-ESM/CJS with pdf-lib external. Bundle-size impact is measured because SHA-2,
-AES, and Unicode tables are shipped to browsers; their self-contained
-implementations require explicit security review, audit maintenance,
-performance benchmarking, and bundle accounting. Tree-shaking must keep the
-encryption implementation out of applications that never import an
-encryption-capable save helper where feasible. If the main entry's static
-exports prevent that, accept the measured v1 cost rather than adding a hidden
-runtime dependency; a future `boxpdf/encryption` subpath requires a separate
-API decision.
+ESM/CJS with pdf-lib external. AES and SHA-2 add no shipped implementation
+bytes because they come from Web Crypto. Bundle-size impact is still measured
+because the PDF writer, R6 orchestration, SASLprep, and Unicode tables are
+shipped to browsers. Tree-shaking must keep the encryption implementation out
+of applications that never import an encryption-capable save helper where
+feasible. If the main entry's static exports prevent that, accept the measured
+v1 cost rather than adding a hidden runtime dependency; a future
+`boxpdf/encryption` subpath requires a separate API decision.
 
 ### Internal interfaces
 
@@ -765,6 +803,7 @@ export type PdfEncryptionErrorCode =
   | "PASSWORD_TOO_LONG"
   | "OWNER_PASSWORD_NOT_DISTINCT"
   | "SECURE_RANDOM_UNAVAILABLE"
+  | "WEB_CRYPTO_UNAVAILABLE"
   | "SIGNED_PDF_UNSUPPORTED"
   | "ENCRYPTED_INPUT_UNSUPPORTED"
   | "UNSUPPORTED_PDF_OBJECT"
@@ -782,10 +821,12 @@ secret material. No debug logging is added to crypto code.
 
 Keep passwords as local variables, convert once to fresh `Uint8Array`s, and do
 not attach options to the PDF context. In `finally`, overwrite mutable password
-byte arrays, intermediate hashes, AES schedules, file keys, and clear
-permission blocks where practical. JavaScript strings, engine copies, and GC
-mean zeroization is best effort and must not be advertised as guaranteed.
-Fixtures use conspicuously non-production test passwords.
+byte arrays, intermediate hashes, file keys, and clear permission blocks where
+practical. `CryptoKey` internals and Web Crypto implementation buffers cannot
+be explicitly overwritten. JavaScript strings, engine copies, promises,
+`ArrayBuffer`s, and GC mean zeroization is best effort and must not be
+advertised as guaranteed. Fixtures use conspicuously non-production test
+passwords.
 
 Run the signed/encrypted-input preflight, validate all options, and finish
 password preparation before `streamFlow` writes its header. Preflight must
@@ -794,10 +835,13 @@ returning partial bytes.
 
 ## Performance and memory
 
-R6 hashing is deliberately CPU-heavy and SHA-384/512 plus AES must be benchmarked
-on the slowest supported Worker. Implementations avoid allocations inside AES
-rounds and reuse a growable Algorithm 2.B workspace, but clarity and testability
-win over clever micro-optimization.
+R6 hashing is deliberately CPU-heavy and its hundreds of sequential Web Crypto
+digest/encrypt operations must be benchmarked on the slowest supported Worker.
+Implementations avoid redundant key imports and reuse a growable Algorithm 2.B
+workspace, but clarity and testability win over clever micro-optimization.
+The benchmark must measure Web Crypto promise/host-boundary overhead as well as
+cryptographic CPU time; a performance regression is not permission to add a
+pure-JavaScript or Node-specific crypto fallback.
 
 The buffered writer computes encrypted objects once and records their final
 bytes/lengths; it must not encrypt once for sizing and again for output because
@@ -814,17 +858,17 @@ to page count beyond existing xref/page bookkeeping.
 
 ## Test and validation matrix
 
-### Primitive and algorithm unit tests
+### Web Crypto adapter and algorithm unit tests
 
 | Area | Required coverage |
 | --- | --- |
-| AES | NIST AES-128 and AES-256 block/CBC vectors; ECB single block; zero IV; PKCS#7 empty, aligned, and unaligned inputs; invalid key/block rejection |
-| SHA-2 | NIST SHA-256/384/512 empty, short, multi-block, and million-byte vectors; SHA-256 boundary lengths 55/56/63/64 bytes; SHA-384/512 boundary lengths 111/112/127/128 bytes |
+| Web Crypto AES adapter | NIST AES-128 and AES-256 CBC vectors; aligned no-padding truncation; single-block zero-IV CBC equals ECB; Web Crypto PKCS#7 empty, aligned, and unaligned inputs; invalid key/IV/block rejection |
+| Web Crypto SHA-2 adapter | NIST SHA-256/384/512 empty, short, multi-block, and million-byte vectors; correct algorithm selection and byte conversion |
 | SASLprep | RFC 4013 examples; mapped spaces; soft hyphen/map-to-nothing; NFKC; prohibited controls/private-use/noncharacters/surrogates; Unicode-3.2 unassigned; RandALCat/LCat BiDi failures; unpaired JS surrogates |
 | Password bounds | Caller password lengths 0, 1, 126, 127, and 128 prepared UTF-8 bytes; multibyte boundary; two source strings preparing equal; empty required password; supplied empty/equal owner rejection; omitted owner consumes and discards independently generated ASCII credential |
 | Algorithm 2.B | fixed inputs for all three hash branches; exactly 64 and extended rounds; unsigned last byte; big-endian modulo; QPDF-matched known answers |
 | R6 field sizing | Separately from hash padding boundaries: exact U/O 48-byte, UE/OE 32-byte, salts 8-byte, file-key 32-byte, `Perms` 16-byte, and internal 127-byte password-input boundary tests |
-| Entries | U/O/UE/OE known answers; zero-IV/no-padding unwrap; all salts independently consumed |
+| Entries | U/O/UE/OE known answers; independent test-oracle zero-IV/no-padding unwrap; all salts independently consumed |
 | Permissions | every printing value and independent modify/copying/annotate/fillForms/assemble toggle; accessibility bit always allowed; signed `P`; all-granted `-4`; restricted values; decrypted 16-byte `Perms`; metadata byte |
 
 Use a deterministic counter/HMAC-like fixture source only to supply recorded
@@ -1005,14 +1049,16 @@ qpdf --show-encryption --password=test-user \
   fixtures/encryption/qpdf/r6.pdf
 ```
 
-### Phase 1 — primitives and password preparation
+### Phase 1 — Web Crypto adapters and password preparation
 
-Write tests, then implement `sha2.ts`, `aes.ts`, `saslprep.ts`, and generated
-tables. Cross-check all primitives against Web Crypto in tests only.
+Write tests, then implement `web-crypto.ts`, `saslprep.ts`, and generated
+tables. The Web Crypto tests cover SHA-2 dispatch, padded AES-CBC, the
+aligned-input no-padding truncation adapter, and the zero-IV single-block
+ECB-equivalence used by `Perms`. There is no BoxPDF AES or SHA-2 implementation.
 
 ```sh
-pnpm vitest run test/encryption/sha2.test.ts \
-  test/encryption/aes.test.ts test/encryption/saslprep.test.ts
+pnpm vitest run test/encryption/web-crypto.test.ts \
+  test/encryption/saslprep.test.ts
 pnpm run typecheck
 ```
 
@@ -1112,8 +1158,8 @@ Encryption ships only when all of the following are true:
 - every **VERIFY (ISO)** item is resolved in the ledger and reflected by a
   named test;
 - no forbidden technology or new runtime service/native/WASM dependency exists;
-- primitive known-answer, R6, serialization, adversarial, and existing BoxPDF
-  suites pass;
+- Web Crypto adapter known-answer, R6, serialization, adversarial, and existing
+  BoxPDF suites pass;
 - user and owner passwords open all four output paths; wrong passwords fail;
 - QPDF `--check`, Poppler text/render, Acrobat, Chromium, and Firefox accept
   representative files;
