@@ -5,6 +5,7 @@ coverage
 .DS_Store
 .idea
 .vscode
+.wrangler
 fixtures/*.pdf
 fixtures/png
 !fixtures/.gitkeep

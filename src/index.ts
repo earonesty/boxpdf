@@ -46,6 +46,14 @@ export { measure, measureContent, resolveMainAxis } from "./measure.js";
 export type { MainAxis, MainAxisLayout, MeasureProfileEvent } from "./measure.js";
 export { render, type RenderOptions } from "./render.js";
 export { renderFlow, renderToPdf, flowToPdf, PageSizes, pageInner, pageContent } from "./document.js";
+export { savePdf } from "./save.js";
+export type { SavePdfOptions } from "./save.js";
+export { PdfEncryptionError } from "./encryption/types.js";
+export type {
+  PdfEncryptionErrorCode,
+  PdfEncryptionOptions,
+  PdfPermissions
+} from "./encryption/types.js";
 
 // Re-export the pdf-lib symbols you need on the common path so a basic
 // document needs no direct `pdf-lib` import. pdf-lib is a peer dependency.
@@ -57,6 +65,8 @@ export type { StreamFlowOptions, StreamPageContext } from "./stream.js";
 export type {
   PageOptions,
   FlowOptions,
+  FlowToPdfOptions,
+  RenderToPdfOptions,
   PageSize,
   PageContext,
   RenderFlowProfileCallback,

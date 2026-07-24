@@ -124,7 +124,7 @@ Core workflow (shortest path):
 3. Pick a theme such as cleanTheme(await standardFonts(pdf)) — theme factories accept a { font, bold, italic? } object or positional fonts.
 4. Build plain object nodes with vstack, hstack, text, image, hline, spacer, flex, link, and keepTogether; return them from the callback.
 
-Explicit path (manage the document yourself): create a PDFDocument using boxpdf's PDFDocument and StandardFonts re-exports, embed fonts, build nodes, call renderFlow(pdf, nodes, options), then pdf.save(). Use renderToPdf(node, options) for simple one-page output.
+Explicit path (manage the document yourself): create a PDFDocument using boxpdf's PDFDocument and StandardFonts re-exports, embed fonts, build nodes, call renderFlow(pdf, nodes, options), then savePdf(pdf, options). Calling pdf.save() directly is always unencrypted. Use renderToPdf(node, options) for simple one-page output.
 
 Important APIs:
 
@@ -145,6 +145,7 @@ Important APIs:
 - aspectRatio(ratio, { width } | { height }): derive the missing dimension.
 - flowToPdf(build, options): create a document, build nodes in the callback, paginate, and return saved Uint8Array. The shortest path to bytes.
 - renderFlow(pdf, nodes, options): paginated rendering with margins, headers, footers, metadata, debug overlays, top-level vstack fragmentation, and table row fragmentation with repeated headers.
+- savePdf(pdf, options): save a caller-owned document; pass { encryption: { password, ownerPassword?, permissions? } } for PDF 2.0 R6 AES-256 output.
 - renderToPdf(node, options): convenience helper that returns Uint8Array for one-page output.
 - standardFonts(pdf, family?): embed a built-in pdf-lib family (helvetica/times/courier) and get { font, bold, italic, boldItalic }.
 - measure(node, parentWidth): compute intrinsic size in a measurement pass.
@@ -158,7 +159,7 @@ Runtime and layout:
 - Layout uses boxpdf's built-in box primitives.
 - Positioning supports relative containing boxes, out-of-flow absolute boxes, point offsets, zIndex, and stretch from paired edges.
 - Complex text shaping is limited by pdf-lib/fontkit.
-- flowToPdf and renderToPdf return Uint8Array; streamFlow emits incrementally to a WritableStream.
+- flowToPdf and renderToPdf return Uint8Array; streamFlow emits incrementally to a WritableStream. All three accept encryption options. PDF permissions are advisory viewer settings.
 
 The template resources exposed by this MCP server are meant to be copied and adapted. They import from "boxpdf" and write their PDF next to the generated source file.`;
 }

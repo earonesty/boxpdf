@@ -292,3 +292,77 @@ describe("streamFlow error handling", () => {
     expect(aborted).toBe(true);
   });
 });
+
+describe("streamFlow encryption", () => {
+  it("emits PDF 2.0 R6 output while preserving pagination", async () => {
+    const { pdf, font } = await newDocWithFonts();
+    const { writable, bytes } = collector();
+    const { pageCount } = await streamFlow(
+      pdf,
+      writable,
+      Array.from({ length: 100 }, (_, index) =>
+        text(`encrypted stream line ${index}`, { size: 12, font })
+      ),
+      {
+        size: PageSizes.Letter,
+        margin: 36,
+        title: "stream title marker 73192",
+        encryption: {
+          password: "stream-user",
+          ownerPassword: "stream-owner",
+          permissions: { copying: false }
+        }
+      }
+    );
+    expect(pageCount).toBeGreaterThan(1);
+    const output = new TextDecoder("latin1").decode(bytes());
+    expect(output.startsWith("%PDF-2.0")).toBe(true);
+    expect(output).toContain("/R 6");
+    expect(output).toContain("/CFM /AESV3");
+    expect(output).toContain("/P -20");
+    expect(output).not.toContain("stream title marker 73192");
+    expect(pdf.context.trailerInfo.Encrypt).toBeUndefined();
+  });
+
+  it("aborts encrypted output and releases encryption state on failure", async () => {
+    const { pdf, font } = await newDocWithFonts();
+    let aborted = false;
+    const writable = new WritableStream<Uint8Array>({
+      write() {},
+      abort() {
+        aborted = true;
+      }
+    });
+    async function* gen(): AsyncIterable<Node> {
+      yield text("first", { size: 12, font });
+      throw new Error("encrypted iterator failure");
+    }
+    await expect(
+      streamFlow(pdf, writable, gen(), {
+        encryption: { password: "stream-user" }
+      })
+    ).rejects.toThrow(/encrypted iterator failure/);
+    expect(aborted).toBe(true);
+    expect(pdf.context.trailerInfo.Encrypt).toBeUndefined();
+  });
+
+  it("releases encryption state when header setup throws", async () => {
+    const { pdf } = await newDocWithFonts();
+    await pdf.flush();
+    const objectCount = pdf.context.enumerateIndirectObjects().length;
+    const { writable } = collector();
+
+    await expect(
+      streamFlow(pdf, writable, [], {
+        encryption: { password: "stream-user" },
+        header() {
+          throw new Error("header setup failure");
+        }
+      })
+    ).rejects.toThrow(/header setup failure/);
+
+    expect(pdf.context.trailerInfo.Encrypt).toBeUndefined();
+    expect(pdf.context.trailerInfo.ID).toBeUndefined();
+    expect(pdf.context.enumerateIndirectObjects()).toHaveLength(objectCount);
+  });
+});

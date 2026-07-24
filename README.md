@@ -1,6 +1,6 @@
 # boxpdf
 
-A box-layout DSL over [pdf-lib](https://pdf-lib.js.org/). Implemented in portable JavaScript, it runs in Node 18+, Cloudflare Workers, Deno, and browsers.
+A box-layout DSL over [pdf-lib](https://pdf-lib.js.org/). Implemented in portable JavaScript, it runs in Node 20+, Cloudflare Workers, Deno, and browsers.
 
 Live gallery: <https://earonesty.github.io/boxpdf/>
 
@@ -159,6 +159,7 @@ Container `style`:
 
 - `flowToPdf(build, options?)`. The shortest path to bytes. Creates a `PDFDocument`, hands it to your `build(pdf)` callback (embed fonts/images there and return the top-level nodes), paginates with `renderFlow`, and returns the saved `Uint8Array`. Same `options` as `renderFlow`.
 - `renderFlow(pdf, nodes[], options)`. Paginates a sequence of top-level children. Top-level `vstack` nodes may fragment between children; `table()` fragments between rows and repeats headers on continuation pages. Use `keepTogether()` or `breakInside: "avoid"` for atomic blocks. Options: `size`, `margin`, `header?`, `footer?`, `reserveBottom?`, `title?`, `author?`, `subject?`, `keywords?`, `creator?`, `producer?`, `debug?`, `warnings?`, `profile?`. Headers and footers receive `{ pageNumber, totalPages }`. Defaults to LETTER (612×792). Pass `{ size: PageSizes.A4 }` for A4. When a top-level child's measured width exceeds the page content area, boxpdf emits a `console.warn`. Suppress with `warnings: false`.
+- `savePdf(pdf, options?)`. Save a caller-owned document, optionally with password encryption. Calling `pdf.save()` directly always remains pdf-lib's unencrypted behavior.
 - `streamFlow(pdf, writable, asyncIterable, options)`. Incremental page-by-page rendering. Memory stays bounded regardless of page count. Writes PDF bytes to a `WritableStream<Uint8Array>` as each page closes. See the Streaming section below for the contract.
 - `renderToPdf(node, options)`. One-page convenience.
 - `pageInner(size, margin)` / `pageContent(size, margin)`. Compute the inner content width or rectangle of a page.
@@ -241,6 +242,56 @@ The full TTF gets fetched and subsetted at embed time. On Cloudflare Workers wit
 
 `loadFont` accepts the same `{ subset?: boolean; features?: { tnum: true } }` options regardless of the source. Use `features: { tnum: true }` to enable tabular numerals.
 
+## Password encryption
+
+BoxPDF can write PDF 2.0 password-encrypted output using the Standard Security
+Handler revision 6 and AES-256. Encryption uses the runtime's Web Crypto
+implementation and adds no crypto dependency to browser bundles. The
+implementation is loaded as a separate chunk only when encryption is requested.
+
+```ts
+const bytes = await flowToPdf(
+  async (pdf) => {
+    const { font } = await standardFonts(pdf);
+    return [text("Confidential", { font, size: 18 })];
+  },
+  {
+    encryption: {
+      password: "document-open-password",
+      ownerPassword: "administrative-password",
+      permissions: {
+        printing: "lowResolution",
+        copying: false,
+        modify: false
+      }
+    }
+  }
+);
+```
+
+For a caller-owned document, save through `savePdf`:
+
+```ts
+import { PDFDocument, renderFlow, savePdf } from "boxpdf";
+
+const pdf = await PDFDocument.create();
+await renderFlow(pdf, nodes);
+const bytes = await savePdf(pdf, {
+  encryption: { password: "open me" }
+});
+```
+
+`password` is required and cannot prepare to an empty value. `ownerPassword` is
+optional; when omitted, BoxPDF generates and discards a random internal owner
+credential. Passwords use SASLprep and may contain Unicode, with a maximum of
+127 UTF-8 bytes after preparation. Available permissions are `printing`,
+`modify`, `copying`, `annotate`, `fillForms`, and `assemble`.
+
+PDF permissions are advisory viewer settings, not DRM. Send the password by a
+different channel from the PDF. Encryption cannot be combined with PDF/A, and
+BoxPDF does not decrypt input PDFs or preserve existing signatures. Saving the
+same document again creates fresh keys, salts, file identifiers, and IVs.
+
 ## Streaming output
 
 For long-running document generation, use `streamFlow` instead of `renderFlow`. It emits PDF bytes to a `WritableStream<Uint8Array>` as each page closes. Peak heap is bounded at `O(shared resources + one page in flight)` regardless of total page count.
@@ -274,7 +325,9 @@ import { createWriteStream } from "node:fs";
 import { streamFlow, nodeAdapter } from "boxpdf";
 
 const out = nodeAdapter(createWriteStream("./report.pdf"));
-await streamFlow(pdf, out, nodes);
+await streamFlow(pdf, out, nodes, {
+  encryption: { password: "open me" }
+});
 ```
 
 ### Contract
