@@ -109,7 +109,7 @@ function prepareTemplate(source: string, name: TemplateName): string {
 function mcpGuide(): string {
   return `# boxpdf guide for agents
 
-boxpdf is a tiny TypeScript box-layout DSL over pdf-lib for generating PDFs in Node, Cloudflare Workers, Deno, and browsers. Use it when you need app-generated PDFs without headless Chrome, native dependencies, or coordinate-heavy pdf-lib drawing code.
+boxpdf is a tiny TypeScript box-layout DSL over pdf-lib for generating PDFs in Node, Cloudflare Workers, Deno, and browsers. Use it for app-generated PDFs with portable JavaScript and declarative box primitives.
 
 Install:
 
@@ -124,7 +124,7 @@ Core workflow (shortest path):
 3. Pick a theme such as cleanTheme(await standardFonts(pdf)) — theme factories accept a { font, bold, italic? } object or positional fonts.
 4. Build plain object nodes with vstack, hstack, text, image, hline, spacer, flex, link, and keepTogether; return them from the callback.
 
-Explicit path (manage the document yourself): create a PDFDocument (boxpdf re-exports PDFDocument and StandardFonts, so no direct pdf-lib import is needed), embed fonts, build nodes, call renderFlow(pdf, nodes, options), then pdf.save(). Use renderToPdf(node, options) for simple one-page output.
+Explicit path (manage the document yourself): create a PDFDocument using boxpdf's PDFDocument and StandardFonts re-exports, embed fonts, build nodes, call renderFlow(pdf, nodes, options), then pdf.save(). Use renderToPdf(node, options) for simple one-page output.
 
 Important APIs:
 
@@ -147,18 +147,18 @@ Important APIs:
 - renderFlow(pdf, nodes, options): paginated rendering with margins, headers, footers, metadata, debug overlays, top-level vstack fragmentation, and table row fragmentation with repeated headers.
 - renderToPdf(node, options): convenience helper that returns Uint8Array for one-page output.
 - standardFonts(pdf, family?): embed a built-in pdf-lib family (helvetica/times/courier) and get { font, bold, italic, boldItalic }.
-- measure(node, parentWidth): measure without drawing.
+- measure(node, parentWidth): compute intrinsic size in a measurement pass.
 - cleanTheme, stripeTheme, editorialTheme, brutalistTheme: shared tokenized themes; each accepts { font, bold, italic? } or positional fonts.
 - formatCurrency, defineStyles, hex, rgb255: helpers.
 
 Use explicit widths for wrapping text and table columns. Set shrink on overflowing stack children when they should give up space and rewrap.
 
-Known limits:
+Runtime and layout:
 
-- No CSS or browser layout engine.
+- Layout uses boxpdf's built-in box primitives.
 - Positioning supports relative containing boxes, out-of-flow absolute boxes, point offsets, zIndex, and stretch from paired edges.
 - Complex text shaping is limited by pdf-lib/fontkit.
-- Output is Uint8Array, not streaming PDF generation.
+- flowToPdf and renderToPdf return Uint8Array; streamFlow emits incrementally to a WritableStream.
 
 The template resources exposed by this MCP server are meant to be copied and adapted. They import from "boxpdf" and write their PDF next to the generated source file.`;
 }

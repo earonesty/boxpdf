@@ -1,6 +1,6 @@
 # Streaming output — API design (draft)
 
-Status: design only, no production code yet.
+Status: design draft; implementation is pending.
 
 > **Compression strategy: PDF 1.5+.** Initial draft assumed plain
 > uncompressed xref + no object streams (= ~2× larger output than
@@ -18,15 +18,13 @@ Status: design only, no production code yet.
 - Web-native: `WritableStream<Uint8Array>` as the primary sink.
 - Node interoperability via a thin adapter.
 
-## Non-goals
+## Design boundaries
 
-- TTFB optimization via PDF linearization (separate post-process; out of
-  scope).
-- Faster total render time. Streaming is a memory feature, not a CPU one;
-  expect similar or marginally slower wall-clock vs `renderFlow`.
-- File-size parity with renderFlow's default save. Per-batch ObjStm
-  compression is slightly less efficient than whole-doc compression;
-  expect 5-15% larger streamed output.
+- PDF linearization remains a separate post-process for TTFB optimization.
+- Streaming targets bounded memory; expect similar or marginally slower
+  wall-clock performance than `renderFlow`.
+- Per-batch ObjStm compression trades some compression efficiency for bounded
+  memory; expect 5-15% larger output than renderFlow's default save.
 
 ## Surface
 
@@ -39,8 +37,8 @@ Status: design only, no production code yet.
  * `nodes` is consumed lazily — yield one node at a time from a generator.
  * Materializing a 1000-page `Node[]` defeats the point.
  *
- * `writable` is fully consumed and closed by streamFlow. Don't write to it
- * concurrently. If `streamFlow` throws, the writable is aborted.
+ * `writable` is fully consumed and closed by streamFlow. streamFlow has
+ * exclusive write access and aborts the writable when an error occurs.
  *
  * Embed any fonts / images BEFORE calling streamFlow. Embedding mid-stream
  * throws — the PDF header has already been emitted by then.
@@ -58,11 +56,9 @@ export interface StreamFlowOptions
   extends Omit<FlowOptions, "header" | "footer"> {
   /**
    * Per-page header. Receives `{ pageNumber }` only. Accessing
-   * `ctx.totalPages` THROWS at runtime — the total page count isn't
-   * knowable without buffering the entire document, so silently
-   * returning `undefined` would mask bugs in code migrated from
-   * `renderFlow`. Catch the throw or switch to `renderFlow` if you need
-   * "Page X of Y".
+   * `ctx.totalPages` THROWS at runtime because calculating the total page
+   * count requires buffering the entire document. This catches migrated
+   * `renderFlow` code early. Use `renderFlow` for "Page X of Y".
    */
   header?: (ctx: { pageNumber: number }) => Node;
   footer?: (ctx: { pageNumber: number }) => Node;
@@ -124,11 +120,10 @@ await streamFlow(pdf, out, generator(), { size: PageSizes.Letter });
 
 1. **Lazy consumption.** The iterable advances one step per page. The
    previous Node is GC-eligible as soon as its page is flushed.
-2. **No `totalPages` in headers/footers.** Stream-time, we can't know the
-   total without buffering. The `ctx` object passed to header/footer
-   builders is a Proxy that THROWS on `ctx.totalPages` access — silent
-   `undefined` would mask bugs in code copied from `renderFlow`. If you
-   need "Page X of Y", switch to `renderFlow`.
+2. **Page-number-only headers and footers.** Calculating the total page count
+   requires buffering. The `ctx` object passed to header/footer builders is a
+   Proxy that THROWS on `ctx.totalPages` access, catching code copied from
+   `renderFlow` early. Use `renderFlow` for "Page X of Y".
 3. **Embed-then-stream.** All `embedFont` / `embedJpg` / `embedPng` calls
    MUST complete before `streamFlow`. Attempting them after throws with a
    `"resource embedded after streamFlow began"` error.
@@ -136,8 +131,7 @@ await streamFlow(pdf, out, generator(), { size: PageSizes.Letter });
    its duration. Wrap the writable in a `TransformStream` to splice extra
    processing (compression, signing) before passing in.
 5. **Error path.** Any thrown error from `pdf` operations or the iterable
-   aborts the writable and re-throws. The output is truncated, not
-   recoverable.
+   aborts the writable and re-throws. The truncated output is unrecoverable.
 6. **Per-batch object streams + cross-reference stream.** Uses pdf-lib's
    public `PDFObjectStream` and `PDFCrossRefStream` (PDF 1.5+ features
    that pdf-lib re-exports from `core/`). Compressible objects (page
@@ -149,9 +143,9 @@ await streamFlow(pdf, out, generator(), { size: PageSizes.Letter });
 ## Internals — uses pdf-lib's PDF 1.5 structures
 
 Key insight: `PDFObjectStream` and `PDFCrossRefStream` are part of
-pdf-lib's **public** export (re-exported from `core/`). We don't have to
-implement either. Our `streamFlow` is a thin orchestrator that calls
-these structures' `copyBytesInto()` at the right moments.
+pdf-lib's **public** export (re-exported from `core/`). `streamFlow` uses
+these existing structures as a thin orchestrator, calling their
+`copyBytesInto()` methods at the right moments.
 
 ```
 async function streamFlow(pdf, writable, nodes, opts):
@@ -175,8 +169,8 @@ async function streamFlow(pdf, writable, nodes, opts):
   offset = headerBytes.length
 
   # 4. Write foundation resources NOW (fonts, images). Fonts/images are
-  #    PDFStream subclasses — they CANNOT go in ObjStms (PDF spec
-  #    forbids streams inside ObjStms). Each gets a Type-1 xref entry.
+  #    PDFStream subclasses. The PDF spec stores streams outside ObjStms,
+  #    so each gets a Type-1 xref entry.
   for ref in initialRefs - deferredRefs:
     obj = ctx.lookup(ref)
     if obj instanceof PDFStream:
@@ -185,9 +179,8 @@ async function streamFlow(pdf, writable, nodes, opts):
       xrefStream.addUncompressedEntry(ref, offset)
       offset += bytes.length
     else:
-      # No PDFDict foundation refs other than catalog/pages should exist
-      # at this point. If one does, embedFont registered an extra dict —
-      # batch it into our first ObjStm via the compressible path below.
+      # Any extra PDFDict foundation ref registered by embedFont joins
+      # our first ObjStm via the compressible path below.
       compressibleBuffer.push([ref, obj])
 
   # 5. Per-page loop with header/footer:
@@ -270,7 +263,7 @@ async function flushPageDelta(prevSnapshot, ctx, writer, xrefStream, opts, ...):
 
   for [ref, obj] in delta:
     if obj instanceof PDFStream:
-      # Content streams stay standalone (can't go in ObjStm)
+      # Content streams stay standalone as required by ObjStm rules
       bytes = framed(ref, obj)
       await writer.write(bytes)
       xrefStream.addUncompressedEntry(ref, offset)
@@ -301,7 +294,7 @@ function throwingCtx({pageNumber}):
   return new Proxy({pageNumber}, {
     get(t, p): {
       if p === "totalPages":
-        throw new Error("streamFlow doesn't know totalPages — switch to renderFlow")
+        throw new Error("totalPages requires renderFlow")
       return t[p]
     }
   })
@@ -322,9 +315,8 @@ function throwingCtx({pageNumber}):
 
 2. **`totalPages` access throws.** The `ctx` passed to header/footer
    builders is `new Proxy({pageNumber}, {get})` — `get` throws on
-   `"totalPages"` with: `"streamFlow doesn't know totalPages — switch
-   to renderFlow if you need it"`. Lets migrated code fail loud, not
-   silently with `undefined`.
+   `"totalPages"` with: `"totalPages requires renderFlow"`. This gives
+   migrated code an immediate, explicit failure.
 
 3. **Mid-stream embed throws.** Initial snapshot captures the
    foundation refs (catalog, pages dict, fonts, images). After each
@@ -337,8 +329,8 @@ function throwingCtx({pageNumber}):
 4. **Initial-resource detection.** Two deferred refs: `/Catalog` and
    the `/Pages` dict. Everything else in the start-snapshot is treated
    as a stable foundation resource (fonts, images) and written
-   immediately. No other ref types are special-cased — outlines /
-   embedded files aren't part of boxpdf's feature set.
+   immediately. The initial implementation recognizes the reference types
+   created by boxpdf; outlines and embedded files sit outside that feature set.
 
 5. **Empty input.** Iterator yields nothing → write header, deferred
    refs (catalog + empty pages dict), xref, trailer. Result is a valid
@@ -359,24 +351,24 @@ Everything in scope:
 - Backpressure via `WritableStream.ready`
 - Error path: thrown errors abort the writable and propagate
 
-Out of scope:
-- Mid-stream resource embedding (always throw)
-- Object-stream compression (always off — that's the streaming trade-off)
-- Linearization / web-optimization (separate post-process)
+Related behavior:
+- Mid-stream resource embedding throws.
+- The v1 implementation writes standalone objects.
+- Linearization and web optimization use a separate post-process.
 
-## What this does NOT change
+## Compatibility
 
-- `renderFlow` stays as-is. Existing users keep their behavior.
-- Layout / measurement code unchanged. Streaming is purely an output
-  serialization concern.
-- `pdf-lib` peer-dep stays at `^1.17.0`. Probe confirmed everything we
-  need is on the public surface.
+- `renderFlow` retains its existing behavior.
+- Layout and measurement retain their existing behavior. Streaming is an
+  output serialization concern.
+- The `pdf-lib` peer dependency stays at `^1.17.0`; its public surface
+  provides every required primitive.
 
 ## Memory bench (real data)
 
 Reproducible via `node --import tsx scripts/bench-memory.ts`. The
 parent process spawns one subprocess per measurement so V8 heap state
-from one test cannot bleed into another. The worker
+is isolated between tests. The worker
 (`scripts/bench-worker.ts`) builds the input `Node[]` first, then
 runs `global.gc()` to set a clean baseline, then renders. Both modes
 consume the same pre-built `Node[]`, so the input cost is in baseline
@@ -413,16 +405,15 @@ on a memory-bounded environment (Workers, AWS Lambda, small
 containers) will hit the ceiling well before 1000 pages.
 
 Both boxpdf paths produce byte-equivalent output (within 0.2%).
-react-pdf's output uses different content stream encoding so it isn't
-directly comparable byte-for-byte, but the rendered PDFs are visually
-equivalent.
+react-pdf's output uses a different content stream encoding, making the
+byte-level comparison inapplicable; the rendered PDFs are visually equivalent.
 
 ### A note on benchmarking
 
 An earlier version of this bench ran every measurement in one
-long-lived process. V8 doesn't shrink its heap aggressively, so
+long-lived process. V8 retains allocated heap pages aggressively, so
 later tests inherited heap pages from earlier ones and the "peak"
-captured carryover state rather than the algorithm's own footprint.
+captured carryover state, obscuring the algorithm's own footprint.
 The 500-page streamFlow test inflated to 72 MB; in isolation it's
 18.7 MB. Running each measurement in its own subprocess fixes that.
 
@@ -434,7 +425,7 @@ The 500-page streamFlow test inflated to 72 MB; in isolation it's
 - Pages with shared fonts / images — assert resources written once
 - Async generator that throws mid-stream — assert writable aborted, error
   propagated
-- Backpressure — slow writable, fast generator, assert no buffering blowup
+- Backpressure — slow writable, fast generator, assert bounded buffering
 - Output size within ~15% of `renderFlow + pdf-lib.save({useObjectStreams: true})`
   for identical input (proves the per-batch ObjStm packing is working)
 - Output still readable by Acrobat / Chrome / pdfium / poppler — i.e.

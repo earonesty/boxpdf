@@ -1,6 +1,6 @@
 # boxpdf
 
-A box-layout DSL over [pdf-lib](https://pdf-lib.js.org/). Runs in Node 18+, Cloudflare Workers, Deno, and browsers. No native dependencies, no WASM, no headless browser.
+A box-layout DSL over [pdf-lib](https://pdf-lib.js.org/). Implemented in portable JavaScript, it runs in Node 18+, Cloudflare Workers, Deno, and browsers.
 
 Live gallery: <https://earonesty.github.io/boxpdf/>
 
@@ -25,7 +25,7 @@ const bytes = await flowToPdf(async (pdf) => {
 });
 ```
 
-No `pdf-lib` import, no manual `PDFDocument.create()` / `pdf.save()` bookkeeping. `flowToPdf` owns the document lifecycle and returns the bytes; `standardFonts` embeds the built-in Helvetica family (regular, bold, italic, bold-italic) in one call.
+`flowToPdf` owns the document lifecycle and returns the saved bytes. `standardFonts` embeds the built-in Helvetica family (regular, bold, italic, bold-italic) in one call.
 
 <details>
 <summary>Prefer to manage the document yourself? The explicit path still works.</summary>
@@ -49,7 +49,7 @@ await renderFlow(pdf, [
 const bytes = await pdf.save();
 ```
 
-`renderFlow(pdf, nodes, options)` paginates into a document you own and returns `{ pages }` — reach for it when you need multiple render passes, the page objects, or custom `save()` options. `boxpdf` also re-exports `PDFDocument` and `StandardFonts`, so you never need a direct `pdf-lib` import.
+`renderFlow(pdf, nodes, options)` paginates into a document you own and returns `{ pages }` — reach for it when you need multiple render passes, the page objects, or custom `save()` options. `boxpdf` re-exports `PDFDocument` and `StandardFonts` for this explicit lifecycle.
 
 </details>
 
@@ -163,13 +163,13 @@ Container `style`:
 - `renderToPdf(node, options)`. One-page convenience.
 - `pageInner(size, margin)` / `pageContent(size, margin)`. Compute the inner content width or rectangle of a page.
 - `render(node, page, x, yTop, parentWidth)`. Draws a subtree at a known position on an existing `PDFPage`.
-- `measure(node, parentWidth)`. Intrinsic size without drawing.
+- `measure(node, parentWidth)`. Computes intrinsic size independently of rendering.
 
 Pass `{ debug: true }` to outline content boxes in red and margin boxes in orange.
 
 ### Helpers
 
-- `standardFonts(pdf, family?)`. Embed a built-in pdf-lib family (`"helvetica"` default, `"times"`, `"courier"`) and get `{ font, bold, italic, boldItalic }` back — ready to drop into any theme. No bytes embedded.
+- `standardFonts(pdf, family?)`. Embed a built-in pdf-lib family (`"helvetica"` default, `"times"`, `"courier"`) and get `{ font, bold, italic, boldItalic }` back — ready to drop into any theme. These use compact PDF standard-font references.
 - `loadFont(pdf, source, options?)`. Embed a TTF from URL, bytes, base64, or data URL.
 - `loadImage(pdf, source)`. Embed a PNG or JPEG (auto-detected).
 - `aspectRatio(ratio, { width })` / `aspectRatio(ratio, { height })`. Derive the missing dimension for fixed-ratio boxes or images.
@@ -198,7 +198,7 @@ const font = await loadFont(pdf, regular);
 const acmeBold = await loadFont(pdf, bold);
 ```
 
-Bytes ship inside your bundle. No network round-trip.
+Bytes ship inside your bundle for immediate local loading.
 
 **The built-in Inter weights.**
 
@@ -212,7 +212,7 @@ const bold = await loadFont(pdf, interBold);
 
 `boxpdf/inter` re-exports the same Inter subset as raw base64 strings (`inter`, `interBold`, `interItalic`) and as `embedInter(pdf, { italic?, tabularFigures? })`.
 
-Importing `boxpdf/inter` loads ~325 KB of font bytes plus `@pdf-lib/fontkit`. The subpath isn't loaded otherwise.
+Importing `boxpdf/inter` loads ~325 KB of font bytes plus `@pdf-lib/fontkit`. Core-only imports stay on the smaller core bundle.
 
 ```ts
 import { embedInter } from "boxpdf/inter";
@@ -281,8 +281,8 @@ await streamFlow(pdf, out, nodes);
 
 1. All `embedFont` / `embedJpg` / `embedPng` calls must complete before `streamFlow`. Embedding mid-stream throws.
 2. The iterable is consumed one node at a time. Pass a generator.
-3. `streamFlow` closes the writable on success and aborts it on failure. Don't write to it concurrently.
-4. `ctx.totalPages` is not available in headers and footers. Accessing it throws. Use `renderFlow` if you need "Page X of Y".
+3. `streamFlow` takes exclusive ownership of the writable, closing it on success and aborting it on failure.
+4. Streaming headers and footers receive `ctx.pageNumber`. Use `renderFlow` for headers or footers that display "Page X of Y"; accessing `ctx.totalPages` during streaming throws.
 5. Output is 0-5% larger than `renderFlow`'s default `save()`.
 
 ### Memory bench
@@ -352,8 +352,8 @@ hstack(
 
 Behavior:
 
-- A text child won't shrink below the width of its widest whitespace-separated word. Wrapping breaks on whitespace, not mid-word.
-- A single-token string (URL, hash, slug) won't shrink at all and overflows its slot visibly. Two opt-ins lower the floor:
+- A text child's minimum width equals its widest whitespace-separated word. Wrapping occurs at whitespace boundaries.
+- A single-token string (URL, hash, slug) preserves its intrinsic width and visibly overflows its slot. Two opt-ins lower the floor:
   - `maxLines: N`. The engine ellipsizes overflow. The text shrinks to its slot and trims with `…`.
   - `breakWords: true`. CSS `overflow-wrap: break-word`. Hard-breaks at character boundaries.
 - When shrunk text rewraps to more lines, the container's intrinsic height grows accordingly.
@@ -383,16 +383,16 @@ Behavior:
 - Any positioned box establishes the containing block for absolute descendant boxes.
 - `position: "absolute"` removes a `vstack` or `hstack` from normal stack flow.
 - Absolute boxes render after normal children, so they can be used for stamps, badges, overlays, and watermarks.
-- `top`, `right`, `bottom`, and `left` are point offsets from the nearest positioned ancestor. If there is no positioned ancestor, they resolve against the current `render()` root.
+- `top`, `right`, `bottom`, and `left` are point offsets from the nearest positioned ancestor, falling back to the current `render()` root.
 - If both `left` and `right` are set and `width` is omitted, the box stretches to the remaining width. `top` plus `bottom` does the same for height.
 - Absolute siblings render by `zIndex` from low to high. Boxes with the same `zIndex` keep document order.
-- Absolute boxes do not affect parent measurement, gaps, flex grow/shrink, or pagination. Give the containing box a fixed `width` and `height` when you need stable placement.
+- Parent measurement, gaps, flex grow/shrink, and pagination ignore absolute boxes. Give the containing box a fixed `width` and `height` when you need stable placement.
 
 ## Limitations
 
 - Positioning supports relative containing boxes, out-of-flow absolute boxes, point offsets, `zIndex`, and stretch from paired edges.
-- Font shaping is whatever pdf-lib and fontkit support. Complex Indic, Arabic, and Thai shaping isn't here. Full HarfBuzz requires a different stack, none of which run on Cloudflare Workers today.
-- PDF linearization (reordering the byte stream so byte 1 is page 1) is not done. Streaming generation is supported via `streamFlow`. Linearization is a separate post-process and out of scope.
+- Font shaping follows pdf-lib and fontkit support. Complex Indic, Arabic, and Thai scripts require a HarfBuzz-based stack; available HarfBuzz stacks currently target runtimes beyond Cloudflare Workers.
+- `streamFlow` supports incremental generation. PDF linearization (reordering the byte stream so byte 1 is page 1) remains a separate post-process.
 
 ## License
 
