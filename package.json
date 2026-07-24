@@ -28,6 +28,7 @@
     "url": "https://github.com/earonesty/boxpdf/issues"
   },
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -63,7 +64,7 @@
     "prepublishOnly": "pnpm run typecheck && pnpm run test && pnpm run build"
   },
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "peerDependencies": {
     "pdf-lib": "^1.17.0"

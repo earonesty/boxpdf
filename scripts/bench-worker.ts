@@ -7,17 +7,24 @@ import { PDFDocument, StandardFonts, type PDFFont } from "pdf-lib";
 import {
   PageSizes,
   renderFlow,
+  savePdf,
   streamFlow,
   text,
   pageInner,
   type Node
 } from "../src/index.js";
 
-const mode = process.argv[2] as "renderFlow" | "streamFlow";
+const mode = process.argv[2] as
+  | "renderFlow"
+  | "streamFlow"
+  | "renderFlowEncrypted"
+  | "streamFlowEncrypted";
 const pages = parseInt(process.argv[3] ?? "0", 10);
 
 if (!mode || !pages) {
-  console.error("usage: bench-worker.ts <renderFlow|streamFlow> <pages>");
+  console.error(
+    "usage: bench-worker.ts <renderFlow|streamFlow|renderFlowEncrypted|streamFlowEncrypted> <pages>"
+  );
   process.exit(1);
 }
 
@@ -56,9 +63,11 @@ const t0 = performance.now();
 let outputBytes = 0;
 
 try {
-  if (mode === "renderFlow") {
+  if (mode === "renderFlow" || mode === "renderFlowEncrypted") {
     await renderFlow(pdf, nodes, { size: PageSizes.Letter, margin: 36 });
-    const out = await pdf.save();
+    const out = mode === "renderFlowEncrypted"
+      ? await savePdf(pdf, { encryption: { password: "benchmark-only" } })
+      : await pdf.save();
     outputBytes = out.byteLength;
   } else {
     const sink = new WritableStream<Uint8Array>({
@@ -66,7 +75,14 @@ try {
         outputBytes += chunk.length;
       }
     });
-    await streamFlow(pdf, sink, nodes, { size: PageSizes.Letter, margin: 36 });
+    await streamFlow(pdf, sink, nodes, {
+      size: PageSizes.Letter,
+      margin: 36,
+      encryption:
+        mode === "streamFlowEncrypted"
+          ? { password: "benchmark-only" }
+          : undefined
+    });
   }
 } finally {
   clearInterval(sampler);

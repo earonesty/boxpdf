@@ -1,6 +1,6 @@
 # AES-256 encrypted output — approved design
 
-Status: approved design; implementation has not started.
+Status: implemented; pending security review and final release gates.
 
 This document is the implementation contract for password-encrypted BoxPDF
 output. Decisions labelled **Decision** are settled for v1. Items labelled
@@ -429,15 +429,15 @@ Generate independently with `globalThis.crypto.getRandomValues`:
 - two 16-byte file identifiers;
 - a fresh 16-byte IV for every encrypted string and stream.
 
-**VERIFY (runtime):** establish the exact minimum Node version for the required
-`globalThis.crypto` surface in both the shipped ESM and CJS builds, without
-flags or polyfills, and verify the same global API in supported browsers,
-Workers, and Deno. The required surface is `getRandomValues`,
+**Verified runtime decision:** the minimum Node version is 20. Node 18.20.8
+exposes `globalThis.crypto` in some eval/REPL contexts but not in ordinary ESM
+file execution without a flag, so it fails the production runtime gate. Node
+20 provides the required surface in both shipped ESM and CJS builds without
+flags or polyfills. Verify the same global API in supported browsers, Workers,
+and Deno. The required surface is `getRandomValues`,
 `subtle.importKey`, `subtle.digest`, and `subtle.encrypt` with AES-CBC and
-SHA-256/384/512. Node 18 is a candidate minimum, not an approved fact. If either
-Node 18 module format lacks that surface, raise BoxPDF's minimum Node version;
-do not add a Node-specific `crypto` import or conditional fallback. Absence or
-failure of `crypto.getRandomValues` is fatal
+SHA-256/384/512. Do not add a Node-specific `crypto` import or conditional
+fallback. Absence or failure of `crypto.getRandomValues` is fatal
 (`SECURE_RANDOM_UNAVAILABLE`); absence of the required `subtle` surface is
 fatal (`WEB_CRYPTO_UNAVAILABLE`). There is no `Math.random`, timestamp,
 counter, process API, or Node-only fallback.
@@ -735,16 +735,13 @@ test/
     writer.test.ts
     interoperability.test.ts
     adversarial.test.ts
-  runtime/
-    encryption.browser.test.ts
 fixtures/
   encryption/
     README.md
     vectors.json
     qpdf/
 scripts/
-  smoke-encryption-deno.ts
-  smoke-encryption-worker.ts
+  smoke-encryption-runtimes.ts
   verify-encryption.mjs
 ```
 
@@ -944,7 +941,7 @@ Every release candidate runs:
 
 Runtime smoke tests execute the same minimal encrypted fixture generation in:
 
-- the minimum Node candidate (initially Node 18) and current Node LTS, in both
+- the minimum Node 20 release line and current Node LTS, in both
   ESM and CJS, specifically verifying unflagged global Web Crypto;
 - Chromium and Firefox current;
 - Cloudflare Worker local compatibility runtime, with no Node compatibility
@@ -1037,9 +1034,8 @@ to that phase is unresolved.
    `fixtures/encryption/README.md`.
 2. Create minimal QPDF R6 fixtures and record exact commands and tool versions.
 3. Turn every **VERIFY (ISO)** item in this document into a checked ledger row
-   with clause/table text paraphrase and a test name. Add a separate
-   **VERIFY (runtime)** row for the minimum Node ESM/CJS global Web Crypto
-   result.
+   with clause/table text paraphrase and a test name. Record the verified Node
+   18 failure and Node 20 ESM/CJS global Web Crypto result in the runtime row.
 
 ```sh
 qpdf --version
@@ -1136,16 +1132,14 @@ pnpm run typecheck
 pnpm run build
 ```
 
-Run Worker, Deno, the candidate minimum Node, browser, and manual Acrobat checks
-from the matrix. The initial Node 18 probe is diagnostic: if either shipped
-module format lacks unflagged global Web Crypto, raise the supported minimum.
-The anticipated direct runtime commands are:
+Run Worker, Deno, minimum Node, browser, and manual Acrobat checks from the
+matrix. The anticipated direct runtime commands are:
 
 ```sh
-npx -y node@18 scripts/verify-encryption.mjs --runtime-smoke-only
-pnpm vitest run --browser test/runtime/encryption.browser.test.ts
-pnpm exec wrangler dev scripts/smoke-encryption-worker.ts --local
-deno run --allow-read --allow-write scripts/smoke-encryption-deno.ts
+npx -y node@20 scripts/verify-encryption.mjs
+pnpm exec esbuild scripts/smoke-encryption-runtimes.ts --bundle --platform=browser
+pnpm exec wrangler dev scripts/smoke-encryption-runtimes.ts --local
+deno run --allow-read --node-modules-dir=auto scripts/smoke-encryption-runtimes.ts
 ```
 
 Pin the browser provider, Wrangler, Deno, QPDF, and Poppler versions in CI
@@ -1165,9 +1159,8 @@ Encryption ships only when all of the following are true:
   representative files;
 - permissions and metadata true/false are independently reported/observed as
   configured;
-- the verified minimum Node version in both ESM and CJS, plus browser, Worker,
-  and Deno smoke tests pass without Node polyfills or Node-specific crypto; if
-  Node 18 fails this gate, the declared minimum has been raised;
+- Node 20 in both ESM and CJS, plus browser, Worker, and Deno smoke tests pass
+  without Node polyfills or Node-specific crypto;
 - encrypted `streamFlow` preserves bounded memory and abort/backpressure
   behavior;
 - production exports contain no deterministic entropy/key injection;

@@ -15,7 +15,12 @@ import { spawn } from "node:child_process";
 
 const PAGE_COUNTS = [10, 50, 100, 250, 500, 1000];
 
-type Mode = "renderFlow" | "streamFlow" | "react-pdf";
+type Mode =
+  | "renderFlow"
+  | "streamFlow"
+  | "renderFlowEncrypted"
+  | "streamFlowEncrypted"
+  | "react-pdf";
 
 interface BenchResult {
   pages: number;
@@ -51,9 +56,13 @@ function runWorker(mode: Mode, pages: number): Promise<BenchResult> {
 
 async function main() {
   const results: BenchResult[] = [];
+  const modes: Mode[] = ["renderFlow", "streamFlow", "react-pdf"];
+  if (process.env.BOXPDF_BENCH_ENCRYPTION === "1") {
+    modes.splice(2, 0, "renderFlowEncrypted", "streamFlowEncrypted");
+  }
 
   for (const pages of PAGE_COUNTS) {
-    for (const mode of ["renderFlow", "streamFlow", "react-pdf"] as const) {
+    for (const mode of modes) {
       process.stdout.write(`  ${mode.padEnd(11)} × ${String(pages).padStart(4)} pages... `);
       try {
         const r = await runWorker(mode, pages);
@@ -99,10 +108,14 @@ function renderChart(results: BenchResult[]): string {
   const rf = results.filter((r) => r.mode === "renderFlow");
   const sf = results.filter((r) => r.mode === "streamFlow");
   const rp = results.filter((r) => r.mode === "react-pdf");
+  const rfe = results.filter((r) => r.mode === "renderFlowEncrypted");
+  const sfe = results.filter((r) => r.mode === "streamFlowEncrypted");
   const maxKB = Math.max(
     ...rf.map((r) => r.peakKB),
     ...sf.map((r) => r.peakKB),
     ...rp.map((r) => r.peakKB),
+    ...rfe.map((r) => r.peakKB),
+    ...sfe.map((r) => r.peakKB),
     1
   );
 
