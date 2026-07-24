@@ -31,6 +31,9 @@ import {
   type PageSize,
   type DocumentMetadata
 } from "./document.js";
+import type { PdfEncryptionOptions } from "./encryption/types.js";
+import type { EncryptionContext } from "./encryption/serialize.js";
+import type { PreparedEncryption } from "./encryption/writer.js";
 
 export interface StreamPageContext {
   /** Current page number, 1-indexed. */
@@ -57,6 +60,8 @@ export interface StreamFlowOptions extends DocumentMetadata {
    */
   objectsPerStream?: number;
   warnings?: boolean;
+  /** Omit for ordinary unencrypted output. */
+  encryption?: PdfEncryptionOptions;
 }
 
 /**
@@ -98,6 +103,20 @@ export async function streamFlow(
   // confusing the embed-vs-page-local classification.
   await pdf.flush();
   const ctx = pdf.context;
+  let preparedEncryption: PreparedEncryption | undefined;
+  let encryption: EncryptionContext | undefined;
+  let encryptedFrame:
+    | typeof import("./encryption/serialize.js").frameEncryptedObject
+    | undefined;
+  if (options.encryption) {
+    const [{ prepareEncryption }, serializer] = await Promise.all([
+      import("./encryption/writer.js"),
+      import("./encryption/serialize.js")
+    ]);
+    preparedEncryption = await prepareEncryption(pdf, options.encryption);
+    encryption = preparedEncryption.encryption;
+    encryptedFrame = serializer.frameEncryptedObject;
+  }
 
   // Pre-measure header/footer. Constant across pages — same approximation
   // as renderFlow.
@@ -179,7 +198,14 @@ export async function streamFlow(
   }
 
   async function writeObject(ref: PDFRef, obj: PDFObject, recordXref: boolean, freeAfter: boolean): Promise<void> {
-    const bytes = frameObject(ref, obj);
+    const bytes = encryption
+      ? await encryptedFrame!(
+          ref,
+          obj,
+          encryption,
+          ref !== encryption.dictionaryRef
+        )
+      : frameObject(ref, obj);
     if (recordXref) {
       xrefEntries.push({ kind: "uncompressed", objNum: ref.objectNumber, offset });
     }
@@ -225,6 +251,7 @@ export async function streamFlow(
     if (handledKeys.has(key)) return;
     if (deferredKeys.has(key)) return; // /Pages and /Catalog written at end
     if (
+      ref === encryption?.dictionaryRef ||
       obj instanceof PDFStream ||
       obj instanceof PDFInvalidObject ||
       ref.generationNumber !== 0
@@ -241,7 +268,7 @@ export async function streamFlow(
 
   try {
     // 1. Header
-    await writeBytes(headerBytes());
+    await writeBytes(headerBytes(encryption !== undefined));
 
     // 2. Foundation refs (stable embedded resources)
     for (const [ref, obj] of initialEntries) {
@@ -359,6 +386,7 @@ export async function streamFlow(
 
     const trailerDict = ctx.obj({
       Root: ctx.trailerInfo.Root,
+      Encrypt: ctx.trailerInfo.Encrypt,
       Info: ctx.trailerInfo.Info,
       ID: ctx.trailerInfo.ID
     });
@@ -394,6 +422,7 @@ export async function streamFlow(
     }
     throw err;
   } finally {
+    preparedEncryption?.cleanup();
     try {
       writer.releaseLock();
     } catch {
@@ -474,9 +503,9 @@ function encodeAscii(s: string): Uint8Array {
   return buf;
 }
 
-function headerBytes(): Uint8Array {
-  // %PDF-1.7\n%<4 high bytes to mark this as binary>\n
-  const head = encodeAscii("%PDF-1.7\n");
+function headerBytes(encrypted = false): Uint8Array {
+  // %PDF-x.y\n%<4 high bytes to mark this as binary>\n
+  const head = encodeAscii(encrypted ? "%PDF-2.0\n" : "%PDF-1.7\n");
   const marker = new Uint8Array([0x25, 0xff, 0xff, 0xff, 0xff, 0x0a]);
   const out = new Uint8Array(head.length + marker.length);
   out.set(head, 0);

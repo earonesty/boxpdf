@@ -153,6 +153,50 @@ export interface EncryptedSaveOptions extends SaveOptions {
   encryption: PdfEncryptionOptions;
 }
 
+export interface PreparedEncryption {
+  encryption: EncryptionContext;
+  cleanup(): void;
+}
+
+export async function prepareEncryption(
+  pdf: PDFDocument,
+  encryptionOptions: PdfEncryptionOptions,
+  random: RandomSource = webCryptoRandomSource
+): Promise<PreparedEncryption> {
+  preflight(pdf);
+  const context = pdf.context;
+  const previousId = context.trailerInfo.ID;
+  const material = await createR6Material(encryptionOptions, random);
+  const encryptDict = encryptionDictionary(pdf, material);
+  const encryptionRef = context.register(encryptDict);
+  const id = context.obj([
+    PDFHexString.of(toHex(material.firstFileId)),
+    PDFHexString.of(toHex(material.secondFileId))
+  ]);
+  context.trailerInfo.Encrypt = encryptionRef;
+  context.trailerInfo.ID = id;
+
+  let cleaned = false;
+  return {
+    encryption: {
+      fileKeyCryptoKey: material.fileKeyCryptoKey,
+      dictionaryRef: encryptionRef,
+      encryptMetadata: material.encryptMetadata,
+      metadataRef: metadataRef(pdf),
+      random
+    },
+    cleanup(): void {
+      if (cleaned) return;
+      cleaned = true;
+      context.delete(encryptionRef);
+      delete context.trailerInfo.Encrypt;
+      if (previousId === undefined) delete context.trailerInfo.ID;
+      else context.trailerInfo.ID = previousId;
+      material.fileKey.fill(0);
+    }
+  };
+}
+
 export async function saveEncryptedPdf(
   pdf: PDFDocument,
   options: EncryptedSaveOptions,
@@ -168,38 +212,14 @@ export async function saveEncryptedPdf(
 
   if (addDefaultPage && pdf.getPageCount() === 0) pdf.addPage();
   await pdf.flush();
-  preflight(pdf);
-
-  const context = pdf.context;
-  const previousId = context.trailerInfo.ID;
-  const material = await createR6Material(encryptionOptions, random);
-  const encryptDict = encryptionDictionary(pdf, material);
-  const encryptionRef = context.register(encryptDict);
-  const id = context.obj([
-    PDFHexString.of(toHex(material.firstFileId)),
-    PDFHexString.of(toHex(material.secondFileId))
-  ]);
-  context.trailerInfo.Encrypt = encryptionRef;
-  context.trailerInfo.ID = id;
-
-  const encryption: EncryptionContext = {
-    fileKeyCryptoKey: material.fileKeyCryptoKey,
-    dictionaryRef: encryptionRef,
-    encryptMetadata: material.encryptMetadata,
-    metadataRef: metadataRef(pdf),
-    random
-  };
+  const prepared = await prepareEncryption(pdf, encryptionOptions, random);
 
   try {
     return useObjectStreams
-      ? await writeWithObjectStreams(pdf, encryption)
-      : await writeWithClassicXref(pdf, encryption);
+      ? await writeWithObjectStreams(pdf, prepared.encryption)
+      : await writeWithClassicXref(pdf, prepared.encryption);
   } finally {
-    context.delete(encryptionRef);
-    delete context.trailerInfo.Encrypt;
-    if (previousId === undefined) delete context.trailerInfo.ID;
-    else context.trailerInfo.ID = previousId;
-    material.fileKey.fill(0);
+    prepared.cleanup();
   }
 }
 
@@ -318,4 +338,3 @@ async function writeWithClassicXref(
   chunks.push(ascii("trailer\n"), trailerBytes, ascii(`\nstartxref\n${xrefOffset}\n%%EOF\n`));
   return concat(chunks);
 }
-
