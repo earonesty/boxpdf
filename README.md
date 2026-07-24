@@ -330,6 +330,26 @@ await streamFlow(pdf, out, nodes, {
 });
 ```
 
+If one logical stack or table is too large to construct at once, emit bounded
+pieces with `flowContinuation`. Adjacent pieces with the same id are paginated
+as though they were one node, including stack gaps, decoration, table headers,
+and row dividers:
+
+```ts
+for (let offset = 0; offset < rows.length; offset += 100) {
+  const final = offset + 100 >= rows.length;
+  yield flowContinuation(
+    table({ columns, header, rows: rows.slice(offset, offset + 100) }),
+    "orders",
+    final
+  );
+}
+```
+
+Continuation fragments must be consecutive and the last one must set
+`final: true`; `streamFlow` rejects interrupted or unfinished sequences instead
+of silently producing an incomplete layout.
+
 ### Contract
 
 1. All `embedFont` / `embedJpg` / `embedPng` calls must complete before `streamFlow`. Embedding mid-stream throws.
