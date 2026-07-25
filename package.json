@@ -61,6 +61,7 @@
     "typecheck": "tsc --noEmit",
     "visual:check:stream": "tsx scripts/check-stream-visuals.ts",
     "memory:check:continuation": "tsx scripts/check-continuation-memory.ts",
+    "docs:check": "node scripts/check-docs-site.mjs",
     "example": "tsx examples/index.ts",
     "gallery": "tsx scripts/build-gallery.ts",
     "prepublishOnly": "pnpm run typecheck && pnpm run test && pnpm run build"
