@@ -11,6 +11,7 @@ export {
   aspectRatio,
   flex,
   group,
+  flowContinuation,
   hline,
   hstack,
   image,

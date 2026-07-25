@@ -3,12 +3,16 @@ import { PassThrough } from "node:stream";
 import { PDFDocument, StandardFonts, type PDFFont } from "pdf-lib";
 import {
   PageSizes,
+  flowContinuation,
   hline,
   hstack,
+  hex,
   link,
   nodeAdapter,
   pageInner,
+  renderFlow,
   streamFlow,
+  table,
   text,
   vstack,
   type Node
@@ -119,6 +123,162 @@ describe("streamFlow basics", () => {
     });
     expect(pageCount).toBe(1);
     expect(bytes().byteLength).toBeGreaterThan(500);
+  });
+
+  it("fragments a top-level vstack between children", async () => {
+    const { pdf, font } = await newDocWithFonts();
+    const blocks = Array.from({ length: 6 }, (_, index) =>
+      vstack(
+        { height: 54, padding: 6, border: { color: hex("#dddddd"), width: 1 } },
+        text(`Fragment ${index + 1}`, { size: 10, font })
+      )
+    );
+    const { writable, bytes } = collector();
+    const { pageCount } = await streamFlow(pdf, writable, [vstack({ gap: 4 }, ...blocks)], {
+      size: { width: 240, height: 220 },
+      margin: 20
+    });
+
+    expect(pageCount).toBeGreaterThan(1);
+    expect((await PDFDocument.load(bytes())).getPageCount()).toBe(pageCount);
+  });
+
+  it("fragments tables between rows", async () => {
+    const { pdf, font, bold } = await newDocWithFonts();
+    const node = table({
+      width: 180,
+      columns: [{ width: "1fr" }, { width: 50 }],
+      header: [
+        text("Item", { size: 10, font: bold }),
+        text("Qty", { size: 10, font: bold })
+      ],
+      rows: Array.from({ length: 10 }, (_, index) => [
+        vstack(
+          { padding: { top: 5, bottom: 5 } },
+          text(`Row ${index + 1}`, { size: 10, font })
+        ),
+        text(String(index + 1), { size: 10, font })
+      ]),
+      rowDivider: { color: hex("#dddddd"), thickness: 1 },
+      headerDivider: { color: hex("#111111"), thickness: 1 },
+      columnGap: 0
+    });
+    const { writable, bytes } = collector();
+    const { pageCount } = await streamFlow(pdf, writable, [node], {
+      size: { width: 240, height: 220 },
+      margin: 20
+    });
+
+    expect(pageCount).toBeGreaterThan(1);
+    expect((await PDFDocument.load(bytes())).getPageCount()).toBe(pageCount);
+  });
+
+  it("merges bounded continuation fragments before pagination", async () => {
+    const options = { size: { width: 240, height: 220 }, margin: 20 };
+    const buffered = await newDocWithFonts();
+    const bufferedChildren = Array.from({ length: 12 }, (_, index) =>
+      vstack({ height: 42 }, text(`Fragment ${index + 1}`, { font: buffered.font, size: 10 }))
+    );
+    const { pages } = await renderFlow(
+      buffered.pdf,
+      [vstack({ gap: 4, padding: 6, border: { width: 1, color: hex("#444444") } }, ...bufferedChildren)],
+      options
+    );
+
+    const streamed = await newDocWithFonts();
+    const fragments = Array.from({ length: 12 }, (_, index) =>
+      flowContinuation(
+        vstack(
+          { gap: 4, padding: 6, border: { width: 1, color: hex("#444444") } },
+          vstack({ height: 42 }, text(`Fragment ${index + 1}`, { font: streamed.font, size: 10 }))
+        ),
+        "report",
+        index === 11
+      )
+    );
+    const { writable, bytes } = collector();
+    const { pageCount } = await streamFlow(streamed.pdf, writable, fragments, options);
+
+    expect(pageCount).toBeGreaterThan(1);
+    expect(pageCount).toBe(pages.length);
+    expect((await PDFDocument.load(bytes())).getPageCount()).toBe(pageCount);
+    expect(streamed.pdf.getPages()).toHaveLength(pageCount);
+  });
+
+  it("rejects a continuation without a final fragment", async () => {
+    const { pdf, font } = await newDocWithFonts();
+    const { writable } = collector();
+    await expect(
+      streamFlow(
+        pdf,
+        writable,
+        [flowContinuation(vstack({}, text("unfinished", { font, size: 10 })), "unfinished")],
+        { margin: 20 }
+      )
+    ).rejects.toThrow(/without a final fragment/);
+  });
+
+  it("reports a plain-node interruption separately from end of stream", async () => {
+    const { pdf, font } = await newDocWithFonts();
+    const { writable } = collector();
+    await expect(
+      streamFlow(
+        pdf,
+        writable,
+        [
+          flowContinuation(vstack({}, text("unfinished", { font, size: 10 })), "unfinished"),
+          text("interrupting node", { font, size: 10 })
+        ],
+        { margin: 20 }
+      )
+    ).rejects.toThrow(/interrupted by a non-continuation text node/);
+  });
+
+  it("merges table continuations while retaining row fragmentation", async () => {
+    const options = { size: { width: 220, height: 180 }, margin: 20 };
+    const makeTable = (
+      tableFont: PDFFont,
+      tableBold: PDFFont,
+      start: number,
+      count: number
+    ) =>
+      table({
+        width: 180,
+        columns: [{ width: "1fr" }],
+        header: [text("Header", { font: tableBold, size: 10 })],
+        rows: Array.from({ length: count }, (_, index) => [
+          vstack({ height: 28 }, text(`Row ${start + index}`, { font: tableFont, size: 9 }))
+        ]),
+        footer: [text("Footer", { font: tableBold, size: 9 })],
+        rowDivider: { color: hex("#dddddd"), thickness: 1 },
+        footerDivider: { color: hex("#111111"), thickness: 1 }
+      });
+
+    const buffered = await newDocWithFonts();
+    const { pages } = await renderFlow(
+      buffered.pdf,
+      [makeTable(buffered.font, buffered.bold, 1, 12)],
+      options
+    );
+
+    const streamed = await newDocWithFonts();
+    const makeChunk = (start: number, final: boolean) =>
+      flowContinuation(
+        makeTable(streamed.font, streamed.bold, start, 4),
+        "table",
+        final
+      );
+    const { writable, bytes } = collector();
+    const { pageCount } = await streamFlow(
+      streamed.pdf,
+      writable,
+      [makeChunk(1, false), makeChunk(5, false), makeChunk(9, true)],
+      options
+    );
+
+    expect(pageCount).toBeGreaterThan(1);
+    expect(pageCount).toBe(pages.length);
+    expect((await PDFDocument.load(bytes())).getPageCount()).toBe(pageCount);
   });
 });
 

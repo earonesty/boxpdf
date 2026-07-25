@@ -6,6 +6,7 @@ import type {
   Justify,
   Node,
   RGB,
+  TableFragmentationMeta,
   TextProps
 } from "./types.js";
 import type { InlineNodeRun, ParagraphItem, ParagraphProps, ParagraphRun, TextRunStyle } from "./paragraph.js";
@@ -34,6 +35,26 @@ export function hstack(options: StackOptions, ...children: Node[]): Node {
 /** Convenience: a vstack with no styling, just to group children. */
 export function group(...children: Node[]): Node {
   return vstack({}, ...children);
+}
+
+/**
+ * Mark a bounded vstack fragment as part of one logical streamed stack.
+ * Consecutive fragments with the same id retain the same gap and box
+ * decoration semantics as a single vstack containing all children.
+ */
+export function flowContinuation(node: Node, id: string, final = false): Node {
+  if (node.kind !== "vstack") {
+    throw new Error("flowContinuation requires a vstack node");
+  }
+  const table: TableFragmentationMeta | undefined =
+    node.fragmentation?.kind === "table"
+      ? {
+          headerCount: node.fragmentation.headerCount,
+          footerCount: node.fragmentation.footerCount,
+          rowDivider: node.fragmentation.rowDivider
+        }
+      : undefined;
+  return { ...node, fragmentation: { kind: "continuation", id, final, table } };
 }
 
 /**

@@ -1,6 +1,6 @@
 {
   "name": "boxpdf",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "mcpName": "io.github.earonesty/boxpdf",
   "description": "Tiny box-layout DSL over pdf-lib. Flexbox-lite for server-side PDF generation in any JS runtime (Node, Cloudflare Workers, Deno, browsers).",
   "keywords": [
@@ -59,6 +59,8 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
+    "visual:check:stream": "tsx scripts/check-stream-visuals.ts",
+    "memory:check:continuation": "tsx scripts/check-continuation-memory.ts",
     "example": "tsx examples/index.ts",
     "gallery": "tsx scripts/build-gallery.ts",
     "prepublishOnly": "pnpm run typecheck && pnpm run test && pnpm run build"

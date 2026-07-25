@@ -1,7 +1,7 @@
 import { PDFDocument, type PDFPage, type SaveOptions } from "pdf-lib";
 import { createMeasureCache, measure, withMeasureProfile, type MeasureProfileEvent } from "./measure.js";
 import { render, type RenderOptions } from "./render.js";
-import { edges, type EdgesInput, type Node } from "./types.js";
+import { edges, type EdgesInput, type Node, type TableFragmentationMeta } from "./types.js";
 import { savePdf } from "./save.js";
 import type { PdfEncryptionOptions } from "./encryption/types.js";
 
@@ -178,11 +178,17 @@ function splitTableStack(
   contentWidth: number
 ): { before: Node; after?: Node } | undefined {
   const meta = node.fragmentation;
-  if (meta?.kind !== "table") return undefined;
-  const header = node.children.slice(0, meta.headerCount);
-  const footerStart = node.children.length - meta.footerCount;
-  const footer = meta.footerCount > 0 ? node.children.slice(footerStart) : [];
-  const body = node.children.slice(meta.headerCount, footerStart);
+  const tableMeta: TableFragmentationMeta | undefined =
+    meta?.kind === "table"
+      ? meta
+      : meta?.kind === "continuation"
+        ? meta.table
+        : undefined;
+  if (!tableMeta) return undefined;
+  const header = node.children.slice(0, tableMeta.headerCount);
+  const footerStart = node.children.length - tableMeta.footerCount;
+  const footer = tableMeta.footerCount > 0 ? node.children.slice(footerStart) : [];
+  const body = node.children.slice(tableMeta.headerCount, footerStart);
   if (body.length <= 1) return undefined;
 
   let splitAt = 0;
@@ -203,13 +209,17 @@ function splitTableStack(
   return { before, after };
 }
 
-function splitForPage(
+/** Split a fragmentable stack so its leading portion fits the current page. */
+export function splitForPage(
   node: Node,
   availableHeight: number,
   contentWidth: number
 ): { before: Node; after?: Node } | undefined {
   if (!isFragmentableStack(node)) return undefined;
-  if (node.fragmentation?.kind === "table") {
+  if (
+    node.fragmentation?.kind === "table" ||
+    (node.fragmentation?.kind === "continuation" && node.fragmentation.table)
+  ) {
     return splitTableStack(node, availableHeight, contentWidth);
   }
   return splitNormalStack(node, availableHeight, contentWidth);

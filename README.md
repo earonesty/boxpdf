@@ -330,6 +330,26 @@ await streamFlow(pdf, out, nodes, {
 });
 ```
 
+If one logical stack or table is too large to construct at once, emit bounded
+pieces with `flowContinuation`. Adjacent pieces with the same id are paginated
+as though they were one node, including stack gaps, decoration, table headers,
+and row dividers:
+
+```ts
+for (let offset = 0; offset < rows.length; offset += 100) {
+  const final = offset + 100 >= rows.length;
+  yield flowContinuation(
+    table({ columns, header, rows: rows.slice(offset, offset + 100) }),
+    "orders",
+    final
+  );
+}
+```
+
+Continuation fragments must be consecutive and the last one must set
+`final: true`; `streamFlow` rejects interrupted or unfinished sequences instead
+of silently producing an incomplete layout.
+
 ### Contract
 
 1. All `embedFont` / `embedJpg` / `embedPng` calls must complete before `streamFlow`. Embedding mid-stream throws.
@@ -350,6 +370,21 @@ Peak heap during render. Each measurement runs in its own subprocess. 50 lines o
 |  1000 |     25.4 MB     |    219.6 MB     |  2,292.6 MB     | 1.4 MB |
 
 streamFlow holds peak heap roughly flat (12 → 25 MB across a 100× workload increase). renderFlow scales roughly linearly with page count. `@react-pdf/renderer` adds ~2.3 MB per page in this workload and peaks at 2.3 GB by 1000 pages. See `docs/design/streaming.md` for the design and the chart.
+
+The continuation path has its own heap-capped subprocess check. Unlike the
+older comparison above, it constructs every fragment lazily and forces a GC
+after output to distinguish V8's allocation high-water mark from the retained
+live set:
+
+| Continuation fragments | Output pages | Sampled peak heap | Retained heap after GC | Output |
+| ---: | ---: | ---: | ---: | ---: |
+| 100 | 81 | ~58 MB | ~16 MB | 129 KB |
+| 1000 | 810 | ~125 MB | ~26 MB | 1.3 MB |
+
+Both runs complete with `--max-old-space-size=128`. Across the 10× workload,
+the retained heap grows by about 10 MB, primarily from the final page tree and xref
+index; rendered page content and continuation input are released incrementally.
+Reproduce it with `pnpm memory:check:continuation`.
 
 ## Cloudflare Workers
 

@@ -25,15 +25,20 @@ import {
 } from "pdf-lib";
 import { measure } from "./measure.js";
 import { render } from "./render.js";
-import { edges, type EdgesInput, type Node } from "./types.js";
+import { edges, type EdgesInput, type Fragmentation, type Node } from "./types.js";
 import {
   PageSizes,
+  splitForPage,
   type PageSize,
   type DocumentMetadata
 } from "./document.js";
 import type { PdfEncryptionOptions } from "./encryption/types.js";
 import type { EncryptionContext } from "./encryption/serialize.js";
 import type { PreparedEncryption } from "./encryption/writer.js";
+
+type ContinuationNode = Extract<Node, { kind: "vstack" }> & {
+  fragmentation: Extract<Fragmentation, { kind: "continuation" }>;
+};
 
 export interface StreamPageContext {
   /** Current page number, 1-indexed. */
@@ -157,6 +162,8 @@ export async function streamFlow(
     const pdfInternals = pdf as unknown as {
       fonts?: { length: number }[];
       images?: { length: number }[];
+      pageMap?: Map<unknown, unknown>;
+      pageCache?: { invalidate(): void };
     };
     const initialFontCount = Array.isArray(pdfInternals.fonts) ? pdfInternals.fonts.length : 0;
     const initialImageCount = Array.isArray(pdfInternals.images) ? pdfInternals.images.length : 0;
@@ -330,30 +337,137 @@ export async function streamFlow(
         }
         await serializeRef(ref, obj);
       }
+      // pdf-lib caches every PDFPage wrapper in pageMap. Each wrapper retains
+      // its in-memory content stream even after the stream ref is deleted from
+      // the context, which otherwise adds roughly one rendered page of heap per
+      // output page. The page leaf remains in the page tree/context and can be
+      // wrapped again by getPages() after streaming.
+      pdfInternals.pageMap?.delete(currentPage.node);
+      pdfInternals.pageCache?.invalidate();
       currentPage = undefined;
     };
 
-    for await (const node of nodes) {
-      checkMidStreamEmbed();
-
-      const nodeSize = measure(node, contentWidth);
-      if (warnings && nodeSize.width > contentWidth + 0.5) {
-        console.warn(
-          `[boxpdf] top-level ${node.kind} measured ${nodeSize.width.toFixed(1)}pt — ` +
-            `exceeds page content area ${contentWidth.toFixed(1)}pt`
-        );
-      }
-
-      if (!currentPage) startPage();
-      else if (cursorY - nodeSize.height < contentBottom) {
+    const processNodes = async (pending: Node[]): Promise<void> => {
+      /** Render the fitting portion, flush its page, and queue any remainder. */
+      const renderSplitAndBreak = async (
+        split: { before: Node; after?: Node }
+      ): Promise<void> => {
+        const beforeSize = measure(split.before, contentWidth);
+        render(split.before, currentPage!, m.left, cursorY, contentWidth, {
+          debug: options.debug
+        });
+        cursorY -= beforeSize.height;
         await closePage();
         startPage();
-      }
+        if (split.after) pending.unshift(split.after);
+      };
 
-      render(node, currentPage!, m.left, cursorY, contentWidth, {
-        debug: options.debug
-      });
-      cursorY -= nodeSize.height;
+      while (pending.length > 0) {
+        checkMidStreamEmbed();
+        const node = pending.shift()!;
+        const nodeSize = measure(node, contentWidth);
+        if (warnings && nodeSize.width > contentWidth + 0.5) {
+          console.warn(
+            `[boxpdf] top-level ${node.kind} measured ${nodeSize.width.toFixed(1)}pt — ` +
+              `exceeds page content area ${contentWidth.toFixed(1)}pt`
+          );
+        }
+
+        if (!currentPage) startPage();
+        const remainingHeight = cursorY - contentBottom;
+        if (nodeSize.height > remainingHeight) {
+          const split = splitForPage(node, remainingHeight, contentWidth);
+          if (split && cursorY !== contentTop) {
+            await renderSplitAndBreak(split);
+            continue;
+          }
+        }
+
+        if (cursorY - nodeSize.height < contentBottom && cursorY !== contentTop) {
+          await closePage();
+          startPage();
+          pending.unshift(node);
+          continue;
+        }
+
+        const topRemainingHeight = cursorY - contentBottom;
+        if (nodeSize.height > topRemainingHeight) {
+          const split = splitForPage(node, topRemainingHeight, contentWidth);
+          if (split) {
+            await renderSplitAndBreak(split);
+            continue;
+          }
+        }
+
+        render(node, currentPage!, m.left, cursorY, contentWidth, {
+          debug: options.debug
+        });
+        cursorY -= nodeSize.height;
+      }
+    };
+
+    const flushContinuationPages = async (
+      initial: ContinuationNode
+    ): Promise<ContinuationNode> => {
+      let node = initial;
+      while (true) {
+        if (!currentPage) startPage();
+        const remainingHeight = cursorY - contentBottom;
+        if (measure(node, contentWidth).height <= remainingHeight) return node;
+        const split = splitForPage(node, remainingHeight, contentWidth);
+        if (!split) {
+          if (cursorY !== contentTop) {
+            await closePage();
+            startPage();
+            continue;
+          }
+          return node;
+        }
+        const beforeSize = measure(split.before, contentWidth);
+        render(split.before, currentPage!, m.left, cursorY, contentWidth, {
+          debug: options.debug
+        });
+        cursorY -= beforeSize.height;
+        await closePage();
+        startPage();
+        if (!split.after || !isContinuation(split.after)) {
+          throw new Error("[boxpdf streamFlow] invalid continuation split");
+        }
+        node = split.after;
+      }
+    };
+
+    let continuation: ContinuationNode | undefined;
+    for await (const input of nodes) {
+      if (isContinuation(input)) {
+        if (continuation && continuation.fragmentation.id !== input.fragmentation.id) {
+          throw new Error(
+            `[boxpdf streamFlow] continuation "${continuation.fragmentation.id}" ` +
+              `was interrupted by "${input.fragmentation.id}"`
+          );
+        }
+        continuation = continuation ? mergeContinuations(continuation, input) : input;
+        if (input.fragmentation.final) {
+          await processNodes([continuation]);
+          continuation = undefined;
+        } else {
+          continuation = await flushContinuationPages(continuation);
+        }
+        continue;
+      }
+      if (continuation) {
+        throw new Error(
+          `[boxpdf streamFlow] continuation "${continuation.fragmentation.id}" ` +
+            `was interrupted by a non-continuation ${input.kind} node`
+        );
+      }
+      await processNodes([input]);
+    }
+    if (continuation) {
+      throw new Error(
+        `[boxpdf streamFlow] continuation "${continuation.fragmentation.id}" ` +
+          "ended without a final fragment"
+      );
     }
 
     if (currentPage) await closePage();
@@ -435,6 +549,80 @@ export async function streamFlow(
       }
     }
   }
+}
+
+/** Narrow a node to a bounded streamed continuation fragment. */
+function isContinuation(
+  node: Node
+): node is ContinuationNode {
+  return node.kind === "vstack" && node.fragmentation?.kind === "continuation";
+}
+
+/** Merge two adjacent fragments while preserving stack and table semantics. */
+function mergeContinuations(
+  left: ContinuationNode,
+  right: ContinuationNode
+): ContinuationNode {
+  if (!isContinuation(left) || !isContinuation(right) || left.fragmentation.id !== right.fragmentation.id) {
+    throw new Error("[boxpdf streamFlow] cannot merge unrelated continuations");
+  }
+  if (left.fragmentation.table && right.fragmentation.table) {
+    const leftTable = left.fragmentation.table;
+    const rightTable = right.fragmentation.table;
+    const leftFooterStart = left.children.length - leftTable.footerCount;
+    const rightHeaderCount = right.fragmentation.table.headerCount;
+    const rightFooterStart = right.children.length - rightTable.footerCount;
+    const leftBody = left.children.slice(leftTable.headerCount, leftFooterStart);
+    const rightBody = right.children.slice(rightHeaderCount, rightFooterStart);
+    const children = [
+      ...left.children.slice(0, leftTable.headerCount),
+      ...leftBody
+    ];
+    if (
+      leftTable.rowDivider &&
+      leftBody.length > 0 &&
+      rightBody.length > 0
+    ) {
+      children.push(leftTable.rowDivider);
+    }
+    children.push(...rightBody);
+    const footerCount = right.fragmentation.final ? rightTable.footerCount : 0;
+    if (footerCount > 0) {
+      children.push(...right.children.slice(rightFooterStart));
+    }
+    return {
+      ...left,
+      children,
+      fragmentation: {
+        kind: "continuation",
+        id: left.fragmentation.id,
+        final: right.fragmentation.final,
+        table: {
+          ...leftTable,
+          footerCount
+        }
+      }
+    };
+  }
+  const children = [...left.children];
+  const first = right.children[0];
+  const last = children[children.length - 1];
+  if (last && first && isContinuation(last) && isContinuation(first) && last.fragmentation.id === first.fragmentation.id) {
+    children[children.length - 1] = mergeContinuations(last, first);
+    children.push(...right.children.slice(1));
+  } else {
+    children.push(...right.children);
+  }
+  return {
+    ...left,
+    children,
+    fragmentation: {
+      kind: "continuation",
+      id: left.fragmentation.id,
+      final: right.fragmentation.final,
+      table: left.fragmentation.table
+    }
+  };
 }
 
 /**
