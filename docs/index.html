@@ -36,7 +36,7 @@
       <strong>Node</strong>, <strong>Cloudflare Workers</strong>, <strong>Deno</strong>,
       and the <strong>browser</strong>. No WASM. No headless browser. No React.
     </p>
-    <div class="hero-pills" aria-label="boxpdf launch highlights">
+    <div class="hero-pills" aria-label="boxpdf highlights">
       <span>HTML + Tailwind input</span>
       <span>MIT open source</span>
       <span>Edge-ready PDFs</span>
@@ -157,10 +157,10 @@ const bytes = await pdf.save(); // -&gt; Uint8Array</code></pre>
   </section>
 
   <section id="large-documents" class="block spotlight">
-    <p class="eyebrow">New in boxpdf 1.12 + boxpdf-html 1.6</p>
+    <p class="eyebrow">Bounded-memory HTML streaming</p>
     <h2>Large HTML, without the large heap</h2>
     <p class="block-lede">
-      The HTML CLI now makes two bounded passes: one to discover CSS, fonts, and images, then one to parse, lay out, and write the PDF incrementally. A single open wrapper can span every fragment, so large real-world documents do not need artificial page-sized roots.
+      The HTML CLI makes two bounded passes: one to discover CSS, fonts, and images, then one to parse, lay out, and write the PDF incrementally. A single open wrapper can span every fragment, so large real-world documents do not need artificial page-sized roots.
     </p>
     <div class="showcase-grid">
       <article class="showcase-card">
@@ -177,7 +177,7 @@ cat archive.html | npx boxpdf-html - archive.pdf --stream</code></pre>
           <div class="stat"><strong>1.54×</strong><span>peak RSS growth<br />141.7 → 217.8 MiB</span></div>
           <div class="stat"><strong>+0.8 MiB</strong><span>peak JS heap growth</span></div>
         </div>
-        <p>The release gate also raster-compares every streamed page against buffered output. <a href="https://github.com/earonesty/boxpdf-html/pull/11" target="_blank" rel="noopener">See the implementation and benchmark record</a>.</p>
+        <p>The visual test suite raster-compares every streamed page against buffered output. <a href="https://github.com/earonesty/boxpdf-html/pull/11" target="_blank" rel="noopener">Inspect the benchmark and visual-parity evidence</a>.</p>
       </article>
     </div>
   </section>
@@ -447,7 +447,7 @@ npx boxpdf-html archive.html archive.pdf --stream --password-env BOXPDF_PASSWORD
   </section>
 
   <section id="roadmap" class="block">
-    <h2>Current surface</h2>
+    <h2>Supported surface</h2>
     <ul class="roadmap">
       <li class="done">✓ Box layout DSL: vstack, hstack, text, image, hline, vline, spacer, flex, keepTogether</li>
       <li class="done">✓ Padding, margin, background, backgroundImage, borders, per-side borders, borderRadius, overflow clipping, flex-grow, justify, align</li>
@@ -465,7 +465,7 @@ npx boxpdf-html archive.html archive.pdf --stream --password-env BOXPDF_PASSWORD
       <li class="done">✓ CSS-like absolute positioning with paired-edge stretch and <code>zIndex</code></li>
       <li class="done">✓ Optional renderFlow profiling hooks for diagnosing layout measurement costs</li>
       <li class="done">✓ Verified end-to-end on Cloudflare Workers (core and Inter path)</li>
-      <li class="done">✓ Streaming page-at-a-time output via <code>streamFlow</code>, with bounded-document-memory release gates.</li>
+      <li class="done">✓ Streaming page-at-a-time output via <code>streamFlow</code>, with bounded-document-memory validation.</li>
       <li class="done">✓ PDF 2.0 AES-256 password encryption for buffered and streamed output.</li>
     </ul>
   </section>
