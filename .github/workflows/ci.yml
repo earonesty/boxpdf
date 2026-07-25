@@ -6,6 +6,10 @@ on:
       - main
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
@@ -49,3 +53,6 @@ jobs:
 
       - name: Check streamed visual parity
         run: pnpm run visual:check:stream
+
+      - name: Check continuation memory
+        run: pnpm run memory:check:continuation

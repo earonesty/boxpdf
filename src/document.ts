@@ -1,7 +1,7 @@
 import { PDFDocument, type PDFPage, type SaveOptions } from "pdf-lib";
 import { createMeasureCache, measure, withMeasureProfile, type MeasureProfileEvent } from "./measure.js";
 import { render, type RenderOptions } from "./render.js";
-import { edges, type EdgesInput, type Node } from "./types.js";
+import { edges, type EdgesInput, type Node, type TableFragmentationMeta } from "./types.js";
 import { savePdf } from "./save.js";
 import type { PdfEncryptionOptions } from "./encryption/types.js";
 
@@ -178,7 +178,7 @@ function splitTableStack(
   contentWidth: number
 ): { before: Node; after?: Node } | undefined {
   const meta = node.fragmentation;
-  const tableMeta =
+  const tableMeta: TableFragmentationMeta | undefined =
     meta?.kind === "table"
       ? meta
       : meta?.kind === "continuation"
@@ -209,6 +209,7 @@ function splitTableStack(
   return { before, after };
 }
 
+/** Split a fragmentable stack so its leading portion fits the current page. */
 export function splitForPage(
   node: Node,
   availableHeight: number,

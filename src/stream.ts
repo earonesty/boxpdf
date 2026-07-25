@@ -25,7 +25,7 @@ import {
 } from "pdf-lib";
 import { measure } from "./measure.js";
 import { render } from "./render.js";
-import { edges, type EdgesInput, type Node } from "./types.js";
+import { edges, type EdgesInput, type Fragmentation, type Node } from "./types.js";
 import {
   PageSizes,
   splitForPage,
@@ -37,7 +37,7 @@ import type { EncryptionContext } from "./encryption/serialize.js";
 import type { PreparedEncryption } from "./encryption/writer.js";
 
 type ContinuationNode = Extract<Node, { kind: "vstack" }> & {
-  fragmentation: { kind: "continuation"; id: string; final: boolean };
+  fragmentation: Extract<Fragmentation, { kind: "continuation" }>;
 };
 
 export interface StreamPageContext {
@@ -162,6 +162,8 @@ export async function streamFlow(
     const pdfInternals = pdf as unknown as {
       fonts?: { length: number }[];
       images?: { length: number }[];
+      pageMap?: Map<unknown, unknown>;
+      pageCache?: { invalidate(): void };
     };
     const initialFontCount = Array.isArray(pdfInternals.fonts) ? pdfInternals.fonts.length : 0;
     const initialImageCount = Array.isArray(pdfInternals.images) ? pdfInternals.images.length : 0;
@@ -335,10 +337,31 @@ export async function streamFlow(
         }
         await serializeRef(ref, obj);
       }
+      // pdf-lib caches every PDFPage wrapper in pageMap. Each wrapper retains
+      // its in-memory content stream even after the stream ref is deleted from
+      // the context, which otherwise adds roughly one rendered page of heap per
+      // output page. The page leaf remains in the page tree/context and can be
+      // wrapped again by getPages() after streaming.
+      pdfInternals.pageMap?.delete(currentPage.node);
+      pdfInternals.pageCache?.invalidate();
       currentPage = undefined;
     };
 
     const processNodes = async (pending: Node[]): Promise<void> => {
+      /** Render the fitting portion, flush its page, and queue any remainder. */
+      const renderSplitAndBreak = async (
+        split: { before: Node; after?: Node }
+      ): Promise<void> => {
+        const beforeSize = measure(split.before, contentWidth);
+        render(split.before, currentPage!, m.left, cursorY, contentWidth, {
+          debug: options.debug
+        });
+        cursorY -= beforeSize.height;
+        await closePage();
+        startPage();
+        if (split.after) pending.unshift(split.after);
+      };
+
       while (pending.length > 0) {
         checkMidStreamEmbed();
         const node = pending.shift()!;
@@ -355,14 +378,7 @@ export async function streamFlow(
         if (nodeSize.height > remainingHeight) {
           const split = splitForPage(node, remainingHeight, contentWidth);
           if (split && cursorY !== contentTop) {
-            const beforeSize = measure(split.before, contentWidth);
-            render(split.before, currentPage!, m.left, cursorY, contentWidth, {
-              debug: options.debug
-            });
-            cursorY -= beforeSize.height;
-            await closePage();
-            startPage();
-            if (split.after) pending.unshift(split.after);
+            await renderSplitAndBreak(split);
             continue;
           }
         }
@@ -378,14 +394,7 @@ export async function streamFlow(
         if (nodeSize.height > topRemainingHeight) {
           const split = splitForPage(node, topRemainingHeight, contentWidth);
           if (split) {
-            const beforeSize = measure(split.before, contentWidth);
-            render(split.before, currentPage!, m.left, cursorY, contentWidth, {
-              debug: options.debug
-            });
-            cursorY -= beforeSize.height;
-            await closePage();
-            startPage();
-            if (split.after) pending.unshift(split.after);
+            await renderSplitAndBreak(split);
             continue;
           }
         }
@@ -431,9 +440,9 @@ export async function streamFlow(
     let continuation: ContinuationNode | undefined;
     for await (const input of nodes) {
       if (isContinuation(input)) {
-        if (continuation && continuation.fragmentation?.id !== input.fragmentation.id) {
+        if (continuation && continuation.fragmentation.id !== input.fragmentation.id) {
           throw new Error(
-            `[boxpdf streamFlow] continuation "${continuation.fragmentation?.id}" ` +
+            `[boxpdf streamFlow] continuation "${continuation.fragmentation.id}" ` +
               `was interrupted by "${input.fragmentation.id}"`
           );
         }
@@ -448,15 +457,15 @@ export async function streamFlow(
       }
       if (continuation) {
         throw new Error(
-          `[boxpdf streamFlow] continuation "${continuation.fragmentation?.id}" ` +
-            "ended without a final fragment"
+          `[boxpdf streamFlow] continuation "${continuation.fragmentation.id}" ` +
+            `was interrupted by a non-continuation ${input.kind} node`
         );
       }
       await processNodes([input]);
     }
     if (continuation) {
       throw new Error(
-        `[boxpdf streamFlow] continuation "${continuation.fragmentation?.id}" ` +
+        `[boxpdf streamFlow] continuation "${continuation.fragmentation.id}" ` +
           "ended without a final fragment"
       );
     }
@@ -542,12 +551,14 @@ export async function streamFlow(
   }
 }
 
+/** Narrow a node to a bounded streamed continuation fragment. */
 function isContinuation(
   node: Node
 ): node is ContinuationNode {
   return node.kind === "vstack" && node.fragmentation?.kind === "continuation";
 }
 
+/** Merge two adjacent fragments while preserving stack and table semantics. */
 function mergeContinuations(
   left: ContinuationNode,
   right: ContinuationNode
@@ -555,17 +566,30 @@ function mergeContinuations(
   if (!isContinuation(left) || !isContinuation(right) || left.fragmentation.id !== right.fragmentation.id) {
     throw new Error("[boxpdf streamFlow] cannot merge unrelated continuations");
   }
-  const children = [...left.children];
   if (left.fragmentation.table && right.fragmentation.table) {
+    const leftTable = left.fragmentation.table;
+    const rightTable = right.fragmentation.table;
+    const leftFooterStart = left.children.length - leftTable.footerCount;
     const rightHeaderCount = right.fragmentation.table.headerCount;
+    const rightFooterStart = right.children.length - rightTable.footerCount;
+    const leftBody = left.children.slice(leftTable.headerCount, leftFooterStart);
+    const rightBody = right.children.slice(rightHeaderCount, rightFooterStart);
+    const children = [
+      ...left.children.slice(0, leftTable.headerCount),
+      ...leftBody
+    ];
     if (
-      left.fragmentation.table.rowDivider &&
-      left.children.length > left.fragmentation.table.headerCount &&
-      right.children.length > rightHeaderCount
+      leftTable.rowDivider &&
+      leftBody.length > 0 &&
+      rightBody.length > 0
     ) {
-      children.push(left.fragmentation.table.rowDivider);
+      children.push(leftTable.rowDivider);
     }
-    children.push(...right.children.slice(rightHeaderCount));
+    children.push(...rightBody);
+    const footerCount = right.fragmentation.final ? rightTable.footerCount : 0;
+    if (footerCount > 0) {
+      children.push(...right.children.slice(rightFooterStart));
+    }
     return {
       ...left,
       children,
@@ -573,10 +597,14 @@ function mergeContinuations(
         kind: "continuation",
         id: left.fragmentation.id,
         final: right.fragmentation.final,
-        table: left.fragmentation.table
+        table: {
+          ...leftTable,
+          footerCount
+        }
       }
     };
   }
+  const children = [...left.children];
   const first = right.children[0];
   const last = children[children.length - 1];
   if (last && first && isContinuation(last) && isContinuation(first) && last.fragmentation.id === first.fragmentation.id) {

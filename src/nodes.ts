@@ -6,6 +6,7 @@ import type {
   Justify,
   Node,
   RGB,
+  TableFragmentationMeta,
   TextProps
 } from "./types.js";
 import type { InlineNodeRun, ParagraphItem, ParagraphProps, ParagraphRun, TextRunStyle } from "./paragraph.js";
@@ -45,7 +46,7 @@ export function flowContinuation(node: Node, id: string, final = false): Node {
   if (node.kind !== "vstack") {
     throw new Error("flowContinuation requires a vstack node");
   }
-  const table =
+  const table: TableFragmentationMeta | undefined =
     node.fragmentation?.kind === "table"
       ? {
           headerCount: node.fragmentation.headerCount,

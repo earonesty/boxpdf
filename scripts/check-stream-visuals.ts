@@ -8,7 +8,7 @@ import {
   writeFileSync
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import {
   PageSizes,
@@ -169,8 +169,10 @@ const scenarios: Scenario[] = [
           columns: [{ width: "1fr" }, { width: 48 }],
           header: [text("Item", { font: bold, size: 9 }), text("Qty", { font: bold, size: 9 })],
           rows: tableRows,
+          footer: [text("Total", { font: bold, size: 9 }), text("24", { font: bold, size: 9, align: "right" })],
           rowDivider: { color: hex("#cccccc"), thickness: 1 },
           headerDivider: { color: hex("#222222"), thickness: 1 },
+          footerDivider: { color: hex("#222222"), thickness: 1 },
           columnGap: 0
         });
       const chunkCount = Math.ceil(rows.length / 4);
@@ -212,6 +214,7 @@ const scenarios: Scenario[] = [
   }
 ];
 
+/** Render every parity scenario through both pagination paths. */
 async function main(): Promise<void> {
   const root = mkdtempSync(join(tmpdir(), "boxpdf-stream-visual-"));
   try {
@@ -256,22 +259,27 @@ async function main(): Promise<void> {
   }
 }
 
+/** Rasterize every PDF page and return paths in numeric page order. */
 function rasterize(pdf: string, prefix: string): string[] {
   execFileSync("pdftoppm", ["-png", "-r", "144", pdf, prefix], { stdio: "pipe" });
-  const directory = join(prefix, "..");
-  const stem = prefix.slice(prefix.lastIndexOf("/") + 1);
-  return readdirSync(directory)
+  const directory = dirname(prefix);
+  const stem = basename(prefix);
+  const pages = readdirSync(directory)
     .filter((name) => name.startsWith(`${stem}-`) && name.endsWith(".png"))
     .sort((left, right) => pageNumber(left) - pageNumber(right))
     .map((name) => join(directory, name));
+  if (pages.length === 0) throw new Error(`no rasterized pages for ${pdf}`);
+  return pages;
 }
 
+/** Extract the numeric page suffix emitted by pdftoppm. */
 function pageNumber(name: string): number {
   const match = name.match(/-(\d+)\.png$/);
   if (!match) throw new Error(`unexpected raster filename: ${name}`);
   return Number(match[1]);
 }
 
+/** Concatenate streamed PDF byte chunks for validation. */
 function concat(chunks: Uint8Array[]): Uint8Array {
   const output = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.length, 0));
   let offset = 0;

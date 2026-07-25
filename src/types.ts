@@ -36,13 +36,16 @@ export type BoxTransform =
   | { kind: "skew"; xDegrees: number; yDegrees: number }
   | { kind: "matrix"; a: number; b: number; c: number; d: number; e: number; f: number };
 export type TransformOrigin = { x: RelativeLength; y: RelativeLength };
+
+/** Table structure retained while a vstack is split across pages. */
+export interface TableFragmentationMeta {
+  headerCount: number;
+  footerCount: number;
+  rowDivider?: Node;
+}
+
 export type Fragmentation =
-  | {
-      kind: "table";
-      headerCount: number;
-      footerCount: number;
-      rowDivider?: Node;
-    }
+  | ({ kind: "table" } & TableFragmentationMeta)
   | {
       /**
        * One bounded fragment of a logical vstack supplied incrementally.
@@ -52,11 +55,7 @@ export type Fragmentation =
       id: string;
       final: boolean;
       /** Preserve table row fragmentation while table chunks are merged. */
-      table?: {
-        headerCount: number;
-        footerCount: number;
-        rowDivider?: Node;
-      };
+      table?: TableFragmentationMeta;
     };
 
 export interface BoxStyle {

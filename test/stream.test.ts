@@ -10,6 +10,7 @@ import {
   link,
   nodeAdapter,
   pageInner,
+  renderFlow,
   streamFlow,
   table,
   text,
@@ -173,25 +174,35 @@ describe("streamFlow basics", () => {
   });
 
   it("merges bounded continuation fragments before pagination", async () => {
-    const { pdf, font } = await newDocWithFonts();
+    const options = { size: { width: 240, height: 220 }, margin: 20 };
+    const buffered = await newDocWithFonts();
+    const bufferedChildren = Array.from({ length: 12 }, (_, index) =>
+      vstack({ height: 42 }, text(`Fragment ${index + 1}`, { font: buffered.font, size: 10 }))
+    );
+    const { pages } = await renderFlow(
+      buffered.pdf,
+      [vstack({ gap: 4, padding: 6, border: { width: 1, color: hex("#444444") } }, ...bufferedChildren)],
+      options
+    );
+
+    const streamed = await newDocWithFonts();
     const fragments = Array.from({ length: 12 }, (_, index) =>
       flowContinuation(
         vstack(
           { gap: 4, padding: 6, border: { width: 1, color: hex("#444444") } },
-          vstack({ height: 42 }, text(`Fragment ${index + 1}`, { font, size: 10 }))
+          vstack({ height: 42 }, text(`Fragment ${index + 1}`, { font: streamed.font, size: 10 }))
         ),
         "report",
         index === 11
       )
     );
     const { writable, bytes } = collector();
-    const { pageCount } = await streamFlow(pdf, writable, fragments, {
-      size: { width: 240, height: 220 },
-      margin: 20
-    });
+    const { pageCount } = await streamFlow(streamed.pdf, writable, fragments, options);
 
     expect(pageCount).toBeGreaterThan(1);
+    expect(pageCount).toBe(pages.length);
     expect((await PDFDocument.load(bytes())).getPageCount()).toBe(pageCount);
+    expect(streamed.pdf.getPages()).toHaveLength(pageCount);
   });
 
   it("rejects a continuation without a final fragment", async () => {
@@ -207,30 +218,66 @@ describe("streamFlow basics", () => {
     ).rejects.toThrow(/without a final fragment/);
   });
 
+  it("reports a plain-node interruption separately from end of stream", async () => {
+    const { pdf, font } = await newDocWithFonts();
+    const { writable } = collector();
+    await expect(
+      streamFlow(
+        pdf,
+        writable,
+        [
+          flowContinuation(vstack({}, text("unfinished", { font, size: 10 })), "unfinished"),
+          text("interrupting node", { font, size: 10 })
+        ],
+        { margin: 20 }
+      )
+    ).rejects.toThrow(/interrupted by a non-continuation text node/);
+  });
+
   it("merges table continuations while retaining row fragmentation", async () => {
-    const { pdf, font, bold } = await newDocWithFonts();
+    const options = { size: { width: 220, height: 180 }, margin: 20 };
+    const makeTable = (
+      tableFont: PDFFont,
+      tableBold: PDFFont,
+      start: number,
+      count: number
+    ) =>
+      table({
+        width: 180,
+        columns: [{ width: "1fr" }],
+        header: [text("Header", { font: tableBold, size: 10 })],
+        rows: Array.from({ length: count }, (_, index) => [
+          vstack({ height: 28 }, text(`Row ${start + index}`, { font: tableFont, size: 9 }))
+        ]),
+        footer: [text("Footer", { font: tableBold, size: 9 })],
+        rowDivider: { color: hex("#dddddd"), thickness: 1 },
+        footerDivider: { color: hex("#111111"), thickness: 1 }
+      });
+
+    const buffered = await newDocWithFonts();
+    const { pages } = await renderFlow(
+      buffered.pdf,
+      [makeTable(buffered.font, buffered.bold, 1, 12)],
+      options
+    );
+
+    const streamed = await newDocWithFonts();
     const makeChunk = (start: number, final: boolean) =>
       flowContinuation(
-        table({
-          width: 180,
-          columns: [{ width: "1fr" }],
-          header: [text("Header", { font: bold, size: 10 })],
-          rows: Array.from({ length: 4 }, (_, index) => [
-            vstack({ height: 28 }, text(`Row ${start + index}`, { font, size: 9 }))
-          ])
-        }),
+        makeTable(streamed.font, streamed.bold, start, 4),
         "table",
         final
       );
     const { writable, bytes } = collector();
     const { pageCount } = await streamFlow(
-      pdf,
+      streamed.pdf,
       writable,
       [makeChunk(1, false), makeChunk(5, false), makeChunk(9, true)],
-      { size: { width: 220, height: 180 }, margin: 20 }
+      options
     );
 
     expect(pageCount).toBeGreaterThan(1);
+    expect(pageCount).toBe(pages.length);
     expect((await PDFDocument.load(bytes())).getPageCount()).toBe(pageCount);
   });
 });
