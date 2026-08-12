@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>boxpdf · open-source HTML and declarative PDF generation</title>
-<meta name="description" content="Open-source, bounded-memory HTML-to-PDF and declarative PDF layout for JavaScript runtimes, with streaming output and PDF 2.0 AES-256 encryption." />
+<meta name="description" content="Open-source, bounded-memory HTML-to-PDF and declarative PDF layout for JavaScript runtimes, with interactive AcroForms, streaming output, and PDF 2.0 AES-256 encryption." />
 <link rel="icon" href="./boxpdf-mark.svg" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="./boxpdf-mark.svg" />
 <link rel="stylesheet" href="./style.css" />
@@ -40,6 +40,7 @@
       <span>HTML + Tailwind input</span>
       <span>MIT open source</span>
       <span>Edge-ready PDFs</span>
+      <span>Interactive AcroForms</span>
       <span>Bounded-memory streaming</span>
       <span>PDF 2.0 AES-256</span>
     </div>
@@ -82,6 +83,10 @@ const bytes = await pdf.save(); // -&gt; Uint8Array</code></pre>
       <div class="feature">
         <h3>Flex-ish layout, no coordinates</h3>
         <p><code>vstack</code> / <code>hstack</code> with <code>padding</code>, <code>margin</code>, <code>gap</code>, <code>justify</code>, <code>align</code>, <code>grow</code>, <code>shrink</code>. Real word-wrapping and ellipsis.</p>
+      </div>
+      <div class="feature">
+        <h3>Layout-aware AcroForms</h3>
+        <p>Compose text fields, checkboxes, radio groups, dropdowns, option lists, and push buttons inside ordinary stacks and tables. Read, update, stream, encrypt, or flatten values without manual page coordinates.</p>
       </div>
       <div class="feature">
         <h3>Streaming output</h3>

@@ -184,6 +184,86 @@ export interface TextProps extends FlexItemStyle {
   opacity?: number;
 }
 
+export interface FormFieldAppearance extends FlexItemStyle {
+  /** Widget width in PDF points. */
+  width: number;
+  /** Widget height in PDF points. */
+  height: number;
+  /** Outer spacing around the widget. */
+  margin?: EdgesInput;
+  /** Font used to generate text appearances. Defaults to Helvetica. */
+  font?: PDFFont;
+  /** Text size used by text-bearing fields. */
+  fontSize?: number;
+  textColor?: RGB;
+  backgroundColor?: RGB;
+  borderColor?: RGB;
+  borderWidth?: number;
+  hidden?: boolean;
+  readOnly?: boolean;
+  required?: boolean;
+  /** Whether the field value is included when a reader exports the form. Defaults to true. */
+  exported?: boolean;
+}
+
+export type FormFieldNode =
+  | {
+      kind: "formField";
+      fieldType: "text";
+      name: string;
+      appearance: FormFieldAppearance;
+      value?: string;
+      multiline?: boolean;
+      password?: boolean;
+      maxLength?: number;
+      combed?: boolean;
+      align?: Align;
+    }
+  | {
+      kind: "formField";
+      fieldType: "checkbox";
+      name: string;
+      appearance: FormFieldAppearance;
+      checked?: boolean;
+    }
+  | {
+      kind: "formField";
+      fieldType: "radio";
+      name: string;
+      appearance: FormFieldAppearance;
+      option: string;
+      selected?: boolean;
+      offToggleable?: boolean;
+      mutuallyExclusive?: boolean;
+    }
+  | {
+      kind: "formField";
+      fieldType: "dropdown";
+      name: string;
+      appearance: FormFieldAppearance;
+      options: string[];
+      selected?: string;
+      editable?: boolean;
+      sorted?: boolean;
+    }
+  | {
+      kind: "formField";
+      fieldType: "optionList";
+      name: string;
+      appearance: FormFieldAppearance;
+      options: string[];
+      selected?: string | string[];
+      multiselect?: boolean;
+      sorted?: boolean;
+    }
+  | {
+      kind: "formField";
+      fieldType: "button";
+      name: string;
+      appearance: FormFieldAppearance;
+      label: string;
+    };
+
 export type Node =
   | {
       kind: "vstack";
@@ -213,6 +293,7 @@ export type Node =
       runs: ParagraphItem[];
       props: ParagraphProps;
     }
+  | FormFieldNode
   | {
       kind: "image";
       image: PDFImage;

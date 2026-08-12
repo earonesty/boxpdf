@@ -29,6 +29,27 @@ export {
   vstack
 } from "./nodes.js";
 export { table } from "./table.js";
+export {
+  button,
+  checkbox,
+  dropdown,
+  flattenForm,
+  getFormValues,
+  optionList,
+  radioOption,
+  setFormValues,
+  textField
+} from "./forms.js";
+export type {
+  ButtonOptions,
+  CheckboxOptions,
+  DropdownOptions,
+  FormFieldOptions,
+  FormValue,
+  OptionListOptions,
+  RadioOptionOptions,
+  TextFieldOptions
+} from "./forms.js";
 export type { CellVerticalAlign, ColumnSpec, ColumnWidth, TableCell, TableCellInput, TableDivider, TableOptions } from "./table.js";
 export type { TextOptions } from "./nodes.js";
 export type {
@@ -104,6 +125,8 @@ export type {
   CrossAxis,
   Edges,
   EdgesInput,
+  FormFieldAppearance,
+  FormFieldNode,
   Justify,
   Node,
   Overflow,

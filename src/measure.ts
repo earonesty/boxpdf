@@ -158,6 +158,8 @@ export function measureContent(node: Node, parentWidth: number): Size {
       return { width: node.width, height: node.height };
     case "imageBox":
       return { width: node.width, height: node.height };
+    case "formField":
+      return { width: node.appearance.width, height: node.appearance.height };
     case "spacer":
       return { width: 0, height: node.size };
     case "hline":
@@ -288,6 +290,8 @@ export function nodeAlignSelf(node: Node): import("./types.js").CrossAxis | unde
     case "link":
     case "svgPath":
       return node.alignSelf;
+    case "formField":
+      return node.appearance.alignSelf;
   }
 }
 
@@ -680,6 +684,8 @@ export function nodeMargin(node: Node): { top: number; right: number; bottom: nu
     case "link":
     case "svgPath":
       return edges(node.margin);
+    case "formField":
+      return edges(node.appearance.margin);
     case "spacer":
       return edges(undefined);
   }
