@@ -9,6 +9,7 @@ import {
   PDFTextField,
   StandardFonts
 } from "pdf-lib";
+import { permissionWord } from "../src/encryption/permissions.js";
 import {
   button,
   checkbox,
@@ -26,6 +27,12 @@ import {
   textField,
   vstack
 } from "../src/index.js";
+
+function permissionFromOutput(output: string): number {
+  const match = /\/P\s+(-?\d+)/.exec(output);
+  if (!match) throw new Error("encrypted PDF is missing /P permission value");
+  return Number(match[1]);
+}
 
 describe("AcroForm nodes", () => {
   it("creates every portable field type with values and flags", async () => {
@@ -161,7 +168,7 @@ describe("AcroForm nodes", () => {
     expect(back.getForm().getTextField("streamed").getText()).toBe("yes");
   });
 
-  it("supports encrypted serialization with form filling permission", async () => {
+  it("supports encrypted serialization with explicit fillForms permission", async () => {
     const pdf = await PDFDocument.create();
     await renderFlow(pdf, [
       textField({ name: "encrypted", width: 120, height: 20, value: "secret" })
@@ -170,7 +177,45 @@ describe("AcroForm nodes", () => {
       encryption: { password: "reader", permissions: { fillForms: true } }
     });
     expect(bytes.byteLength).toBeGreaterThan(500);
-    expect(new TextDecoder().decode(bytes.slice(0, 8))).toBe("%PDF-2.0");
+    const output = new TextDecoder().decode(bytes);
+    expect(output).toContain("/Filter /Standard");
+    expect(permissionFromOutput(output)).toBe(permissionWord({ fillForms: true }));
+    expect(output.startsWith("%PDF-2.0")).toBe(true);
+  });
+
+  it("supports encrypted serialization with denied fillForms permission", async () => {
+    const pdf = await PDFDocument.create();
+    await renderFlow(pdf, [
+      textField({ name: "deniedFillForms", width: 120, height: 20, value: "secret" })
+    ]);
+    const bytes = await savePdf(pdf, {
+      encryption: { password: "reader", permissions: { fillForms: false } }
+    });
+    const output = new TextDecoder().decode(bytes);
+    expect(permissionFromOutput(output)).toBe(permissionWord({ fillForms: false }));
+  });
+
+  it("supports non-exportable form fields", async () => {
+    const pdf = await PDFDocument.create();
+    await renderFlow(pdf, [
+      textField({
+        name: "person.password",
+        width: 120,
+        height: 20,
+        password: true,
+        exported: false
+      })
+    ]);
+    const field = pdf.getForm().getTextField("person.password");
+    expect(field.isExported()).toBe(false);
+  });
+
+  it("rejects widgets inside non-opaque ancestors", async () => {
+    const node = vstack(
+      { opacity: 0.8 },
+      textField({ name: "faded", width: 100, height: 20 })
+    );
+    await expect(renderToPdf(node)).rejects.toThrow(/opacity-adjusted form widgets are not supported/);
   });
 
   it("rejects widgets inside transformed ancestors", async () => {
@@ -178,7 +223,7 @@ describe("AcroForm nodes", () => {
       { transform: [{ kind: "translate", x: { length: 1, percent: 0 }, y: { length: 0, percent: 0 } }] },
       textField({ name: "moved", width: 100, height: 20 })
     );
-    await expect(renderToPdf(node)).rejects.toThrow(/transformed form widgets are not supported/);
+    await expect(renderToPdf(node)).rejects.toThrow(/transformed or opacity-adjusted form widgets are not supported/);
   });
 
   it("validates dimensions and combed-field constraints", () => {

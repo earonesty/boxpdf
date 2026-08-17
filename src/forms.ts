@@ -64,7 +64,7 @@ export interface ButtonOptions extends FormFieldOptions {
   label: string;
 }
 
-function validateBase(options: { name: string; width: number; height: number }): void {
+function validateBase(options: FormFieldOptions & { name: string }): void {
   if (options.name.trim().length === 0) {
     throw new Error("boxpdf form field: name must not be empty");
   }
@@ -74,11 +74,10 @@ function validateBase(options: { name: string; width: number; height: number }):
   if (!Number.isFinite(options.height) || options.height <= 0) {
     throw new Error(`boxpdf form field \"${options.name}\": height must be positive`);
   }
-  const style = options as FormFieldOptions;
-  if (style.fontSize !== undefined && (!Number.isFinite(style.fontSize) || style.fontSize <= 0)) {
+  if (options.fontSize !== undefined && (!Number.isFinite(options.fontSize) || options.fontSize <= 0)) {
     throw new Error(`boxpdf form field \"${options.name}\": fontSize must be positive`);
   }
-  if (style.borderWidth !== undefined && (!Number.isFinite(style.borderWidth) || style.borderWidth < 0)) {
+  if (options.borderWidth !== undefined && (!Number.isFinite(options.borderWidth) || options.borderWidth < 0)) {
     throw new Error(`boxpdf form field \"${options.name}\": borderWidth must not be negative`);
   }
 }
@@ -265,6 +264,10 @@ export function renderFormField(node: FormFieldNode, page: PDFPage, x: number, y
   const form = pdf.getForm();
   const y = yTop - node.appearance.height;
   const options = widgetOptions(node, x, y);
+  // Reusing a field name maps to one logical PDF field. Text, dropdown, and
+  // option-list settings that initialize options/selection apply only on first
+  // creation. For radio groups, group flags also apply only first-time.
+  // `selected` is still enforced per widget to support per-option state.
 
   switch (node.fieldType) {
     case "text": {

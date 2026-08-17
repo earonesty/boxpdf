@@ -111,6 +111,7 @@ async function main(): Promise<void> {
     labeled(fonts, "Password field", textField({
       name: "person.password",
       password: true,
+      exported: false,
       ...fieldAppearance(fonts)
     }), "Type a fake value; the viewer should mask it."),
     labeled(fonts, "Multiline comments", textField({

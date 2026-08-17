@@ -487,16 +487,18 @@ function renderContent(
       page.pushOperators(popGraphicsState());
       return node.height;
     }
-    case "formField":
-      if (currentPaintMatrix !== IDENTITY_MATRIX && (
+    case "formField": {
+      if (
+        currentOpacity !== 1 ||
         currentPaintMatrix.a !== 1 || currentPaintMatrix.b !== 0 ||
         currentPaintMatrix.c !== 0 || currentPaintMatrix.d !== 1 ||
         currentPaintMatrix.e !== 0 || currentPaintMatrix.f !== 0
-      )) {
-        throw new Error(`boxpdf form field \"${node.name}\": transformed form widgets are not supported`);
+      ) {
+        throw new Error(`boxpdf form field \"${node.name}\": transformed or opacity-adjusted form widgets are not supported`);
       }
       renderFormField(node, page, x, yTop);
       return node.appearance.height;
+    }
     case "spacer":
       return node.size;
     case "hline": {
