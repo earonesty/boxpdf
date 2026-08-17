@@ -202,7 +202,11 @@ export interface FormFieldAppearance extends FlexItemStyle {
   hidden?: boolean;
   readOnly?: boolean;
   required?: boolean;
-  /** Whether the field value is included when a reader exports the form. Defaults to true. */
+  /**
+   * Whether the field value is included when a reader exports the form.
+   * Defaults to `true`, except `password: true` text fields default to non-exportable
+   * unless `exported: true` is explicitly provided.
+   */
   exported?: boolean;
 }
 

@@ -212,6 +212,39 @@ describe("AcroForm nodes", () => {
     expect(field.isExported()).toBe(false);
   });
 
+  it("defaults password text fields to non-exportable and keeps setFormValues compatible", async () => {
+    const pdf = await PDFDocument.create();
+    const password = textField({
+      name: "security.password",
+      width: 120,
+      height: 20,
+      password: true
+    });
+    await renderFlow(pdf, [vstack({ gap: 10 }, password, password)]);
+
+    const field = pdf.getForm().getTextField("security.password");
+    expect(field.acroField.getWidgets()).toHaveLength(2);
+    expect(field.isExported()).toBe(false);
+
+    setFormValues(pdf, { "security.password": "hunter2" });
+    expect(field.getText()).toBe("hunter2");
+  });
+
+  it("keeps password fields exportable only when explicitly opted in", async () => {
+    const pdf = await PDFDocument.create();
+    await renderFlow(pdf, [
+      textField({
+        name: "security.passwordOptIn",
+        width: 120,
+        height: 20,
+        password: true,
+        exported: true
+      })
+    ]);
+    const field = pdf.getForm().getTextField("security.passwordOptIn");
+    expect(field.isExported()).toBe(true);
+  });
+
   it("rejects widgets inside non-opaque ancestors", async () => {
     const node = vstack(
       { opacity: 0.8 },

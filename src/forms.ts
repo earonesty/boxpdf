@@ -279,6 +279,7 @@ export function renderFormField(node: FormFieldNode, page: PDFPage, x: number, y
         if (node.maxLength !== undefined) field.setMaxLength(node.maxLength);
         if (node.multiline) field.enableMultiline();
         if (node.password) field.enablePassword();
+        if (node.password && node.appearance.exported === undefined) field.disableExporting();
         if (node.combed) field.enableCombing();
         if (node.align) field.setAlignment(textAlignment(node.align));
       }
