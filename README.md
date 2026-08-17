@@ -210,6 +210,7 @@ const bytes = await flowToPdf(async (pdf) => {
 - `button({ name, label, width, height, ... })`. Creates a portable push-button widget and appearance; BoxPDF does not attach PDF JavaScript or submit actions. Standard SubmitForm actions are reader-dependent and browser viewers may block submissions from local PDFs by origin policy.
 
 All fields accept `margin`, `alignSelf`, `readOnly`, `required`, `exported`, `hidden`, `backgroundColor`, `borderColor`, and `borderWidth`. Text-bearing fields also accept `font`, `fontSize`, and `textColor`. Field names are document-global. Reusing a name adds another widget for the same logical field; reusing it for a different field type throws. Forms work with ordinary, streamed, and encrypted output; use the encryption `fillForms` permission to control whether conforming readers allow changes.
+For shared logical fields, text, dropdown, and option-list initialization state (`value`, `options`, and initial `selected`) is fixed by the first node. Radio-group flags (`offToggleable`, `mutuallyExclusive`) are also first-node-only. `selected: true` on a `radioOption` marks that option, while `selected: false` does not clear any existing selection.
 
 Use `getFormValues(pdf)`, `setFormValues(pdf, values)`, and `flattenForm(pdf)` when working with a caller-owned `PDFDocument`. When updating non-WinAnsi text, pass the embedded font as `{ font }` to `setFormValues` or `flattenForm` so pdf-lib regenerates the appearances with that font.
 

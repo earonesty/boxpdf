@@ -9,7 +9,6 @@ import {
   PDFTextField,
   StandardFonts
 } from "pdf-lib";
-import { permissionWord } from "../src/encryption/permissions.js";
 import {
   button,
   checkbox,
@@ -27,6 +26,9 @@ import {
   textField,
   vstack
 } from "../src/index.js";
+
+const PDF_ENCRYPTED_ALLOW_FILL_FORMS_PERMISSION = -4;
+const PDF_ENCRYPTED_DENY_FILL_FORMS_PERMISSION = PDF_ENCRYPTED_ALLOW_FILL_FORMS_PERMISSION & ~0x100;
 
 function permissionFromOutput(output: string): number {
   const match = /\/P\s+(-?\d+)/.exec(output);
@@ -179,7 +181,7 @@ describe("AcroForm nodes", () => {
     expect(bytes.byteLength).toBeGreaterThan(500);
     const output = new TextDecoder().decode(bytes);
     expect(output).toContain("/Filter /Standard");
-    expect(permissionFromOutput(output)).toBe(permissionWord({ fillForms: true }));
+    expect(permissionFromOutput(output)).toBe(PDF_ENCRYPTED_ALLOW_FILL_FORMS_PERMISSION);
     expect(output.startsWith("%PDF-2.0")).toBe(true);
   });
 
@@ -192,7 +194,7 @@ describe("AcroForm nodes", () => {
       encryption: { password: "reader", permissions: { fillForms: false } }
     });
     const output = new TextDecoder().decode(bytes);
-    expect(permissionFromOutput(output)).toBe(permissionWord({ fillForms: false }));
+    expect(permissionFromOutput(output)).toBe(PDF_ENCRYPTED_DENY_FILL_FORMS_PERMISSION);
   });
 
   it("supports non-exportable form fields", async () => {

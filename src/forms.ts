@@ -265,9 +265,9 @@ export function renderFormField(node: FormFieldNode, page: PDFPage, x: number, y
   const y = yTop - node.appearance.height;
   const options = widgetOptions(node, x, y);
   // Reusing a field name maps to one logical PDF field. Text, dropdown, and
-  // option-list settings that initialize options/selection apply only on first
-  // creation. For radio groups, group flags also apply only first-time.
-  // `selected` is still enforced per widget to support per-option state.
+  // option-list initialization settings apply only on first creation.
+  // For radio groups, group flags also apply only first-time.
+  // `selected: true` marks the current option; false does not clear existing radio selections.
 
   switch (node.fieldType) {
     case "text": {
