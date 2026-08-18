@@ -15,6 +15,7 @@ import {
 import { edges, type BackgroundImage, type BorderSides, type BoxStyle, type Justify, type Node, type RGB } from "./types.js";
 import { fontLineHeight, fontLineMetrics, measureTextSpaced } from "./text.js";
 import { layoutParagraph, layoutParagraphWithFloats, measureParagraphIntrinsicWidthWithIndent } from "./paragraph.js";
+import { renderFormField } from "./forms.js";
 import {
   layoutText,
   measure,
@@ -485,6 +486,18 @@ function renderContent(
       });
       page.pushOperators(popGraphicsState());
       return node.height;
+    }
+    case "formField": {
+      if (
+        currentOpacity !== 1 ||
+        currentPaintMatrix.a !== 1 || currentPaintMatrix.b !== 0 ||
+        currentPaintMatrix.c !== 0 || currentPaintMatrix.d !== 1 ||
+        currentPaintMatrix.e !== 0 || currentPaintMatrix.f !== 0
+      ) {
+        throw new Error(`boxpdf form field \"${node.name}\": transformed or opacity-adjusted form widgets are not supported`);
+      }
+      renderFormField(node, page, x, yTop);
+      return node.appearance.height;
     }
     case "spacer":
       return node.size;

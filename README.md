@@ -64,6 +64,7 @@ npm install boxpdf pdf-lib
 ## What it does
 
 - Declarative layout primitives: `vstack`, `hstack`, `text`, `image`, `hline`, `vline`, `spacer`, `flex`, `keepTogether`, `link`, `svgPath`, `table`.
+- Layout-aware AcroForm fields: text, checkbox, radio, dropdown, option-list, and push-button widgets.
 - Padding, margin, background, background images, borders, borderRadius, overflow clipping, flex-grow, flex-shrink, justify, align.
 - Rich paragraphs with mixed inline runs, inline replaced nodes, hard breaks, hanging indents, and optional paragraph floats.
 - Word wrapping with `maxLines` truncation, optional `breakWords`, and no-wrap control.
@@ -154,6 +155,66 @@ Container `style`:
 - `vline({ color, thickness?, height?, margin? })`.
 - `link({ href }, child)`. Wraps a child and registers a PDF Link annotation over its rendered bounding box.
 - `table({ columns, rows, ... })`. Fixed / auto / fractional columns with header/footer rows, dividers, styled cells, and row-level page fragmentation under `renderFlow`. Cells can be plain nodes or `{ content, colSpan?, padding?, background?, border?, borderSides?, borderRadius?, align?, valign? }`.
+
+### AcroForm fields
+
+Form widgets are atomic layout nodes, so they work inside stacks, tables, pagination, and streamed documents without manual page coordinates.
+
+```ts
+import {
+  checkbox,
+  dropdown,
+  flowToPdf,
+  standardFonts,
+  text,
+  textField,
+  vstack
+} from "boxpdf";
+
+const bytes = await flowToPdf(async (pdf) => {
+  const { font } = await standardFonts(pdf);
+  return [
+    vstack({ gap: 10 },
+      text("Registration", { size: 18, font }),
+      textField({
+        name: "person.name",
+        width: 260,
+        height: 26,
+        font,
+        fontSize: 11,
+        required: true
+      }),
+      dropdown({
+        name: "person.state",
+        width: 140,
+        height: 26,
+        font,
+        options: ["CA", "NY", "WA"]
+      }),
+      checkbox({
+        name: "terms.accepted",
+        width: 16,
+        height: 16,
+        required: true
+      })
+    )
+  ];
+});
+```
+
+- `textField({ name, width, height, ... })`. Supports an initial `value`, `multiline`, `password`, `maxLength`, `combed`, alignment, and shared field flags and appearance options. Password text fields are non-exportable by default unless `exported: true` is explicitly set.
+- `checkbox({ name, width, height, checked? })`.
+- `radioOption({ name, option, width, height, selected? })`. Nodes with the same name form one radio group.
+- `dropdown({ name, options, width, height, selected?, editable?, sorted? })`. Kept single-select for consistent viewer behavior.
+- `optionList({ name, options, width, height, selected?, multiselect?, sorted? })`.
+- `button({ name, label, width, height, ... })`. Creates a portable push-button widget and appearance; BoxPDF does not attach PDF JavaScript or submit actions. Standard SubmitForm actions are reader-dependent and browser viewers may block submissions from local PDFs by origin policy.
+
+All fields accept `margin`, `alignSelf`, `readOnly`, `required`, `exported`, `hidden`, `backgroundColor`, `borderColor`, and `borderWidth`. Text-bearing fields also accept `font`, `fontSize`, and `textColor`. Field names are document-global. Reusing a name adds another widget for the same logical field; reusing it for a different field type throws. Password text fields default to `exported: false`, so mark `exported: true` to permit submission/export intentionally. Forms work with ordinary, streamed, and encrypted output; use the encryption `fillForms` permission to control whether conforming readers allow changes.
+For shared logical fields, text, dropdown, and option-list initialization state (`value`, `options`, and initial `selected`) is fixed by the first node. Radio-group flags (`offToggleable`, `mutuallyExclusive`) are also first-node-only. `selected: true` on a `radioOption` marks that option, while `selected: false` does not clear any existing selection.
+
+Use `getFormValues(pdf)`, `setFormValues(pdf, values)`, and `flattenForm(pdf)` when working with a caller-owned `PDFDocument`. When updating non-WinAnsi text, pass the embedded font as `{ font }` to `setFormValues` or `flattenForm` so pdf-lib regenerates the appearances with that font.
+
+AcroForm widgets are PDF annotations rather than page drawing operations. They therefore cannot be placed inside transformed BoxPDF ancestors; BoxPDF throws instead of emitting a misplaced widget. XFA, signature fields, PDF JavaScript, and cryptographic signing are outside the core form layer.
 
 ### Rendering
 
