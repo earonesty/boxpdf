@@ -6,6 +6,8 @@ coverage
 .idea
 .vscode
 .wrangler
+.env
+.dev.vars
 fixtures/*.pdf
 fixtures/png
 !fixtures/.gitkeep

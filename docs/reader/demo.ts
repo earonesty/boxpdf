@@ -2,15 +2,14 @@ import { httpSource, openPdf } from "../../../streaming-pdf-reader/dist/index.js
 import { pageToHtml } from "../../../streaming-pdf-reader/packages/html-writer/dist/index.js";
 
 const fixtures = [
-  ["Rich content", "../gallery/pdf/rich-content.pdf"],
-  ["Invoice", "../gallery/pdf/tailwind-invoice.pdf"],
-  ["Utilities", "../gallery/pdf/tailwind-utilities.pdf"],
-  ["Clipping", "../gallery/pdf/overflow-clipping.pdf"],
-  ["Receipt", "../gallery/pdf/receipt-inter.pdf"],
+  ["100 MiB · 1,000 pages", "https://docs.boxpdf.dev/reader/thousand-pages.pdf"],
+  ["Research paper", "https://docs.boxpdf.dev/reader/research-paper.pdf"],
+  ["Rich content", "https://docs.boxpdf.dev/reader/rich-content.pdf"],
+  ["Invoice", "https://docs.boxpdf.dev/reader/invoice.pdf"],
+  ["Utilities", "https://docs.boxpdf.dev/reader/utilities.pdf"],
+  ["Clipping", "https://docs.boxpdf.dev/reader/clipping.pdf"],
+  ["Receipt", "https://docs.boxpdf.dev/reader/receipt.pdf"],
 ] as const;
-const fixtureBase = location.hostname === "localhost" || location.hostname === "127.0.0.1"
-  ? "https://boxpdf.dev/reader/"
-  : location.href;
 
 const choices = document.querySelector<HTMLElement>("#fixture-choices")!;
 const nativeFrame = document.querySelector<HTMLIFrameElement>("#native-frame")!;
@@ -41,7 +40,7 @@ for (const [label, url] of fixtures) {
 async function loadFixture(button: HTMLButtonElement, relativeUrl: string): Promise<void> {
   const currentRun = ++run;
   for (const choice of choices.querySelectorAll("button")) choice.classList.toggle("active", choice === button);
-  const url = new URL(relativeUrl, fixtureBase).href;
+  const url = new URL(relativeUrl).href;
   const nativeUrl = new URL(url);
   nativeUrl.searchParams.set("renderer", "native");
   const readerUrl = new URL(url);
@@ -67,7 +66,12 @@ async function loadFixture(button: HTMLButtonElement, relativeUrl: string): Prom
   try {
     const started = performance.now();
     const source = await httpSource(readerUrl, { fetch: measuredFetch });
-    pdf = await openPdf(source, { maxBytes: 2 * 1024 * 1024, maxObjectCacheBytes: 2 * 1024 * 1024 });
+    pdf = await openPdf(source, {
+      maxBytes: 2 * 1024 * 1024,
+      maxObjectCacheBytes: 2 * 1024 * 1024,
+      maxObjectBytes: 512 * 1024,
+      maxXrefBytes: 512 * 1024,
+    });
     const opened = performance.now();
     const pageCount = await pdf.getPageCount();
     const page = await pdf.getPage(0);
