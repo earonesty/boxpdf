@@ -41,11 +41,7 @@ async function loadFixture(button: HTMLButtonElement, relativeUrl: string): Prom
   const currentRun = ++run;
   for (const choice of choices.querySelectorAll("button")) choice.classList.toggle("active", choice === button);
   const url = new URL(relativeUrl).href;
-  const nativeUrl = new URL(url);
-  nativeUrl.searchParams.set("renderer", "native");
-  const readerUrl = new URL(url);
-  readerUrl.searchParams.set("renderer", "boxpdf");
-  nativeFrame.src = `${nativeUrl.href}#toolbar=0&view=FitH`;
+  nativeFrame.src = `${url}#toolbar=0&view=FitH`;
   htmlFrame.srcdoc = loadingDocument();
   status.textContent = "Opening with HTTP byte ranges…";
   status.className = "demo-status loading";
@@ -73,7 +69,7 @@ async function loadFixture(button: HTMLButtonElement, relativeUrl: string): Prom
   let pdf: Awaited<ReturnType<typeof openPdf>> | undefined;
   try {
     const started = performance.now();
-    const source = await httpSource(readerUrl, { fetch: measuredFetch });
+    const source = await httpSource(url, { fetch: measuredFetch });
     pdf = await openPdf(source, {
       maxBytes: 2 * 1024 * 1024,
       maxObjectCacheBytes: 2 * 1024 * 1024,
