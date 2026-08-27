@@ -56,10 +56,18 @@ async function loadFixture(button: HTMLButtonElement, relativeUrl: string): Prom
   const measuredFetch: typeof fetch = async (input, init) => {
     const response = await fetch(input, init);
     requests += 1;
-    const clone = response.clone();
-    const bytes = await clone.arrayBuffer();
-    transferred += bytes.byteLength;
-    return response;
+    if (!response.body) return response;
+    const counter = new TransformStream<Uint8Array, Uint8Array>({
+      transform(chunk, controller) {
+        transferred += chunk.byteLength;
+        controller.enqueue(chunk);
+      },
+    });
+    return new Response(response.body.pipeThrough(counter), {
+      status: response.status,
+      statusText: response.statusText,
+      headers: response.headers,
+    });
   };
 
   let pdf: Awaited<ReturnType<typeof openPdf>> | undefined;
@@ -124,7 +132,7 @@ function errorDocument(message: string): string {
 }
 
 function frameStyles(): string {
-  return `html,body{margin:0;min-height:100%;background:#dfe5eb}main{display:flex;justify-content:center;padding:8px;box-sizing:border-box}#page-stage{flex:none}.pdf-page{margin:0!important;box-shadow:0 4px 14px #0f172a24;transform-origin:top left}`;
+  return `html,body{margin:0;min-height:100%;background:#fff}main{display:flex;justify-content:center;padding:8px;box-sizing:border-box}#page-stage{flex:none}.pdf-page{margin:0!important;border:1px solid #e2e8f0;box-shadow:0 4px 14px #0f172a1a;transform-origin:top left}`;
 }
 
 function fitHtmlPage(): void {
