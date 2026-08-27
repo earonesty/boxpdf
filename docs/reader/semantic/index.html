@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Semantic PDF extraction · boxpdf reader</title>
-<meta name="description" content="Learn why boxpdf derives semantic reading order from a visually faithful PDF model, and how to produce structured HTML for accessibility, search, data extraction, and LLM workflows." />
+<meta name="description" content="Turn PDFs into clean, reflowable HTML with useful reading order, sections, lists, cards, addresses, totals, and tables." />
 <link rel="icon" href="/boxpdf-mark.svg" type="image/svg+xml" />
 <link rel="stylesheet" href="/style.css" />
 <link rel="stylesheet" href="/reader/reader.css" />
@@ -15,6 +15,7 @@
   <nav>
     <a href="../">Visual reader</a>
     <a href="#difference">Why two views</a>
+    <a href="#semantic-demo">Live demo</a>
     <a href="#pipeline">How it works</a>
     <a href="#uses">Use cases</a>
     <a href="#api">API</a>
@@ -27,9 +28,9 @@
     <p class="eyebrow">Semantic PDF extraction</p>
     <h1>Understand the page<br /><span class="muted">before simplifying it.</span></h1>
     <p class="lede">
-      A PDF stores drawing instructions, not a document tree. Reading order is an interpretation.
-      <strong>@boxpdf/reader</strong> first reconstructs what is actually on the page, then derives
-      paragraphs, tables, nested sections, cards, label/value groups, and document flow from that visual evidence.
+      PDFs do not contain the clean document tree that HTML does. <strong>@boxpdf/reader</strong>
+      uses the page layout to put content back into a useful reading order, with paragraphs,
+      tables, nested sections, cards, addresses, labels, and values.
     </p>
     <div class="hero-pills" aria-label="Semantic reader highlights">
       <span>Reading order</span>
@@ -45,30 +46,54 @@
     </div>
   </section>
 
+  <section id="semantic-demo" class="block">
+    <p class="eyebrow">Live semantic comparison</p>
+    <h2>The designed page on the left. Its document flow on the right.</h2>
+    <p class="block-lede">Choose a real PDF. The browser renders its original pages on the left while boxpdf turns the same document into reflowable headings, paragraphs, lists, cards, address groups, totals, and tables on the right.</p>
+    <div id="semantic-fixture-choices" class="fixture-choices" aria-label="Choose a PDF fixture"></div>
+    <div class="comparison-grid semantic-comparison">
+      <section class="comparison-pane">
+        <div class="viewer-bar"><strong>Visual PDF</strong><span>browser renderer · scrollable</span></div>
+        <iframe id="semantic-native-frame" title="PDF rendered by the browser's native viewer"></iframe>
+      </section>
+      <section class="comparison-pane">
+        <div class="viewer-bar"><strong>Semantic HTML</strong><span>reflowable document structure</span></div>
+        <iframe id="semantic-html-frame" title="PDF converted to semantic HTML" sandbox="allow-same-origin"></iframe>
+      </section>
+    </div>
+    <div class="live-metrics semantic-metrics" aria-live="polite">
+      <div><strong id="semantic-metric-open">—</strong><span>open</span></div>
+      <div><strong id="semantic-metric-render">—</strong><span>semantic HTML</span></div>
+      <div><strong id="semantic-metric-pages">—</strong><span>pages structured</span></div>
+      <div><strong id="semantic-metric-resident">—</strong><span>peak reader cache</span></div>
+    </div>
+    <p id="semantic-demo-status" class="demo-status loading">Loading the semantic comparison…</p>
+  </section>
+
   <section id="difference" class="block">
     <p class="eyebrow">The important distinction</p>
-    <h2>Visual is evidence. Semantic is interpretation.</h2>
-    <p class="block-lede">Two text fragments close in the PDF byte stream may belong to different columns. Two fragments far apart may form one sentence. Flattening text first destroys the strongest clues for putting the document back together.</p>
+    <h2>Keep the page layout before simplifying it.</h2>
+    <p class="block-lede">Text stored next to each other in a PDF may belong to different columns. Text stored far apart may belong to the same sentence. boxpdf looks at where content appears on the page before deciding how it should read.</p>
     <div class="intent-comparison">
       <article class="intent-card visual-intent">
         <span class="profile-tag">visual</span>
         <h3>Preserve what the author placed</h3>
         <p>Coordinates, baselines, font metrics, vectors, images, clipping, transforms, and paint order remain available. The output can be rendered and compared to the PDF.</p>
-        <ul><li>Best for viewers and previews</li><li>Best for visual LLM input</li><li>The ground truth for later inference</li></ul>
+        <ul><li>Best for viewers and previews</li><li>Best for visual LLM input</li><li>Keeps the layout needed to build semantic HTML</li></ul>
       </article>
       <article class="intent-card semantic-intent">
         <span class="profile-tag semantic">semantic</span>
-        <h3>Express what the page means</h3>
-        <p>Geometry becomes reading order. Aligned spans become lines, cards, addresses, totals, and real tables. Repeated page furniture disappears; sections and continued tables stay connected across pages.</p>
+        <h3>Produce HTML that reads naturally</h3>
+        <p>boxpdf orders the text, groups related content, builds real tables, removes repeated headers and footers, and keeps sections and continued tables together across pages.</p>
         <ul><li>Best for accessibility and search</li><li>Best for extraction and indexing</li><li>Best for compact language-model context</li></ul>
       </article>
     </div>
-    <aside class="semantic-principle"><strong>Why visual comes first:</strong> a faithful intermediate representation lets semantic extraction improve without reparsing the PDF—and lets every inference remain traceable to its position on the original page.</aside>
+    <aside class="semantic-principle"><strong>Why visual comes first:</strong> boxpdf can only recover the right reading order if it first knows where everything appeared on the page. The original coordinates remain available so you can check every result against the PDF.</aside>
   </section>
 
   <section id="pipeline" class="block spotlight">
-    <p class="eyebrow">One source of truth</p>
-    <h2>PDF instructions become evidence, then structure.</h2>
+    <p class="eyebrow">How it works</p>
+    <h2>Read the PDF. Rebuild the page. Produce useful HTML.</h2>
     <div class="semantic-pipeline" aria-label="PDF to visual model to semantic structure pipeline">
       <div><b>1</b><strong>PDF objects</strong><span>fonts · text · paths · images</span></div>
       <i>→</i>
@@ -76,7 +101,7 @@
       <i>→</i>
       <div><b>3</b><strong>Semantic flow</strong><span>sections · cards · paragraphs · tables</span></div>
     </div>
-    <p class="block-lede">Each semantic node can carry the spans and page coordinates that support it. That makes the result inspectable: highlight the source, render the page, or ask an LLM to verify an uncertain interpretation visually.</p>
+    <p class="block-lede">The semantic output keeps links to the original text and page coordinates. You can highlight the source, show the matching page, or let an LLM check the result against the visual document.</p>
   </section>
 
   <section id="uses" class="block">
@@ -106,5 +131,6 @@ await writeHtmlDocument(pdf.pages(), write, &#123;
 
   <footer class="site-footer"><p>Start with the <a href="../">live visual reader</a>, or inspect the <a href="https://github.com/earonesty/streaming-pdf-reader" target="_blank" rel="noopener">reader source</a>.</p></footer>
 </main>
+<script type="module" src="/reader/semantic-demo.js?v=20260827-1"></script>
 </body>
 </html>
