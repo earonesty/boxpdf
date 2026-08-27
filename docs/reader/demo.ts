@@ -26,6 +26,9 @@ const metrics = {
 
 let run = 0;
 
+htmlFrame.addEventListener("load", fitHtmlPage);
+new ResizeObserver(fitHtmlPage).observe(htmlFrame);
+
 for (const [label, url] of fixtures) {
   const button = document.createElement("button");
   button.type = "button";
@@ -105,7 +108,7 @@ function formatBytes(value: number): string {
 }
 
 function renderedDocument(page: string): string {
-  return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>${frameStyles()}</style><main>${page}</main>`;
+  return `<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>${frameStyles()}</style><main><div id="page-stage">${page}</div></main>`;
 }
 
 function loadingDocument(): string {
@@ -117,7 +120,23 @@ function errorDocument(message: string): string {
 }
 
 function frameStyles(): string {
-  return `html,body{margin:0;min-height:100%;background:#dfe5eb}main{display:flex;justify-content:center;padding:16px;box-sizing:border-box}.pdf-page{margin:0!important;box-shadow:0 8px 24px #0f172a2e;max-width:100%;transform-origin:top center}@media(max-width:700px){.pdf-page{transform:scale(.68);margin-bottom:-32%!important}}`;
+  return `html,body{margin:0;min-height:100%;background:#dfe5eb}main{display:flex;justify-content:center;padding:8px;box-sizing:border-box}#page-stage{flex:none}.pdf-page{margin:0!important;box-shadow:0 4px 14px #0f172a24;transform-origin:top left}`;
+}
+
+function fitHtmlPage(): void {
+  const document = htmlFrame.contentDocument;
+  const page = document?.querySelector<HTMLElement>(".pdf-page");
+  const stage = document?.querySelector<HTMLElement>("#page-stage");
+  if (!document || !page || !stage) return;
+
+  page.style.transform = "none";
+  const width = page.offsetWidth;
+  const height = page.offsetHeight;
+  const availableWidth = Math.max(1, document.documentElement.clientWidth - 16);
+  const scale = Math.min(1, availableWidth / width);
+  page.style.transform = `scale(${scale})`;
+  stage.style.width = `${width * scale}px`;
+  stage.style.height = `${height * scale}px`;
 }
 
 function escapeHtml(value: string): string {
