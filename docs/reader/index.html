@@ -75,15 +75,15 @@ viewer.innerHTML = await pageToHtml(page, &#123; profile: "visual" &#125;);</cod
   <section id="visual" class="block">
     <p class="eyebrow">Live comparison</p>
     <h2>The PDF on the left. Reconstructed HTML on the right.</h2>
-    <p class="block-lede">Choose a real document—including a 100 MiB, 1,000-page PDF. Both panes receive the same public R2 URL: the left uses your browser's native PDF viewer; the right uses <code>@boxpdf/reader</code> and <code>@boxpdf/html-writer</code>. Every number below is measured live in your browser.</p>
+    <p class="block-lede">Choose a real document—including a 100 MiB, 1,000-page PDF. Both panes receive the same public R2 URL: the left is a scrollable native PDF viewer; the right extracts and renders page one with <code>@boxpdf/reader</code> and <code>@boxpdf/html-writer</code>. The metrics describe the right-hand conversion, measured live in your browser.</p>
     <div id="fixture-choices" class="fixture-choices" aria-label="Choose a PDF fixture"></div>
     <div class="comparison-grid">
       <section class="comparison-pane">
-        <div class="viewer-bar"><strong>Browser PDF viewer</strong><span>native reference</span></div>
+        <div class="viewer-bar"><strong>Browser PDF viewer</strong><span>complete · scrollable</span></div>
         <iframe id="native-frame" title="PDF rendered by the browser's native viewer"></iframe>
       </section>
       <section class="comparison-pane">
-        <div class="viewer-bar"><strong>boxpdf visual HTML</strong><span>DOM + SVG</span></div>
+        <div class="viewer-bar"><strong>boxpdf visual HTML</strong><span>page 1 only · DOM + SVG</span></div>
         <iframe id="html-frame" title="PDF reconstructed as visual HTML" sandbox="allow-same-origin"></iframe>
       </section>
     </div>

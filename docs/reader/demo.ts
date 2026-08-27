@@ -2,10 +2,10 @@ import { httpSource, openPdf } from "../../../streaming-pdf-reader/dist/index.js
 import { pageToHtml } from "../../../streaming-pdf-reader/packages/html-writer/dist/index.js";
 
 const fixtures = [
-  ["100 MiB · 1,000 pages", "https://docs.boxpdf.dev/reader/thousand-pages.pdf"],
-  ["Research paper", "https://docs.boxpdf.dev/reader/research-paper.pdf"],
   ["Rich content", "https://docs.boxpdf.dev/reader/rich-content.pdf"],
   ["Invoice", "https://docs.boxpdf.dev/reader/invoice.pdf"],
+  ["Research paper", "https://docs.boxpdf.dev/reader/research-paper.pdf"],
+  ["100 MiB · 1,000 pages", "https://docs.boxpdf.dev/reader/thousand-pages.pdf"],
   ["Utilities", "https://docs.boxpdf.dev/reader/utilities.pdf"],
   ["Clipping", "https://docs.boxpdf.dev/reader/clipping.pdf"],
   ["Receipt", "https://docs.boxpdf.dev/reader/receipt.pdf"],

@@ -10,6 +10,12 @@ Apply the policy:
 pnpm dlx wrangler@latest r2 bucket cors set boxpdf-public-docs --file r2/cors.json
 ```
 
+Build the large, structurally valid streaming fixture:
+
+```sh
+node scripts/build-reader-r2-fixture.mjs /tmp/boxpdf-reader-1000.pdf
+```
+
 Upload a fixture with an explicit content type and public cache policy:
 
 ```sh
