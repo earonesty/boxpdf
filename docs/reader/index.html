@@ -25,7 +25,7 @@
 <main>
   <section class="hero reader-hero">
     <p class="eyebrow">PDF → model → HTML</p>
-    <h1>Open the first page now.<br /><span class="muted">Keep the whole document faithful.</span></h1>
+    <h1>Turn PDFs into visually faithful HTML.<br /><span class="muted">Stream one page at a time.</span></h1>
     <p class="lede">
       <strong>@boxpdf/reader</strong> is a streaming, bounded-memory PDF reader for JavaScript.
       It fetches the bytes a page needs, reconstructs text, vectors, images, fonts, and reading order,
@@ -56,36 +56,29 @@ viewer.innerHTML = await pageToHtml(page, &#123; profile: "visual" &#125;);</cod
   </section>
 
   <section id="visual" class="block">
-    <p class="eyebrow">Presentation first</p>
-    <h2>HTML that still looks like the PDF</h2>
-    <p class="block-lede">The visual profile preserves page geometry, embedded fonts, Type 3 glyphs, vector paths, images, opacity, rotations, vertical text, and paint order. PDFium raster output is the fixture oracle.</p>
-    <div class="visual-demo">
-      <div class="document-shell" aria-label="Example reconstructed document">
-        <div class="viewer-bar"><i></i><i></i><i></i><span>page 1 / 1 · visual HTML</span></div>
-        <article class="reconstructed-page">
-          <div class="invoice-mark">NORTHSTAR<br /><small>DESIGN WORKS</small></div>
-          <div class="invoice-title">INVOICE</div>
-          <div class="invoice-meta"><span>INV-2048</span><span>27 AUG 2026</span></div>
-          <div class="invoice-rule"></div>
-          <div class="invoice-address"><b>Bill to</b><br />Acme Research Group<br />Portland, Oregon</div>
-          <div class="invoice-items">
-            <b>DESCRIPTION</b><b>QTY</b><b>AMOUNT</b>
-            <span>Document reconstruction system</span><span>1</span><span>$8,400</span>
-            <span>Accessibility structure audit</span><span>1</span><span>$1,250</span>
-            <span>PDFium parity fixture suite</span><span>62</span><span>$0</span>
-          </div>
-          <div class="invoice-total"><span>Total</span><b>$9,650.00</b></div>
-          <div class="invoice-stamp">PAID</div>
-        </article>
-      </div>
-      <div class="parity-panel">
-        <div><strong>62 / 62</strong><span>PDFium fixtures passing</span></div>
-        <div><strong>4</strong><span>bitwise-exact rasters</span></div>
-        <div><strong>58</strong><span>deterministic visual tolerance</span></div>
-        <p>Fixtures cover embedded TrueType, Type 1 and Type 3 fonts, CJK text, RTL, malformed PDFs, clipping, transparency, vector paths, images, and rotations.</p>
-        <a href="https://github.com/earonesty/streaming-pdf-reader/blob/main/corpus/pdfium-visual-baseline.json" target="_blank" rel="noopener">Inspect the committed baseline →</a>
-      </div>
+    <p class="eyebrow">Live comparison</p>
+    <h2>The PDF on the left. Reconstructed HTML on the right.</h2>
+    <p class="block-lede">Choose a real document. Both panes receive the same URL: the left uses your browser's native PDF viewer; the right uses <code>@boxpdf/reader</code> and <code>@boxpdf/html-writer</code>. Every number below is measured live in your browser.</p>
+    <div id="fixture-choices" class="fixture-choices" aria-label="Choose a PDF fixture"></div>
+    <div class="comparison-grid">
+      <section class="comparison-pane">
+        <div class="viewer-bar"><strong>Browser PDF viewer</strong><span>native reference</span></div>
+        <iframe id="native-frame" title="PDF rendered by the browser's native viewer"></iframe>
+      </section>
+      <section class="comparison-pane">
+        <div class="viewer-bar"><strong>boxpdf visual HTML</strong><span>DOM + SVG</span></div>
+        <iframe id="html-frame" title="PDF reconstructed as visual HTML" sandbox="allow-same-origin"></iframe>
+      </section>
     </div>
+    <div class="live-metrics" aria-live="polite">
+      <div><strong id="metric-open">—</strong><span>open</span></div>
+      <div><strong id="metric-render">—</strong><span>first page → HTML</span></div>
+      <div><strong id="metric-bytes">—</strong><span>bytes transferred</span></div>
+      <div><strong id="metric-requests">—</strong><span>range requests</span></div>
+      <div><strong id="metric-resident">—</strong><span>peak reader cache</span></div>
+    </div>
+    <p id="demo-status" class="demo-status loading">Loading the live demo…</p>
+    <noscript><p class="demo-status error">JavaScript is required for the live reader comparison.</p></noscript>
   </section>
 
   <section id="speed" class="block spotlight">
@@ -152,5 +145,6 @@ openPdf(memorySource(bytes))</code></pre><p>HTTP range requests, browser files, 
 
   <footer class="site-footer"><p><strong>@boxpdf/reader</strong> is MIT-licensed. Pair it with the <a href="../">boxpdf PDF writer</a>, or inspect the <a href="https://github.com/earonesty/streaming-pdf-reader" target="_blank" rel="noopener">reader source and benchmarks</a>.</p></footer>
 </main>
+<script type="module" src="./demo.js"></script>
 </body>
 </html>
