@@ -14,6 +14,7 @@
   <a class="brand" href="./"><img src="./boxpdf-mark.svg" alt="" />boxpdf</a>
   <nav>
     <a href="#features">Features</a>
+    <a href="./reader/">PDF reader</a>
     <a href="#tailwind">Tailwind</a>
     <a href="#themes">Themes</a>
     <a href="#templates">Templates</a>
@@ -48,6 +49,7 @@
       <a class="btn btn-primary" href="#install">Install</a>
       <a class="btn btn-secondary" href="#tailwind">See HTML rendering</a>
       <a class="btn btn-secondary" href="#templates">See templates</a>
+      <a class="btn btn-secondary" href="./reader/">PDF → HTML reader</a>
       <a class="btn btn-ghost" href="https://github.com/earonesty/boxpdf" target="_blank" rel="noopener">GitHub →</a>
     </div>
     <pre class="hero-code"><code>import &#123; cleanTheme, hline, hstack, renderFlow, text, vstack &#125; from "boxpdf";
@@ -76,6 +78,10 @@ const bytes = await pdf.save(); // -&gt; Uint8Array</code></pre>
   <section id="features" class="block">
     <h2>What's in the box</h2>
     <div class="feature-grid">
+      <div class="feature">
+        <h3>PDF → model → HTML</h3>
+        <p><a href="./reader/">@boxpdf/reader</a> opens PDFs from random-access sources, reconstructs visually faithful HTML, and keeps cache memory bounded as documents grow.</p>
+      </div>
       <div class="feature">
         <h3>Runs at the edge</h3>
         <p>Works on Cloudflare Workers without <code>nodejs_compat</code> or any WASM flag. Verified end-to-end with embedded Inter.</p>

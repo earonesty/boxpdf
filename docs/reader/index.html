@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>boxpdf reader · stream PDFs into visually faithful HTML</title>
+<meta name="description" content="Open PDFs from random-access sources, render visually faithful HTML, extract semantic structure, and keep memory bounded with @boxpdf/reader." />
+<link rel="icon" href="../boxpdf-mark.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="../style.css" />
+<link rel="stylesheet" href="./reader.css" />
+</head>
+<body>
+<header class="site">
+  <a class="brand" href="../"><img src="../boxpdf-mark.svg" alt="" />boxpdf</a>
+  <nav>
+    <a href="#visual">Visual HTML</a>
+    <a href="#speed">Streaming</a>
+    <a href="#memory">Memory</a>
+    <a href="#api">API</a>
+    <a href="../">PDF writer</a>
+    <a href="https://github.com/earonesty/streaming-pdf-reader" target="_blank" rel="noopener">GitHub</a>
+  </nav>
+</header>
+
+<main>
+  <section class="hero reader-hero">
+    <p class="eyebrow">PDF → model → HTML</p>
+    <h1>Open the first page now.<br /><span class="muted">Keep the whole document faithful.</span></h1>
+    <p class="lede">
+      <strong>@boxpdf/reader</strong> is a streaming, bounded-memory PDF reader for JavaScript.
+      It fetches the bytes a page needs, reconstructs text, vectors, images, fonts, and reading order,
+      then emits either <strong>visual HTML</strong> or a simpler <strong>semantic model</strong>.
+    </p>
+    <div class="hero-pills" aria-label="Reader highlights">
+      <span>62 / 62 PDFium visual fixtures</span>
+      <span>Random-access HTTP</span>
+      <span>Bounded byte + object caches</span>
+      <span>Visual and semantic profiles</span>
+      <span>Node · browser · edge</span>
+    </div>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="#api">Install</a>
+      <a class="btn btn-secondary" href="#visual">See visual parity</a>
+      <a class="btn btn-ghost" href="https://github.com/earonesty/streaming-pdf-reader" target="_blank" rel="noopener">Source →</a>
+    </div>
+    <pre class="hero-code"><code>import &#123; httpSource, openPdf &#125; from "@boxpdf/reader";
+import &#123; pageToHtml &#125; from "@boxpdf/html-writer";
+
+const pdf = await openPdf(httpSource(url), &#123;
+  maxBytes: 2 * 1024 * 1024,
+  maxObjectCacheBytes: 2 * 1024 * 1024
+&#125;);
+
+const page = await pdf.getPage(0);
+viewer.innerHTML = await pageToHtml(page, &#123; profile: "visual" &#125;);</code></pre>
+  </section>
+
+  <section id="visual" class="block">
+    <p class="eyebrow">Presentation first</p>
+    <h2>HTML that still looks like the PDF</h2>
+    <p class="block-lede">The visual profile preserves page geometry, embedded fonts, Type 3 glyphs, vector paths, images, opacity, rotations, vertical text, and paint order. PDFium raster output is the fixture oracle.</p>
+    <div class="visual-demo">
+      <div class="document-shell" aria-label="Example reconstructed document">
+        <div class="viewer-bar"><i></i><i></i><i></i><span>page 1 / 1 · visual HTML</span></div>
+        <article class="reconstructed-page">
+          <div class="invoice-mark">NORTHSTAR<br /><small>DESIGN WORKS</small></div>
+          <div class="invoice-title">INVOICE</div>
+          <div class="invoice-meta"><span>INV-2048</span><span>27 AUG 2026</span></div>
+          <div class="invoice-rule"></div>
+          <div class="invoice-address"><b>Bill to</b><br />Acme Research Group<br />Portland, Oregon</div>
+          <div class="invoice-items">
+            <b>DESCRIPTION</b><b>QTY</b><b>AMOUNT</b>
+            <span>Document reconstruction system</span><span>1</span><span>$8,400</span>
+            <span>Accessibility structure audit</span><span>1</span><span>$1,250</span>
+            <span>PDFium parity fixture suite</span><span>62</span><span>$0</span>
+          </div>
+          <div class="invoice-total"><span>Total</span><b>$9,650.00</b></div>
+          <div class="invoice-stamp">PAID</div>
+        </article>
+      </div>
+      <div class="parity-panel">
+        <div><strong>62 / 62</strong><span>PDFium fixtures passing</span></div>
+        <div><strong>4</strong><span>bitwise-exact rasters</span></div>
+        <div><strong>58</strong><span>deterministic visual tolerance</span></div>
+        <p>Fixtures cover embedded TrueType, Type 1 and Type 3 fonts, CJK text, RTL, malformed PDFs, clipping, transparency, vector paths, images, and rotations.</p>
+        <a href="https://github.com/earonesty/streaming-pdf-reader/blob/main/corpus/pdfium-visual-baseline.json" target="_blank" rel="noopener">Inspect the committed baseline →</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="speed" class="block spotlight">
+    <p class="eyebrow">Large documents feel small</p>
+    <h2>1,000 pages. First page in milliseconds.</h2>
+    <p class="block-lede">Opening a document does not decode every page. The reader resolves the cross-reference data, fetches page one, and leaves the remaining 999 pages on the source until requested.</p>
+    <div class="speed-grid">
+      <div class="timeline-card">
+        <div class="timeline-label"><span>openPdf()</span><b>~1–6 ms</b></div>
+        <div class="timeline"><i style="width:12%"></i></div>
+        <div class="timeline-label"><span>first page extracted</span><b>~3–20 ms</b></div>
+        <div class="timeline"><i style="width:28%"></i></div>
+        <div class="timeline-label faint"><span>pages 2–1,000</span><b>not loaded yet</b></div>
+        <div class="timeline pending"></div>
+        <p>Local Node 24 benchmark, seven warm/cold runs, synthetic 1,000-page PDF. Hardware and document complexity vary.</p>
+      </div>
+      <div class="jump-card">
+        <span class="page-stack page-back"></span><span class="page-stack page-mid"></span>
+        <div class="page-front"><b>10,000</b><span>jump directly to a page</span></div>
+        <p>The memory gate seeks directly to page 10,000 with compact xrefs while retaining bounded caches.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="memory" class="block">
+    <p class="eyebrow">Measured process memory</p>
+    <h2>Input size grows 10×. Reader memory stays flat.</h2>
+    <p class="block-lede">Same logical PDF, isolated Node 24 processes. PDF.js and unpdf use their complete-<code>Uint8Array</code> APIs; @boxpdf/reader uses a random-access source.</p>
+    <div class="memory-chart" role="img" aria-label="RSS growth for 100 MiB input: reader 3.64 MiB, unpdf 126.75 MiB, PDF.js 174.44 MiB">
+      <div class="chart-row reader"><span>@boxpdf/reader</span><i style="--value:2.1%"></i><b>3.64 MiB</b></div>
+      <div class="chart-row"><span>unpdf</span><i style="--value:72.7%"></i><b>126.75 MiB</b></div>
+      <div class="chart-row"><span>PDF.js</span><i style="--value:100%"></i><b>174.44 MiB</b></div>
+    </div>
+    <div class="memory-stats">
+      <div><strong>140 KiB</strong><span>source data read from a 100 MiB input</span></div>
+      <div><strong>77 KiB</strong><span>ArrayBuffer growth</span></div>
+      <div><strong>3.64 MiB</strong><span>RSS growth at both 10 and 100 MiB</span></div>
+    </div>
+    <p class="footnote">Peak RSS includes a ~46 MiB Node baseline. Results vary by OS and dependency version. <a href="https://github.com/earonesty/streaming-pdf-reader/blob/main/scripts/memory-comparison.mjs" target="_blank" rel="noopener">Run the benchmark yourself</a>.</p>
+  </section>
+
+  <section id="profiles" class="block">
+    <h2>One extraction, two output intents</h2>
+    <div class="profile-grid">
+      <article><span class="profile-tag">visual</span><h3>Display presentation</h3><p>Absolute positioning, original geometry, SVG vectors, embedded font programs, and page paint order. Use it for viewers, previews, and PDF-to-HTML conversion.</p></article>
+      <article><span class="profile-tag semantic">semantic</span><h3>Reading order</h3><p>Lines, paragraphs, tables, inferred spaces, and nested structure. Use it for accessibility, search, CSV extraction, indexing, and downstream transforms.</p></article>
+    </div>
+  </section>
+
+  <section id="api" class="block install-block">
+    <h2>Install the reader and HTML writer</h2>
+    <pre><code>npm install @boxpdf/reader @boxpdf/html-writer</code></pre>
+    <div class="showcase-grid">
+      <article class="showcase-card"><h3>Random-access sources</h3><pre><code>openPdf(httpSource(url))
+openPdf(blobSource(file))
+openPdf(memorySource(bytes))</code></pre><p>HTTP range requests, browser files, in-memory bytes, or your own <code>size + read(offset, length)</code> source.</p></article>
+      <article class="showcase-card"><h3>Stream HTML pages</h3><pre><code>for (let i = 0; i &lt; await pdf.getPageCount(); i++) &#123;
+  await write(pageToHtml(await pdf.getPage(i), &#123;
+    profile: "visual"
+  &#125;));
+&#125;</code></pre><p>Consume a page at a time without retaining the original PDF or completed HTML output.</p></article>
+    </div>
+  </section>
+
+  <footer class="site-footer"><p><strong>@boxpdf/reader</strong> is MIT-licensed. Pair it with the <a href="../">boxpdf PDF writer</a>, or inspect the <a href="https://github.com/earonesty/streaming-pdf-reader" target="_blank" rel="noopener">reader source and benchmarks</a>.</p></footer>
+</main>
+</body>
+</html>
