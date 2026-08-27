@@ -29,7 +29,7 @@
     <p class="lede">
       A PDF stores drawing instructions, not a document tree. Reading order is an interpretation.
       <strong>@boxpdf/reader</strong> first reconstructs what is actually on the page, then derives
-      paragraphs, tables, nesting, and flow from that visual evidence.
+      paragraphs, tables, nested sections, cards, label/value groups, and document flow from that visual evidence.
     </p>
     <div class="hero-pills" aria-label="Semantic reader highlights">
       <span>Reading order</span>
@@ -59,7 +59,7 @@
       <article class="intent-card semantic-intent">
         <span class="profile-tag semantic">semantic</span>
         <h3>Express what the page means</h3>
-        <p>Geometry becomes reading order. Aligned spans become lines and tables. Repeated visual patterns become nested sections, lists, labels, and values.</p>
+        <p>Geometry becomes reading order. Aligned spans become lines, cards, addresses, totals, and real tables. Repeated page furniture disappears; sections and continued tables stay connected across pages.</p>
         <ul><li>Best for accessibility and search</li><li>Best for extraction and indexing</li><li>Best for compact language-model context</li></ul>
       </article>
     </div>
@@ -74,7 +74,7 @@
       <i>→</i>
       <div><b>2</b><strong>Visual model</strong><span>geometry · paint order · source refs</span></div>
       <i>→</i>
-      <div><b>3</b><strong>Semantic flow</strong><span>sections · paragraphs · tables</span></div>
+      <div><b>3</b><strong>Semantic flow</strong><span>sections · cards · paragraphs · tables</span></div>
     </div>
     <p class="block-lede">Each semantic node can carry the spans and page coordinates that support it. That makes the result inspectable: highlight the source, render the page, or ask an LLM to verify an uncertain interpretation visually.</p>
   </section>
@@ -85,7 +85,7 @@
       <article><h3>Accessible reading order</h3><p>Turn positioned content into headings, paragraphs, lists, and tables that assistive technology can navigate.</p></article>
       <article><h3>Grounded LLM extraction</h3><p>Send compact semantic content for reasoning and retain visual HTML for layout-sensitive verification and citations.</p></article>
       <article><h3>Search and indexing</h3><p>Index coherent blocks instead of isolated glyph runs, while preserving page and bounding-box provenance for every result.</p></article>
-      <article><h3>Tables and forms</h3><p>Use repeated alignment, rules, labels, and spatial grouping to recover relationships that plain-text extraction cannot see.</p></article>
+      <article><h3>Tables and forms</h3><p>Recover real rows, continued tables, totals, addresses, cards, labels, and values that plain-text extraction cannot keep connected.</p></article>
     </div>
   </section>
 
@@ -93,14 +93,15 @@
     <p class="eyebrow">Same extraction, different intent</p>
     <h2>Choose semantic output when meaning matters most.</h2>
     <pre><code>import &#123; blobSource, openPdf &#125; from "@boxpdf/reader";
-import &#123; pageToHtml &#125; from "@boxpdf/html-writer";
+import &#123; writeHtmlDocument &#125; from "@boxpdf/html-writer";
 
 const pdf = await openPdf(await blobSource(file));
-const page = await pdf.getPage(0);
 
-const visual = await pageToHtml(page, &#123; profile: "visual" &#125;);
-const semantic = await pageToHtml(page, &#123; profile: "semantic" &#125;);</code></pre>
-    <p class="footnote">Semantic inference is under active development. The stable visual model and source coordinates are the foundation that lets it improve fixture by fixture.</p>
+await writeHtmlDocument(pdf.pages(), write, &#123;
+  profile: "semantic",
+  semanticLookaheadPages: 4
+&#125;);</code></pre>
+    <p class="footnote">Semantic output streams with bounded lookahead, so cross-page structure improves without turning a large document into a large memory spike.</p>
   </section>
 
   <footer class="site-footer"><p>Start with the <a href="../">live visual reader</a>, or inspect the <a href="https://github.com/earonesty/streaming-pdf-reader" target="_blank" rel="noopener">reader source</a>.</p></footer>
