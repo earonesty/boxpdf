@@ -13,9 +13,11 @@
 <header class="site">
   <a class="brand" href="../"><img src="../boxpdf-mark.svg" alt="" />boxpdf</a>
   <nav>
-    <a href="#visual">Visual HTML</a>
+    <a href="#why">Why reader</a>
+    <a href="#visual">Live demo</a>
     <a href="#speed">Streaming</a>
     <a href="#memory">Memory</a>
+    <a href="./semantic/">Semantic view</a>
     <a href="#api">API</a>
     <a href="../">PDF writer</a>
     <a href="https://github.com/earonesty/streaming-pdf-reader" target="_blank" rel="noopener">GitHub</a>
@@ -24,23 +26,25 @@
 
 <main>
   <section class="hero reader-hero">
-    <p class="eyebrow">PDF → model → HTML</p>
-    <h1>Turn PDFs into visually faithful HTML.<br /><span class="muted">Stream one page at a time.</span></h1>
+    <p class="eyebrow">Open-source PDF extraction for JavaScript runtimes</p>
+    <h1>Read PDFs without loading them.<br /><span class="muted">Render them without losing the page.</span></h1>
     <p class="lede">
-      <strong>@boxpdf/reader</strong> is a streaming, bounded-memory PDF reader for JavaScript.
-      It fetches the bytes a page needs, reconstructs text, vectors, images, fonts, and reading order,
-      then emits either <strong>visual HTML</strong> or a simpler <strong>semantic model</strong>.
+      <strong>@boxpdf/reader</strong> turns PDFs into a structured model and pixel-accurate HTML
+      using only the bytes each page needs. It is fast, bounded-memory, and built for
+      <strong>Node</strong>, <strong>edge functions</strong>, and the <strong>browser</strong>—with no WASM,
+      native binary, or headless browser.
     </p>
     <div class="hero-pills" aria-label="Reader highlights">
-      <span>62 / 62 PDFium visual fixtures</span>
-      <span>Random-access HTTP</span>
-      <span>Bounded byte + object caches</span>
-      <span>Visual and semantic profiles</span>
-      <span>Node · browser · edge</span>
+      <span>Low-memory extraction</span>
+      <span>Edge-function compatible</span>
+      <span>Fast first page</span>
+      <span>Pixel-accurate visual HTML</span>
+      <span>Visual context for LLMs</span>
     </div>
     <div class="cta-row">
       <a class="btn btn-primary" href="#api">Install</a>
-      <a class="btn btn-secondary" href="#visual">See visual parity</a>
+      <a class="btn btn-secondary" href="#visual">Try the live reader</a>
+      <a class="btn btn-secondary" href="./semantic/">Why visual comes first</a>
       <a class="btn btn-ghost" href="https://github.com/earonesty/streaming-pdf-reader" target="_blank" rel="noopener">Source →</a>
     </div>
     <pre class="hero-code"><code>import &#123; httpSource, openPdf &#125; from "@boxpdf/reader";
@@ -53,6 +57,19 @@ const pdf = await openPdf(httpSource(url), &#123;
 
 const page = await pdf.getPage(0);
 viewer.innerHTML = await pageToHtml(page, &#123; profile: "visual" &#125;);</code></pre>
+  </section>
+
+  <section id="why" class="block">
+    <p class="eyebrow">Why @boxpdf/reader</p>
+    <h2>A PDF extractor that understands the page.</h2>
+    <p class="block-lede">Most PDF tools choose between pulling out text and drawing pixels. boxpdf keeps the visual evidence—geometry, fonts, vectors, images, and paint order—while exposing it as a JavaScript model and ordinary HTML.</p>
+    <div class="reader-benefits">
+      <article><h3>Low memory by design</h3><p>Fetch and retain only the ranges and objects needed for the current page. Cache limits stay fixed even when the source document grows to thousands of pages.</p></article>
+      <article><h3>Made for edge functions</h3><p>Pure JavaScript with random-access HTTP, <code>Blob</code>, memory, and custom data sources. No filesystem assumption, WASM module, native addon, or browser process.</p></article>
+      <article><h3>Fast where users feel it</h3><p>Open the cross-reference data and go directly to page one—or page 10,000. Work begins before the entire file has crossed the network.</p></article>
+      <article><h3>Accurate when rendered</h3><p>Visual HTML preserves page coordinates, embedded fonts, images, SVG paths, opacity, rotation, and paint order. PDFium raster fixtures gate the result.</p></article>
+      <article class="benefit-wide"><h3>Let LLMs look at the PDF, not merely read its text</h3><p>Render the reconstructed HTML in a browser and give a multimodal model the page as it was designed: columns, labels, callouts, diagrams, handwriting, and spatial relationships intact. Pair that view with the extracted model for grounded document workflows.</p></article>
+    </div>
   </section>
 
   <section id="visual" class="block">
@@ -124,7 +141,7 @@ viewer.innerHTML = await pageToHtml(page, &#123; profile: "visual" &#125;);</cod
     <h2>One extraction, two output intents</h2>
     <div class="profile-grid">
       <article><span class="profile-tag">visual</span><h3>Display presentation</h3><p>Absolute positioning, original geometry, SVG vectors, embedded font programs, and page paint order. Use it for viewers, previews, and PDF-to-HTML conversion.</p></article>
-      <article><span class="profile-tag semantic">semantic</span><h3>Reading order</h3><p>Lines, paragraphs, tables, inferred spaces, and nested structure. Use it for accessibility, search, CSV extraction, indexing, and downstream transforms.</p></article>
+      <article><span class="profile-tag semantic">semantic</span><h3>Reading order</h3><p>Lines, paragraphs, tables, inferred spaces, and nested structure—derived from the visual evidence rather than flattened text. <a href="./semantic/">See why visual fidelity comes first →</a></p></article>
     </div>
   </section>
 

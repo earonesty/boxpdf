@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Semantic PDF extraction · boxpdf reader</title>
+<meta name="description" content="Learn why boxpdf derives semantic reading order from a visually faithful PDF model, and how to produce structured HTML for accessibility, search, data extraction, and LLM workflows." />
+<link rel="icon" href="../../boxpdf-mark.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="../../style.css" />
+<link rel="stylesheet" href="../reader.css" />
+</head>
+<body>
+<header class="site">
+  <a class="brand" href="../../"><img src="../../boxpdf-mark.svg" alt="" />boxpdf</a>
+  <nav>
+    <a href="../">Visual reader</a>
+    <a href="#difference">Why two views</a>
+    <a href="#pipeline">How it works</a>
+    <a href="#uses">Use cases</a>
+    <a href="#api">API</a>
+    <a href="https://github.com/earonesty/streaming-pdf-reader" target="_blank" rel="noopener">GitHub</a>
+  </nav>
+</header>
+
+<main>
+  <section class="hero semantic-hero">
+    <p class="eyebrow">Semantic PDF extraction</p>
+    <h1>Understand the page<br /><span class="muted">before simplifying it.</span></h1>
+    <p class="lede">
+      A PDF stores drawing instructions, not a document tree. Reading order is an interpretation.
+      <strong>@boxpdf/reader</strong> first reconstructs what is actually on the page, then derives
+      paragraphs, tables, nesting, and flow from that visual evidence.
+    </p>
+    <div class="hero-pills" aria-label="Semantic reader highlights">
+      <span>Reading order</span>
+      <span>Paragraphs and lines</span>
+      <span>Table structure</span>
+      <span>Source coordinates retained</span>
+      <span>Accessible HTML</span>
+      <span>LLM-ready context</span>
+    </div>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="#api">Use semantic mode</a>
+      <a class="btn btn-secondary" href="../#visual">Try the visual reader</a>
+    </div>
+  </section>
+
+  <section id="difference" class="block">
+    <p class="eyebrow">The important distinction</p>
+    <h2>Visual is evidence. Semantic is interpretation.</h2>
+    <p class="block-lede">Two text fragments close in the PDF byte stream may belong to different columns. Two fragments far apart may form one sentence. Flattening text first destroys the strongest clues for putting the document back together.</p>
+    <div class="intent-comparison">
+      <article class="intent-card visual-intent">
+        <span class="profile-tag">visual</span>
+        <h3>Preserve what the author placed</h3>
+        <p>Coordinates, baselines, font metrics, vectors, images, clipping, transforms, and paint order remain available. The output can be rendered and compared to the PDF.</p>
+        <ul><li>Best for viewers and previews</li><li>Best for visual LLM input</li><li>The ground truth for later inference</li></ul>
+      </article>
+      <article class="intent-card semantic-intent">
+        <span class="profile-tag semantic">semantic</span>
+        <h3>Express what the page means</h3>
+        <p>Geometry becomes reading order. Aligned spans become lines and tables. Repeated visual patterns become nested sections, lists, labels, and values.</p>
+        <ul><li>Best for accessibility and search</li><li>Best for extraction and indexing</li><li>Best for compact language-model context</li></ul>
+      </article>
+    </div>
+    <aside class="semantic-principle"><strong>Why visual comes first:</strong> a faithful intermediate representation lets semantic extraction improve without reparsing the PDF—and lets every inference remain traceable to its position on the original page.</aside>
+  </section>
+
+  <section id="pipeline" class="block spotlight">
+    <p class="eyebrow">One source of truth</p>
+    <h2>PDF instructions become evidence, then structure.</h2>
+    <div class="semantic-pipeline" aria-label="PDF to visual model to semantic structure pipeline">
+      <div><b>1</b><strong>PDF objects</strong><span>fonts · text · paths · images</span></div>
+      <i>→</i>
+      <div><b>2</b><strong>Visual model</strong><span>geometry · paint order · source refs</span></div>
+      <i>→</i>
+      <div><b>3</b><strong>Semantic flow</strong><span>sections · paragraphs · tables</span></div>
+    </div>
+    <p class="block-lede">Each semantic node can carry the spans and page coordinates that support it. That makes the result inspectable: highlight the source, render the page, or ask an LLM to verify an uncertain interpretation visually.</p>
+  </section>
+
+  <section id="uses" class="block">
+    <h2>Use the right representation for the next job.</h2>
+    <div class="reader-benefits semantic-uses">
+      <article><h3>Accessible reading order</h3><p>Turn positioned content into headings, paragraphs, lists, and tables that assistive technology can navigate.</p></article>
+      <article><h3>Grounded LLM extraction</h3><p>Send compact semantic content for reasoning and retain visual HTML for layout-sensitive verification and citations.</p></article>
+      <article><h3>Search and indexing</h3><p>Index coherent blocks instead of isolated glyph runs, while preserving page and bounding-box provenance for every result.</p></article>
+      <article><h3>Tables and forms</h3><p>Use repeated alignment, rules, labels, and spatial grouping to recover relationships that plain-text extraction cannot see.</p></article>
+    </div>
+  </section>
+
+  <section id="api" class="block install-block">
+    <p class="eyebrow">Same extraction, different intent</p>
+    <h2>Choose semantic output when meaning matters most.</h2>
+    <pre><code>import &#123; blobSource, openPdf &#125; from "@boxpdf/reader";
+import &#123; pageToHtml &#125; from "@boxpdf/html-writer";
+
+const pdf = await openPdf(await blobSource(file));
+const page = await pdf.getPage(0);
+
+const visual = await pageToHtml(page, &#123; profile: "visual" &#125;);
+const semantic = await pageToHtml(page, &#123; profile: "semantic" &#125;);</code></pre>
+    <p class="footnote">Semantic inference is under active development. The stable visual model and source coordinates are the foundation that lets it improve fixture by fixture.</p>
+  </section>
+
+  <footer class="site-footer"><p>Start with the <a href="../">live visual reader</a>, or inspect the <a href="https://github.com/earonesty/streaming-pdf-reader" target="_blank" rel="noopener">reader source</a>.</p></footer>
+</main>
+</body>
+</html>
