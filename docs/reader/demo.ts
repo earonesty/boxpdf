@@ -75,7 +75,7 @@ async function loadFixture(button: HTMLButtonElement, relativeUrl: string): Prom
       maxBytes: 32 * 1024 * 1024,
       maxObjectCacheBytes: 16 * 1024 * 1024,
       maxObjectBytes: 4 * 1024 * 1024,
-      maxXrefBytes: 8 * 1024 * 1024,
+      maxXrefBytes: 1024 * 1024,
     });
     const opened = performance.now();
     const pageCount = await pdf.getPageCount();
