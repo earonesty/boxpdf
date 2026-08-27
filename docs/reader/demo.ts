@@ -5,7 +5,7 @@ const fixtures = [
   ["Rich content", "https://docs.boxpdf.dev/reader/rich-content.pdf"],
   ["Invoice", "https://docs.boxpdf.dev/reader/invoice.pdf"],
   ["Research paper", "https://docs.boxpdf.dev/reader/research-paper.pdf"],
-  ["100 MiB · 1,000 pages", "https://docs.boxpdf.dev/reader/thousand-pages.pdf"],
+  ["100 MiB · 1,000 pages", "https://docs.boxpdf.dev/reader/thousand-pages-v2.pdf"],
   ["Utilities", "https://docs.boxpdf.dev/reader/utilities.pdf"],
   ["Clipping", "https://docs.boxpdf.dev/reader/clipping.pdf"],
   ["Receipt", "https://docs.boxpdf.dev/reader/receipt.pdf"],
@@ -71,10 +71,11 @@ async function loadFixture(button: HTMLButtonElement, relativeUrl: string): Prom
     const started = performance.now();
     const source = await httpSource(url, { fetch: measuredFetch });
     pdf = await openPdf(source, {
-      maxBytes: 2 * 1024 * 1024,
-      maxObjectCacheBytes: 2 * 1024 * 1024,
-      maxObjectBytes: 512 * 1024,
-      maxXrefBytes: 512 * 1024,
+      chunkSize: 1024 * 1024,
+      maxBytes: 32 * 1024 * 1024,
+      maxObjectCacheBytes: 16 * 1024 * 1024,
+      maxObjectBytes: 4 * 1024 * 1024,
+      maxXrefBytes: 8 * 1024 * 1024,
     });
     const opened = performance.now();
     const pageCount = await pdf.getPageCount();
