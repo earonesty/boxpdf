@@ -62,6 +62,31 @@ const doc = vstack(
     }),
     run(".", body)
   ),
+  vstack(
+    {
+      width: 392,
+      margin: { left: 30, right: 30 },
+      padding: 12,
+      background: panel,
+      border: { color: line, width: 1 },
+      gap: 6
+    },
+    paragraph(
+      { width: 368, lineHeight: 14 },
+      run(
+        "This inset note is visually grouped by a narrower measure, a changed typeface, and a containing panel. ",
+        bodyItalic
+      ),
+      run(
+        "Semantic reflow should keep these lines together without guessing whether the block is a quotation, abstract, sidebar, or figure.",
+        bodyItalic
+      )
+    )
+  ),
+  paragraph(
+    { width: 452, lineHeight: 15 },
+    run("Normal body text resumes at the outer measure after the inset block.", body)
+  ),
   hline({ color: line }),
   table({
     width: 452,
