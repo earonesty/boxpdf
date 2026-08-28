@@ -176,9 +176,9 @@ const bytes = await pdf.save(); // -&gt; Uint8Array</code></pre>
     <div class="showcase-grid">
       <article class="showcase-card">
         <h3>Stream from a file or stdin</h3>
-        <pre><code>npx boxpdf-html archive.html archive.pdf --stream
+        <pre><code>npx @boxpdf/html-reader archive.html archive.pdf --stream
 
-cat archive.html | npx boxpdf-html - archive.pdf --stream</code></pre>
+cat archive.html | npx @boxpdf/html-reader - archive.pdf --stream</code></pre>
         <p>The destination is replaced only after conversion succeeds. Stdin is spooled to a temporary file for the required second pass.</p>
       </article>
       <article class="showcase-card">
@@ -450,7 +450,7 @@ export default app;</code></pre>
       <article class="showcase-card">
         <h3>CLI, without secrets in process arguments</h3>
         <pre><code>export BOXPDF_PASSWORD="open me"
-npx boxpdf-html archive.html archive.pdf --stream --password-env BOXPDF_PASSWORD</code></pre>
+npx @boxpdf/html-reader archive.html archive.pdf --stream --password-env BOXPDF_PASSWORD</code></pre>
         <p>The CLI reads the password from the named environment variable. Owner passwords and viewer permissions are available through the library API. Viewer permissions are advisory, as defined by the PDF standard.</p>
       </article>
     </div>
