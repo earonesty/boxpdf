@@ -1,11 +1,11 @@
-# boxpdf
+# @boxpdf/writer
 
 A box-layout DSL over [pdf-lib](https://pdf-lib.js.org/). Implemented in portable JavaScript, it runs in Node 20+, Cloudflare Workers, Deno, and browsers.
 
 Live gallery: <https://earonesty.github.io/boxpdf/>
 
 ```ts
-import { cleanTheme, flowToPdf, hline, hstack, standardFonts, text, vstack } from "boxpdf";
+import { cleanTheme, flowToPdf, hline, hstack, standardFonts, text, vstack } from "@boxpdf/writer";
 
 const bytes = await flowToPdf(async (pdf) => {
   const { font, bold } = await standardFonts(pdf);
@@ -32,7 +32,7 @@ const bytes = await flowToPdf(async (pdf) => {
 
 ```ts
 import { PDFDocument, StandardFonts } from "pdf-lib";
-import { cleanTheme, renderFlow, text, vstack } from "boxpdf";
+import { cleanTheme, renderFlow, text, vstack } from "@boxpdf/writer";
 
 const pdf  = await PDFDocument.create();
 const font = await pdf.embedFont(StandardFonts.Helvetica);
@@ -56,10 +56,22 @@ const bytes = await pdf.save();
 ## Install
 
 ```sh
-npm install boxpdf pdf-lib
+npm install @boxpdf/writer pdf-lib
 ```
 
 `pdf-lib` is a peer dependency.
+
+### Legacy package name
+
+The original `boxpdf` package remains supported and is published from the same build at the same
+version. Existing imports and the `boxpdf` CLI continue to work unchanged:
+
+```sh
+npm install boxpdf pdf-lib
+```
+
+New projects should use `@boxpdf/writer`. Both package names expose the same API, and both provide
+the `boxpdf` command.
 
 ## What it does
 
@@ -94,7 +106,7 @@ claude mcp add boxpdf -- npx -y boxpdf mcp
 ## Themes
 
 ```ts
-import { cleanTheme, editorialTheme, standardFonts } from "boxpdf";
+import { cleanTheme, editorialTheme, standardFonts } from "@boxpdf/writer";
 
 const theme = cleanTheme(await standardFonts(pdf));            // Helvetica
 const serif = editorialTheme(await standardFonts(pdf, "times")); // serif + italic slot
@@ -169,7 +181,7 @@ import {
   text,
   textField,
   vstack
-} from "boxpdf";
+} from "@boxpdf/writer";
 
 const bytes = await flowToPdf(async (pdf) => {
   const { font } = await standardFonts(pdf);
@@ -253,7 +265,7 @@ npx boxpdf font add ./Acme-Regular.ttf=regular ./Acme-Bold.ttf=bold \
 Generates `src/fonts/acme.ts` with `export const` base64 strings. Then:
 
 ```ts
-import { loadFont } from "boxpdf";
+import { loadFont } from "@boxpdf/writer";
 import { regular, bold } from "./fonts/acme.js";
 
 const font = await loadFont(pdf, regular);
@@ -265,7 +277,7 @@ Bytes ship inside your bundle for immediate local loading.
 **The built-in Inter weights.**
 
 ```ts
-import { loadFont } from "boxpdf";
+import { loadFont } from "@boxpdf/writer";
 import { inter, interBold } from "boxpdf/inter";
 
 const font = await loadFont(pdf, inter);
@@ -333,7 +345,7 @@ const bytes = await flowToPdf(
 For a caller-owned document, save through `savePdf`:
 
 ```ts
-import { PDFDocument, renderFlow, savePdf } from "boxpdf";
+import { PDFDocument, renderFlow, savePdf } from "@boxpdf/writer";
 
 const pdf = await PDFDocument.create();
 await renderFlow(pdf, nodes);
@@ -359,7 +371,7 @@ For long-running document generation, use `streamFlow` instead of `renderFlow`. 
 
 ```ts
 import { PDFDocument, StandardFonts } from "pdf-lib";
-import { streamFlow, text, cleanTheme } from "boxpdf";
+import { streamFlow, text, cleanTheme } from "@boxpdf/writer";
 
 const pdf = await PDFDocument.create();
 const font = await pdf.embedFont(StandardFonts.Helvetica);
@@ -383,7 +395,7 @@ For Node, adapt a `stream.Writable`:
 
 ```ts
 import { createWriteStream } from "node:fs";
-import { streamFlow, nodeAdapter } from "boxpdf";
+import { streamFlow, nodeAdapter } from "@boxpdf/writer";
 
 const out = nodeAdapter(createWriteStream("./report.pdf"));
 await streamFlow(pdf, out, nodes, {
@@ -453,7 +465,7 @@ Both the core and the `boxpdf/inter` subpath run on Workers without `nodejs_comp
 
 ```ts
 import { Hono } from "hono";
-import { cleanTheme, flowToPdf, standardFonts, text } from "boxpdf";
+import { cleanTheme, flowToPdf, standardFonts, text } from "@boxpdf/writer";
 
 const app = new Hono();
 

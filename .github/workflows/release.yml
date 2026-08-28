@@ -12,8 +12,8 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     # `id-token: write` is required for npm's OIDC-based trusted publishing
-    # (configured via `npm trust github boxpdf --repo earonesty/boxpdf
-    # --file release.yml`). With OIDC there's no NPM_TOKEN secret — the
+    # (configured for both `@boxpdf/writer` and `boxpdf` against this
+    # repository and workflow). With OIDC there's no NPM_TOKEN secret — the
     # job mints a short-lived token by proving its identity to npm.
     permissions:
       contents: write
@@ -51,11 +51,14 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      - name: Publish to npm
+      - name: Verify package aliases
+        run: node scripts/check-package-aliases.mjs
+
+      - name: Publish scoped and legacy packages to npm
         # `--provenance` requires the `id-token: write` permission above and
         # records the build's GitHub Actions origin in npm's provenance
         # ledger so consumers can verify where the published bytes came from.
-        run: npm publish --provenance --access public
+        run: node scripts/prepare-packages.mjs --publish
         env:
           NPM_CONFIG_PROVENANCE: "true"
 
