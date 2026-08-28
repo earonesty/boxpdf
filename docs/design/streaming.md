@@ -80,7 +80,7 @@ export function nodeAdapter(
 
 ```ts
 import { PDFDocument, StandardFonts } from "pdf-lib";
-import { streamFlow, cleanTheme, text, hline } from "boxpdf";
+import { streamFlow, cleanTheme, text, hline } from "@boxpdf/writer";
 
 export default {
   async fetch() {
@@ -110,7 +110,7 @@ async function* generateOrderRows(font) {
 
 ```ts
 import { createWriteStream } from "node:fs";
-import { streamFlow, nodeAdapter } from "boxpdf";
+import { streamFlow, nodeAdapter } from "@boxpdf/writer";
 
 const out = nodeAdapter(createWriteStream("./report.pdf"));
 await streamFlow(pdf, out, generator(), { size: PageSizes.Letter });

@@ -52,7 +52,7 @@
       <a class="btn btn-secondary" href="./reader/">PDF → HTML reader</a>
       <a class="btn btn-ghost" href="https://github.com/earonesty/boxpdf" target="_blank" rel="noopener">GitHub →</a>
     </div>
-    <pre class="hero-code"><code>import &#123; cleanTheme, hline, hstack, renderFlow, text, vstack &#125; from "boxpdf";
+    <pre class="hero-code"><code>import &#123; cleanTheme, hline, hstack, renderFlow, text, vstack &#125; from "@boxpdf/writer";
 import &#123; PDFDocument, StandardFonts &#125; from "pdf-lib";
 
 const pdf = await PDFDocument.create();
@@ -112,7 +112,7 @@ const bytes = await pdf.save(); // -&gt; Uint8Array</code></pre>
       </div>
       <div class="feature">
         <h3>Bring your own fonts</h3>
-        <p>Optional <code>boxpdf/inter</code> ships subsetted Inter (82 KB / weight). <code>loadFont(pdf, source)</code> and the <code>boxpdf font add</code> CLI bundle any TTF as base64.</p>
+        <p>Optional <code>@boxpdf/writer/inter</code> ships subsetted Inter (82 KB / weight). <code>loadFont(pdf, source)</code> and the <code>boxpdf font add</code> CLI bundle any TTF as base64.</p>
       </div>
       <div class="feature">
         <h3>Hyperlinks, decorations, metadata</h3>
@@ -124,7 +124,7 @@ const bytes = await pdf.save(); // -&gt; Uint8Array</code></pre>
       </div>
       <div class="feature">
         <h3>Tiny, tree-shakable</h3>
-        <p>Core is &lt;7 KB minified. <code>boxpdf/inter</code> and <code>@pdf-lib/fontkit</code> only load when you use them.</p>
+        <p>Core is &lt;7 KB minified. <code>@boxpdf/writer/inter</code> and <code>@pdf-lib/fontkit</code> only load when you use them.</p>
       </div>
     </div>
   </section>
@@ -362,15 +362,15 @@ cat archive.html | npx boxpdf-html - archive.pdf --stream</code></pre>
 
   <section id="install" class="block">
     <h2>Install</h2>
-    <pre><code>npm install boxpdf pdf-lib</code></pre>
+    <pre><code>npm install @boxpdf/writer pdf-lib</code></pre>
     <p class="block-lede">
-      <code>pdf-lib</code> is a peer dependency. If you want custom-font embedding (incl. <code>boxpdf/inter</code>), <code>@pdf-lib/fontkit</code> comes along for the ride and is lazy-loaded only when you embed a non-standard font.
+      <code>pdf-lib</code> is a peer dependency. The original <code>boxpdf</code> package remains fully supported and publishes the same API and CLI at the same version. If you want custom-font embedding (incl. <code>@boxpdf/writer/inter</code>), <code>@pdf-lib/fontkit</code> comes along for the ride and is lazy-loaded only when you embed a non-standard font.
     </p>
     <h3>Cloudflare Workers</h3>
-    <p>Both the core and the <code>boxpdf/inter</code> subpath are verified to run on Cloudflare Workers without <code>nodejs_compat</code> or any WASM flag. Drop it into a worker handler:</p>
+    <p>Both the core and the <code>@boxpdf/writer/inter</code> subpath are verified to run on Cloudflare Workers without <code>nodejs_compat</code> or any WASM flag. Drop it into a worker handler:</p>
     <pre><code>import &#123; Hono &#125; from "hono";
 import &#123; PDFDocument, StandardFonts &#125; from "pdf-lib";
-import &#123; cleanTheme, renderFlow, text, vstack &#125; from "boxpdf";
+import &#123; cleanTheme, renderFlow, text, vstack &#125; from "@boxpdf/writer";
 
 const app = new Hono();
 

@@ -278,7 +278,7 @@ Bytes ship inside your bundle for immediate local loading.
 
 ```ts
 import { loadFont } from "@boxpdf/writer";
-import { inter, interBold } from "boxpdf/inter";
+import { inter, interBold } from "@boxpdf/writer/inter";
 
 const font = await loadFont(pdf, inter);
 const bold = await loadFont(pdf, interBold);
@@ -289,7 +289,7 @@ const bold = await loadFont(pdf, interBold);
 Importing `boxpdf/inter` loads ~325 KB of font bytes plus `@pdf-lib/fontkit`. Core-only imports stay on the smaller core bundle.
 
 ```ts
-import { embedInter } from "boxpdf/inter";
+import { embedInter } from "@boxpdf/writer/inter";
 
 const { font, bold } = await embedInter(pdf);
 const theme = cleanTheme(font, bold);
