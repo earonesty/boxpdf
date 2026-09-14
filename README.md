@@ -4,6 +4,8 @@ A box-layout DSL over [pdf-lib](https://pdf-lib.js.org/). Implemented in portabl
 
 Live gallery: <https://earonesty.github.io/boxpdf/>
 
+Related repos: [boxpdf-html](https://github.com/earonesty/boxpdf-html) (HTML → BoxPDF) and [streaming-pdf-reader](https://github.com/earonesty/streaming-pdf-reader) (PDF → document model, HTML, and structured data).
+
 ```ts
 import { cleanTheme, flowToPdf, hline, hstack, standardFonts, text, vstack } from "@boxpdf/writer";
 
