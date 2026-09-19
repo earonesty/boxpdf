@@ -28,7 +28,7 @@
 <main>
   <section class="hero">
     <p class="eyebrow">Open-source HTML-to-PDF for JavaScript runtimes</p>
-    <h1>Render HTML or code<br /><span class="muted">into PDFs that run anywhere.</span></h1>
+    <h1>Create PDFs<br /><span class="muted">from HTML or JavaScript.</span></h1>
     <p class="lede">
       <strong>boxpdf</strong> is a tiny OSS toolkit for server-side PDF generation:
       render document-style <strong>HTML + Tailwind CSS</strong> with <code>boxpdf-html</code>,
@@ -40,7 +40,7 @@
     <div class="hero-pills" aria-label="boxpdf highlights">
       <span>HTML + Tailwind input</span>
       <span>MIT open source</span>
-      <span>Edge-ready PDFs</span>
+      <span>Node, Workers, Deno, and browsers</span>
       <span>Interactive AcroForms</span>
       <span>Bounded-memory streaming</span>
       <span>PDF 2.0 AES-256</span>
@@ -88,7 +88,7 @@ const bytes = await pdf.save(); // -&gt; Uint8Array</code></pre>
       </div>
       <div class="feature">
         <h3>Flex-ish layout, no coordinates</h3>
-        <p><code>vstack</code> / <code>hstack</code> with <code>padding</code>, <code>margin</code>, <code>gap</code>, <code>justify</code>, <code>align</code>, <code>grow</code>, <code>shrink</code>. Real word-wrapping and ellipsis.</p>
+        <p><code>vstack</code> / <code>hstack</code> with <code>padding</code>, <code>margin</code>, <code>gap</code>, <code>justify</code>, <code>align</code>, <code>grow</code>, <code>shrink</code>. Word wrapping and ellipsis.</p>
       </div>
       <div class="feature">
         <h3>Layout-aware AcroForms</h3>
@@ -234,7 +234,7 @@ cat archive.html | npx @boxpdf/html-reader - archive.pdf --stream</code></pre>
 
   <section id="templates" class="block">
     <h2>Template gallery</h2>
-    <p class="block-lede">Production-ready documents in <code>templates/</code>. Copy a file, edit it for your data, ship it.</p>
+    <p class="block-lede">Example documents in <code>templates/</code>. Copy a file and edit it for your data.</p>
 
     <div class="template-grid">
       <figure class="template-card">
