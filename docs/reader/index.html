@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>boxpdf reader · stream PDFs into visually faithful HTML</title>
-<meta name="description" content="Open PDFs from random-access sources, render visually faithful HTML, extract semantic structure, and keep memory bounded with @boxpdf/reader." />
+<title>boxpdf reader · streaming PDF extraction for JavaScript</title>
+<meta name="description" content="Parse PDFs from HTTP ranges, blobs, or memory; extract page content; and write visual or semantic HTML with configurable cache limits." />
 <link rel="icon" href="/boxpdf-mark.svg" type="image/svg+xml" />
 <link rel="stylesheet" href="/style.css" />
 <link rel="stylesheet" href="/reader/reader.css" />
@@ -13,7 +13,7 @@
 <header class="site">
   <a class="brand" href="../"><img src="../boxpdf-mark.svg" alt="" />boxpdf</a>
   <nav>
-    <a href="#why">Why reader</a>
+    <a href="#why">Features</a>
     <a href="#visual">Live demo</a>
     <a href="#speed">Streaming</a>
     <a href="#memory">Memory</a>
@@ -27,24 +27,23 @@
 <main>
   <section class="hero reader-hero">
     <p class="eyebrow">Open-source PDF extraction for JavaScript runtimes</p>
-    <h1>Read PDFs without loading them.<br /><span class="muted">Render them without losing the page.</span></h1>
+    <h1>Parse PDFs a page at a time.<br /><span class="muted">Use the result as JavaScript data or HTML.</span></h1>
     <p class="lede">
-      <strong>@boxpdf/reader</strong> turns PDFs into a structured model and pixel-accurate HTML
-      using only the bytes each page needs. It is fast, bounded-memory, and built for
-      <strong>Node</strong>, <strong>edge functions</strong>, and the <strong>browser</strong>—with no WASM,
-      native binary, or headless browser.
+      <strong>@boxpdf/reader</strong> reads PDFs from HTTP ranges, <code>Blob</code> objects, memory,
+      or custom random-access sources. It extracts positioned text, fonts, paths, and images in
+      <strong>Node</strong>, <strong>edge functions</strong>, and the <strong>browser</strong>. Cache limits are configurable.
     </p>
     <div class="hero-pills" aria-label="Reader highlights">
-      <span>Low-memory extraction</span>
-      <span>Edge-function compatible</span>
-      <span>Fast first page</span>
-      <span>Pixel-accurate visual HTML</span>
-      <span>Visual context for LLMs</span>
+      <span>Configurable cache limits</span>
+      <span>HTTP range requests</span>
+      <span>Node, edge, and browser</span>
+      <span>Positioned visual HTML</span>
+      <span>Semantic HTML</span>
     </div>
     <div class="cta-row">
       <a class="btn btn-primary" href="#api">Install</a>
       <a class="btn btn-secondary" href="#visual">Try the live reader</a>
-      <a class="btn btn-secondary" href="./semantic/">Why visual comes first</a>
+      <a class="btn btn-secondary" href="./semantic/">Semantic HTML</a>
       <a class="btn btn-ghost" href="https://github.com/earonesty/streaming-pdf-reader" target="_blank" rel="noopener">Source →</a>
     </div>
     <pre class="hero-code"><code>import &#123; httpSource, openPdf &#125; from "@boxpdf/reader";
@@ -60,22 +59,22 @@ viewer.innerHTML = await pageToHtml(page, &#123; profile: "visual" &#125;);</cod
   </section>
 
   <section id="why" class="block">
-    <p class="eyebrow">Why @boxpdf/reader</p>
-    <h2>A PDF extractor that understands the page.</h2>
-    <p class="block-lede">Most PDF tools choose between pulling out text and drawing pixels. boxpdf keeps the visual evidence—geometry, fonts, vectors, images, and paint order—while exposing it as a JavaScript model and ordinary HTML.</p>
+    <p class="eyebrow">Reader features</p>
+    <h2>Page extraction with explicit cache limits.</h2>
+    <p class="block-lede">The reader exposes page dimensions, positioned text, fonts, vectors, images, and paint order as a JavaScript model. The HTML writer converts that model to positioned or reflowable HTML.</p>
     <div class="reader-benefits">
-      <article><h3>Low memory by design</h3><p>Fetch and retain only the ranges and objects needed for the current page. Cache limits stay fixed even when the source document grows to thousands of pages.</p></article>
-      <article><h3>Made for edge functions</h3><p>Pure JavaScript with random-access HTTP, <code>Blob</code>, memory, and custom data sources. No filesystem assumption, WASM module, native addon, or browser process.</p></article>
-      <article><h3>Fast where users feel it</h3><p>Open the cross-reference data and go directly to page one—or page 10,000. Work begins before the entire file has crossed the network.</p></article>
-      <article><h3>Accurate when rendered</h3><p>Visual HTML preserves page coordinates, embedded fonts, images, SVG paths, opacity, rotation, and paint order. PDFium raster fixtures gate the result.</p></article>
-      <article class="benefit-wide"><h3>Let LLMs look at the PDF, not merely read its text</h3><p>Render the reconstructed HTML in a browser and give a multimodal model the page as it was designed: columns, labels, callouts, diagrams, handwriting, and spatial relationships intact. Pair that view with the extracted model for grounded document workflows.</p></article>
+      <article><h3>Bounded caches</h3><p>Set limits for source bytes, decoded objects, individual objects, and cross-reference data. The reader reports peak cache use.</p></article>
+      <article><h3>Portable sources</h3><p>Use random-access HTTP, <code>Blob</code>, memory, or a custom <code>size + read(offset, length)</code> source. The parser is pure JavaScript.</p></article>
+      <article><h3>Random page access</h3><p>The reader resolves the page tree and requests the byte ranges for the selected page. It can seek directly to page one or page 10,000.</p></article>
+      <article><h3>Visual HTML</h3><p>The visual profile writes page coordinates, embedded fonts, images, SVG paths, opacity, rotation, clipping, and paint order to HTML.</p></article>
+      <article class="benefit-wide"><h3>Structured page data</h3><p>Process extracted spans, paths, and images directly, or pass them to the HTML writer. Text spans retain page geometry and source references.</p></article>
     </div>
   </section>
 
   <section id="visual" class="block">
     <p class="eyebrow">Live comparison</p>
     <h2>The PDF on the left. Reconstructed HTML on the right.</h2>
-    <p class="block-lede">Choose a real document—including a 100 MiB, 1,000-page PDF. Both panes receive the same public R2 URL: the left is a scrollable native PDF viewer; the right extracts and renders page one with <code>@boxpdf/reader</code> and <code>@boxpdf/html-writer</code>. The metrics describe the right-hand conversion, measured live in your browser.</p>
+    <p class="block-lede">Choose a fixture, including a 100 MiB, 1,000-page PDF. Both panes receive the same URL. The left uses the browser PDF viewer; the right extracts page one with <code>@boxpdf/reader</code> and writes it as HTML with <code>@boxpdf/html-writer</code>. The measurements come from the right-hand conversion in your browser.</p>
     <div id="fixture-choices" class="fixture-choices" aria-label="Choose a PDF fixture"></div>
     <div class="comparison-grid">
       <section class="comparison-pane">
@@ -99,9 +98,9 @@ viewer.innerHTML = await pageToHtml(page, &#123; profile: "visual" &#125;);</cod
   </section>
 
   <section id="speed" class="block spotlight">
-    <p class="eyebrow">Large documents feel small</p>
-    <h2>1,000 pages. First page in milliseconds.</h2>
-    <p class="block-lede">Opening a document does not decode every page. The reader resolves the cross-reference data, fetches page one, and leaves the remaining 999 pages on the source until requested.</p>
+    <p class="eyebrow">Random page access</p>
+    <h2>Only requested pages are decoded.</h2>
+    <p class="block-lede">For the 1,000-page fixture, the reader resolves the cross-reference data and fetches page one. The remaining pages stay on the source until requested.</p>
     <div class="speed-grid">
       <div class="timeline-card">
         <div class="timeline-label"><span>openPdf()</span><b>~1–6 ms</b></div>
@@ -138,10 +137,10 @@ viewer.innerHTML = await pageToHtml(page, &#123; profile: "visual" &#125;);</cod
   </section>
 
   <section id="profiles" class="block">
-    <h2>One extraction, two output intents</h2>
+    <h2>Two HTML output profiles</h2>
     <div class="profile-grid">
-      <article><span class="profile-tag">visual</span><h3>Display presentation</h3><p>Absolute positioning, original geometry, SVG vectors, embedded font programs, and page paint order. Use it for viewers, previews, and PDF-to-HTML conversion.</p></article>
-      <article><span class="profile-tag semantic">semantic</span><h3>Document flow</h3><p>Get clean reading order, nested sections, lists, cards, addresses, financial summaries, and tables that continue across pages. <a href="./semantic/">See why the page layout matters →</a></p></article>
+      <article><span class="profile-tag">visual</span><h3>Positioned HTML</h3><p>Absolute positioning, page geometry, SVG vectors, embedded font programs, and paint order. Use it for viewers, previews, and PDF-to-HTML conversion.</p></article>
+      <article><span class="profile-tag semantic">semantic</span><h3>Reflowable HTML</h3><p>Infer reading order, sections, lists, cards, addresses, summaries, and tables across a bounded page window. <a href="./semantic/">See the semantic profile →</a></p></article>
     </div>
   </section>
 
@@ -156,7 +155,7 @@ openPdf(memorySource(bytes))</code></pre><p>HTTP range requests, browser files, 
   await write(pageToHtml(await pdf.getPage(i), &#123;
     profile: "visual"
   &#125;));
-&#125;</code></pre><p>Consume a page at a time without retaining the original PDF or completed HTML output.</p></article>
+&#125;</code></pre><p>Process each page as it is extracted and write each HTML result to your output stream.</p></article>
     </div>
   </section>
 
