@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Semantic PDF extraction · boxpdf reader</title>
-<meta name="description" content="Turn PDFs into clean, reflowable HTML with useful reading order, sections, lists, cards, addresses, totals, and tables." />
+<meta name="description" content="Turn PDFs into reflowable HTML with headings, paragraphs, lists, addresses, totals, and tables." />
 <link rel="icon" href="/boxpdf-mark.svg" type="image/svg+xml" />
 <link rel="stylesheet" href="/style.css" />
 <link rel="stylesheet" href="/reader/reader.css" />
@@ -26,19 +26,19 @@
 <main>
   <section class="hero semantic-hero">
     <p class="eyebrow">Semantic PDF extraction</p>
-    <h1>Understand the page<br /><span class="muted">before simplifying it.</span></h1>
+    <h1>Turn PDFs into reflowable HTML.</h1>
     <p class="lede">
-      PDFs do not contain the clean document tree that HTML does. <strong>@boxpdf/reader</strong>
-      uses the page layout to put content back into a useful reading order, with paragraphs,
-      tables, nested sections, cards, addresses, labels, and values.
+      A PDF knows where text belongs on a page, but not whether it is a heading, paragraph,
+      label, or table row. <strong>@boxpdf/reader</strong> uses the layout to rebuild that document
+      structure as HTML.
     </p>
     <div class="hero-pills" aria-label="Semantic reader highlights">
       <span>Reading order</span>
       <span>Paragraphs and lines</span>
       <span>Table structure</span>
-      <span>Source coordinates retained</span>
-      <span>Accessible HTML</span>
-      <span>LLM-ready context</span>
+      <span>Links back to each page</span>
+      <span>Reflowable HTML</span>
+      <span>Multi-page documents</span>
     </div>
     <div class="cta-row">
       <a class="btn btn-primary" href="#api">Use semantic mode</a>
@@ -48,8 +48,8 @@
 
   <section id="semantic-demo" class="block">
     <p class="eyebrow">Live semantic comparison</p>
-    <h2>The designed page on the left. Its document flow on the right.</h2>
-    <p class="block-lede">Choose a real PDF. The browser renders its original pages on the left while boxpdf turns the same document into reflowable headings, paragraphs, lists, cards, address groups, totals, and tables on the right.</p>
+    <h2>The PDF on the left. Reflowable HTML on the right.</h2>
+    <p class="block-lede">Choose a document. Your browser displays the PDF on the left while boxpdf turns the same content into headings, paragraphs, lists, cards, addresses, totals, and tables on the right.</p>
     <div id="semantic-fixture-choices" class="fixture-choices" aria-label="Choose a PDF fixture"></div>
     <div class="comparison-grid semantic-comparison">
       <section class="comparison-pane">
@@ -71,52 +71,52 @@
   </section>
 
   <section id="difference" class="block">
-    <p class="eyebrow">The important distinction</p>
-    <h2>Keep the page layout before simplifying it.</h2>
-    <p class="block-lede">Text stored next to each other in a PDF may belong to different columns. Text stored far apart may belong to the same sentence. boxpdf looks at where content appears on the page before deciding how it should read.</p>
+    <p class="eyebrow">Two ways to use the same PDF</p>
+    <h2>Keep the page layout, or rebuild the document.</h2>
+    <p class="block-lede">Visual mode keeps everything where it appeared on the page. Semantic mode uses those positions to work out the reading order and create HTML that flows from top to bottom.</p>
     <div class="intent-comparison">
       <article class="intent-card visual-intent">
         <span class="profile-tag">visual</span>
-        <h3>Preserve what the author placed</h3>
-        <p>Coordinates, baselines, font metrics, vectors, images, clipping, transforms, and paint order remain available. The output can be rendered and compared to the PDF.</p>
-        <ul><li>Best for viewers and previews</li><li>Best for visual LLM input</li><li>Keeps the layout needed to build semantic HTML</li></ul>
+        <h3>Looks like the PDF</h3>
+        <p>Text, images, and graphics stay in their original positions on each page.</p>
+        <ul><li>Viewers and previews</li><li>Page-by-page conversion</li><li>Side-by-side comparison with the PDF</li></ul>
       </article>
       <article class="intent-card semantic-intent">
         <span class="profile-tag semantic">semantic</span>
-        <h3>Produce HTML that reads naturally</h3>
-        <p>boxpdf orders the text, groups related content, builds real tables, removes repeated headers and footers, and keeps sections and continued tables together across pages.</p>
-        <ul><li>Best for accessibility and search</li><li>Best for extraction and indexing</li><li>Best for compact language-model context</li></ul>
+        <h3>Reads like a web page</h3>
+        <p>Text follows the reading order and becomes headings, paragraphs, lists, sections, and tables. Repeated page headers and footers are removed.</p>
+        <ul><li>Responsive reading</li><li>Search and indexing</li><li>Structured data extraction</li></ul>
       </article>
     </div>
-    <aside class="semantic-principle"><strong>Why visual comes first:</strong> boxpdf can only recover the right reading order if it first knows where everything appeared on the page. The original coordinates remain available so you can check every result against the PDF.</aside>
+    <aside class="semantic-principle"><strong>Both modes start from the same page data.</strong> Use visual HTML for the original layout and semantic HTML for a reflowable document.</aside>
   </section>
 
   <section id="pipeline" class="block spotlight">
     <p class="eyebrow">How it works</p>
-    <h2>Read the PDF. Rebuild the page. Produce useful HTML.</h2>
+    <h2>How semantic mode builds the document</h2>
     <div class="semantic-pipeline" aria-label="PDF to visual model to semantic structure pipeline">
-      <div><b>1</b><strong>PDF objects</strong><span>fonts · text · paths · images</span></div>
+      <div><b>1</b><strong>Read the PDF</strong><span>text · fonts · images · graphics</span></div>
       <i>→</i>
-      <div><b>2</b><strong>Visual model</strong><span>geometry · paint order · source refs</span></div>
+      <div><b>2</b><strong>Rebuild each page</strong><span>positions · sizes · drawing order</span></div>
       <i>→</i>
-      <div><b>3</b><strong>Semantic flow</strong><span>sections · cards · paragraphs · tables</span></div>
+      <div><b>3</b><strong>Create the document</strong><span>headings · paragraphs · lists · tables</span></div>
     </div>
-    <p class="block-lede">The semantic output keeps links to the original text and page coordinates. You can highlight the source, show the matching page, or let an LLM check the result against the visual document.</p>
+    <p class="block-lede">The HTML keeps links to the original text and page coordinates, so an app can highlight the source or open the matching place in the PDF.</p>
   </section>
 
   <section id="uses" class="block">
-    <h2>Use the right representation for the next job.</h2>
+    <h2>What semantic HTML is for</h2>
     <div class="reader-benefits semantic-uses">
-      <article><h3>Accessible reading order</h3><p>Turn positioned content into headings, paragraphs, lists, and tables that assistive technology can navigate.</p></article>
-      <article><h3>Grounded LLM extraction</h3><p>Send compact semantic content for reasoning and retain visual HTML for layout-sensitive verification and citations.</p></article>
-      <article><h3>Search and indexing</h3><p>Index coherent blocks instead of isolated glyph runs, while preserving page and bounding-box provenance for every result.</p></article>
-      <article><h3>Tables and forms</h3><p>Recover real rows, continued tables, totals, addresses, cards, labels, and values that plain-text extraction cannot keep connected.</p></article>
+      <article><h3>Responsive reading</h3><p>Turn fixed PDF pages into headings, paragraphs, lists, and tables that adapt to the screen width.</p></article>
+      <article><h3>Data extraction</h3><p>Work with paragraphs, fields, and tables while keeping a link back to the source page.</p></article>
+      <article><h3>Search and indexing</h3><p>Search paragraphs and sections instead of disconnected pieces of text. Every result still points to its page and position.</p></article>
+      <article><h3>Tables and forms</h3><p>Keep rows, totals, addresses, labels, and values together instead of flattening them into a block of text.</p></article>
     </div>
   </section>
 
   <section id="api" class="block install-block">
-    <p class="eyebrow">Same extraction, different intent</p>
-    <h2>Choose semantic output when meaning matters most.</h2>
+    <p class="eyebrow">Semantic HTML</p>
+    <h2>Create a reflowable document</h2>
     <pre><code>import &#123; blobSource, openPdf &#125; from "@boxpdf/reader";
 import &#123; writeHtmlDocument &#125; from "@boxpdf/html-writer";
 
@@ -126,7 +126,7 @@ await writeHtmlDocument(pdf.pages(), write, &#123;
   profile: "semantic",
   semanticLookaheadPages: 4
 &#125;);</code></pre>
-    <p class="footnote">Semantic output streams with bounded lookahead, so cross-page structure improves without turning a large document into a large memory spike.</p>
+    <p class="footnote">This example examines four pages at a time so it can join tables and sections that continue across page breaks.</p>
   </section>
 
   <footer class="site-footer"><p>Start with the <a href="../">live visual reader</a>, or inspect the <a href="https://github.com/earonesty/streaming-pdf-reader" target="_blank" rel="noopener">reader source</a>.</p></footer>

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>boxpdf reader · stream PDFs into visually faithful HTML</title>
-<meta name="description" content="Open PDFs from random-access sources, render visually faithful HTML, extract semantic structure, and keep memory bounded with @boxpdf/reader." />
+<title>boxpdf reader · turn PDF pages into HTML</title>
+<meta name="description" content="Open large PDFs in JavaScript and turn their text, images, and layout into visual or reflowable HTML." />
 <link rel="icon" href="/boxpdf-mark.svg" type="image/svg+xml" />
 <link rel="stylesheet" href="/style.css" />
 <link rel="stylesheet" href="/reader/reader.css" />
@@ -27,24 +27,23 @@
 <main>
   <section class="hero reader-hero">
     <p class="eyebrow">Open-source PDF extraction for JavaScript runtimes</p>
-    <h1>Read PDFs without loading them.<br /><span class="muted">Render them without losing the page.</span></h1>
+    <h1>Turn PDF pages into HTML.<br /><span class="muted">Keep the text, images, and layout.</span></h1>
     <p class="lede">
-      <strong>@boxpdf/reader</strong> turns PDFs into a structured model and pixel-accurate HTML
-      using only the bytes each page needs. It is fast, bounded-memory, and built for
-      <strong>Node</strong>, <strong>edge functions</strong>, and the <strong>browser</strong>—with no WASM,
-      native binary, or headless browser.
+      <strong>@boxpdf/reader</strong> reads the parts of a PDF needed for the page you ask for,
+      then gives your app the text, images, fonts, and layout. It runs in <strong>Node</strong>,
+      <strong>edge functions</strong>, and the <strong>browser</strong>.
     </p>
     <div class="hero-pills" aria-label="Reader highlights">
-      <span>Low-memory extraction</span>
-      <span>Edge-function compatible</span>
+      <span>Works with large PDFs</span>
+      <span>Predictable memory use</span>
       <span>Fast first page</span>
-      <span>Pixel-accurate visual HTML</span>
-      <span>Visual context for LLMs</span>
+      <span>Visual HTML</span>
+      <span>Reflowable HTML</span>
     </div>
     <div class="cta-row">
       <a class="btn btn-primary" href="#api">Install</a>
       <a class="btn btn-secondary" href="#visual">Try the live reader</a>
-      <a class="btn btn-secondary" href="./semantic/">Why visual comes first</a>
+      <a class="btn btn-secondary" href="./semantic/">Explore semantic HTML</a>
       <a class="btn btn-ghost" href="https://github.com/earonesty/streaming-pdf-reader" target="_blank" rel="noopener">Source →</a>
     </div>
     <pre class="hero-code"><code>import &#123; httpSource, openPdf &#125; from "@boxpdf/reader";
@@ -61,21 +60,21 @@ viewer.innerHTML = await pageToHtml(page, &#123; profile: "visual" &#125;);</cod
 
   <section id="why" class="block">
     <p class="eyebrow">Why @boxpdf/reader</p>
-    <h2>A PDF extractor that understands the page.</h2>
-    <p class="block-lede">Most PDF tools choose between pulling out text and drawing pixels. boxpdf keeps the visual evidence—geometry, fonts, vectors, images, and paint order—while exposing it as a JavaScript model and ordinary HTML.</p>
+    <h2>Use PDF content in a web app.</h2>
+    <p class="block-lede">Plain-text extractors lose columns, labels, images, and other parts of the page. Page renderers give you an image but not much structure. boxpdf gives you the content and where it appeared, as JavaScript data and HTML.</p>
     <div class="reader-benefits">
-      <article><h3>Low memory by design</h3><p>Fetch and retain only the ranges and objects needed for the current page. Cache limits stay fixed even when the source document grows to thousands of pages.</p></article>
-      <article><h3>Made for edge functions</h3><p>Pure JavaScript with random-access HTTP, <code>Blob</code>, memory, and custom data sources. No filesystem assumption, WASM module, native addon, or browser process.</p></article>
-      <article><h3>Fast where users feel it</h3><p>Open the cross-reference data and go directly to page one—or page 10,000. Work begins before the entire file has crossed the network.</p></article>
-      <article><h3>Accurate when rendered</h3><p>Visual HTML preserves page coordinates, embedded fonts, images, SVG paths, opacity, rotation, and paint order. PDFium raster fixtures gate the result.</p></article>
-      <article class="benefit-wide"><h3>Let LLMs look at the PDF, not merely read its text</h3><p>Render the reconstructed HTML in a browser and give a multimodal model the page as it was designed: columns, labels, callouts, diagrams, handwriting, and spatial relationships intact. Pair that view with the extracted model for grounded document workflows.</p></article>
+      <article><h3>Open large files</h3><p>The reader fetches and keeps only the parts it needs. You choose how much memory its caches may use.</p></article>
+      <article><h3>Run it almost anywhere</h3><p>Use it with an HTTP URL, a browser <code>File</code>, bytes already in memory, or your own data source. It is pure JavaScript, with no native binary or headless browser.</p></article>
+      <article><h3>Start on any page</h3><p>Go directly to page one, page 10,000, or any page in between. The rest of the document is read as your app needs it.</p></article>
+      <article><h3>Keep the page layout</h3><p>Visual HTML includes positioned text, embedded fonts, images, vector graphics, opacity, rotation, clipping, and paint order.</p></article>
+      <article class="benefit-wide"><h3>Choose the kind of HTML you need</h3><p>Visual mode recreates the PDF page for viewers and previews. Semantic mode turns the same content into headings, paragraphs, lists, and tables that reflow like a web page.</p></article>
     </div>
   </section>
 
   <section id="visual" class="block">
     <p class="eyebrow">Live comparison</p>
     <h2>The PDF on the left. Reconstructed HTML on the right.</h2>
-    <p class="block-lede">Choose a real document—including a 100 MiB, 1,000-page PDF. Both panes receive the same public R2 URL: the left is a scrollable native PDF viewer; the right extracts and renders page one with <code>@boxpdf/reader</code> and <code>@boxpdf/html-writer</code>. The metrics describe the right-hand conversion, measured live in your browser.</p>
+    <p class="block-lede">Choose a document, including a 100 MiB, 1,000-page PDF. The left side uses your browser's PDF viewer. The right side reads page one and turns it into HTML. The numbers below are measured live in your browser.</p>
     <div id="fixture-choices" class="fixture-choices" aria-label="Choose a PDF fixture"></div>
     <div class="comparison-grid">
       <section class="comparison-pane">
@@ -99,9 +98,9 @@ viewer.innerHTML = await pageToHtml(page, &#123; profile: "visual" &#125;);</cod
   </section>
 
   <section id="speed" class="block spotlight">
-    <p class="eyebrow">Large documents feel small</p>
-    <h2>1,000 pages. First page in milliseconds.</h2>
-    <p class="block-lede">Opening a document does not decode every page. The reader resolves the cross-reference data, fetches page one, and leaves the remaining 999 pages on the source until requested.</p>
+    <p class="eyebrow">Large PDFs</p>
+    <h2>Start with the page you need.</h2>
+    <p class="block-lede">Opening the 1,000-page example reads the PDF's page index and page one. The other 999 pages stay on the server until your app asks for them.</p>
     <div class="speed-grid">
       <div class="timeline-card">
         <div class="timeline-label"><span>openPdf()</span><b>~1–6 ms</b></div>
@@ -115,15 +114,15 @@ viewer.innerHTML = await pageToHtml(page, &#123; profile: "visual" &#125;);</cod
       <div class="jump-card">
         <span class="page-stack page-back"></span><span class="page-stack page-mid"></span>
         <div class="page-front"><b>10,000</b><span>jump directly to a page</span></div>
-        <p>The memory gate seeks directly to page 10,000 with compact xrefs while retaining bounded caches.</p>
+        <p>The large-file test opens page 10,000 while keeping the same memory limits.</p>
       </div>
     </div>
   </section>
 
   <section id="memory" class="block">
     <p class="eyebrow">Measured process memory</p>
-    <h2>Input size grows 10×. Reader memory stays flat.</h2>
-    <p class="block-lede">Same logical PDF, isolated Node 24 processes. PDF.js and unpdf use their complete-<code>Uint8Array</code> APIs; @boxpdf/reader uses a random-access source.</p>
+    <h2>Memory use stays steady as the PDF grows.</h2>
+    <p class="block-lede">Each tool reads the same test document in its own Node 24 process. PDF.js and unpdf receive the entire file in memory; @boxpdf/reader reads only the ranges it needs.</p>
     <div class="memory-chart" role="img" aria-label="RSS growth for 100 MiB input: reader 3.64 MiB, unpdf 126.75 MiB, PDF.js 174.44 MiB">
       <div class="chart-row reader"><span>@boxpdf/reader</span><i style="--value:2.1%"></i><b>3.64 MiB</b></div>
       <div class="chart-row"><span>unpdf</span><i style="--value:72.7%"></i><b>126.75 MiB</b></div>
@@ -134,14 +133,14 @@ viewer.innerHTML = await pageToHtml(page, &#123; profile: "visual" &#125;);</cod
       <div><strong>77 KiB</strong><span>ArrayBuffer growth</span></div>
       <div><strong>3.64 MiB</strong><span>RSS growth at both 10 and 100 MiB</span></div>
     </div>
-    <p class="footnote">Peak RSS includes a ~46 MiB Node baseline. Results vary by OS and dependency version. <a href="https://github.com/earonesty/streaming-pdf-reader/blob/main/scripts/memory-comparison.mjs" target="_blank" rel="noopener">Run the benchmark yourself</a>.</p>
+    <p class="footnote">The process-memory numbers include about 46 MiB used by Node itself. Results vary by computer and software version. <a href="https://github.com/earonesty/streaming-pdf-reader/blob/main/scripts/memory-comparison.mjs" target="_blank" rel="noopener">Run the benchmark yourself</a>.</p>
   </section>
 
   <section id="profiles" class="block">
-    <h2>One extraction, two output intents</h2>
+    <h2>Choose how the HTML should work</h2>
     <div class="profile-grid">
-      <article><span class="profile-tag">visual</span><h3>Display presentation</h3><p>Absolute positioning, original geometry, SVG vectors, embedded font programs, and page paint order. Use it for viewers, previews, and PDF-to-HTML conversion.</p></article>
-      <article><span class="profile-tag semantic">semantic</span><h3>Document flow</h3><p>Get clean reading order, nested sections, lists, cards, addresses, financial summaries, and tables that continue across pages. <a href="./semantic/">See why the page layout matters →</a></p></article>
+      <article><span class="profile-tag">visual</span><h3>Looks like the PDF</h3><p>Text and graphics stay in their original positions. Use visual mode for viewers, previews, and page-by-page PDF-to-HTML conversion.</p></article>
+      <article><span class="profile-tag semantic">semantic</span><h3>Reads like a web page</h3><p>Headings, paragraphs, lists, cards, addresses, summaries, and tables follow the normal document flow and adapt to the available width. <a href="./semantic/">Explore semantic HTML →</a></p></article>
     </div>
   </section>
 
@@ -149,14 +148,14 @@ viewer.innerHTML = await pageToHtml(page, &#123; profile: "visual" &#125;);</cod
     <h2>Install the reader and HTML writer</h2>
     <pre><code>npm install @boxpdf/reader @boxpdf/html-writer</code></pre>
     <div class="showcase-grid">
-      <article class="showcase-card"><h3>Random-access sources</h3><pre><code>openPdf(httpSource(url))
+      <article class="showcase-card"><h3>Open PDFs from several sources</h3><pre><code>openPdf(httpSource(url))
 openPdf(blobSource(file))
 openPdf(memorySource(bytes))</code></pre><p>HTTP range requests, browser files, in-memory bytes, or your own <code>size + read(offset, length)</code> source.</p></article>
       <article class="showcase-card"><h3>Stream HTML pages</h3><pre><code>for (let i = 0; i &lt; await pdf.getPageCount(); i++) &#123;
   await write(pageToHtml(await pdf.getPage(i), &#123;
     profile: "visual"
   &#125;));
-&#125;</code></pre><p>Consume a page at a time without retaining the original PDF or completed HTML output.</p></article>
+&#125;</code></pre><p>Read, convert, and write one page at a time.</p></article>
     </div>
   </section>
 
