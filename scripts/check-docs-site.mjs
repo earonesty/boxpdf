@@ -1,5 +1,5 @@
 import { access, readFile } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../docs");
@@ -64,6 +64,14 @@ for (const match of readerHtml.matchAll(/\s(?:href|src)="([^"]+)"/g)) {
   ];
   let found = false;
   for (const candidate of candidates) {
+    const relativeCandidate = relative(root, candidate);
+    if (
+      relativeCandidate === ".." ||
+      relativeCandidate.startsWith(`..${sep}`) ||
+      isAbsolute(relativeCandidate)
+    ) {
+      continue;
+    }
     try {
       await access(candidate);
       found = true;
