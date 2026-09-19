@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>boxpdf reader · turn PDF pages into HTML</title>
-<meta name="description" content="Open large PDFs in JavaScript and turn their text, images, and layout into visual or reflowable HTML." />
+<meta name="description" content="Convert PDFs to visual or reflowable HTML in Node, edge functions, and the browser." />
 <link rel="icon" href="/boxpdf-mark.svg" type="image/svg+xml" />
 <link rel="stylesheet" href="/style.css" />
 <link rel="stylesheet" href="/reader/reader.css" />
@@ -26,12 +26,12 @@
 
 <main>
   <section class="hero reader-hero">
-    <p class="eyebrow">Open-source PDF extraction for JavaScript runtimes</p>
+    <p class="eyebrow">Open-source PDF-to-HTML for JavaScript</p>
     <h1>Turn PDF pages into HTML.<br /><span class="muted">Keep the text, images, and layout.</span></h1>
     <p class="lede">
-      <strong>@boxpdf/reader</strong> reads the parts of a PDF needed for the page you ask for,
-      then gives your app the text, images, fonts, and layout. It runs in <strong>Node</strong>,
-      <strong>edge functions</strong>, and the <strong>browser</strong>.
+      <strong>@boxpdf/reader</strong> and <strong>@boxpdf/html-writer</strong> convert PDFs into visual
+      or reflowable HTML, preserving text, images, fonts, and page layout. They run in
+      <strong>Node</strong>, <strong>edge functions</strong>, and the <strong>browser</strong>.
     </p>
     <div class="hero-pills" aria-label="Reader highlights">
       <span>Works with large PDFs</span>
@@ -63,11 +63,11 @@ viewer.innerHTML = await pageToHtml(page, &#123; profile: "visual" &#125;);</cod
     <h2>Use PDF content in a web app.</h2>
     <p class="block-lede">Plain-text extractors lose columns, labels, images, and other parts of the page. Page renderers give you an image but not much structure. boxpdf gives you the content and where it appeared, as JavaScript data and HTML.</p>
     <div class="reader-benefits">
-      <article><h3>Open large files</h3><p>The reader fetches and keeps only the parts it needs. You choose how much memory its caches may use.</p></article>
+      <article><h3>Open large files</h3><p>The reader fetches requested byte ranges and keeps them within cache limits set by the application.</p></article>
       <article><h3>Run it almost anywhere</h3><p>Use it with an HTTP URL, a browser <code>File</code>, bytes already in memory, or your own data source. It is pure JavaScript, with no native binary or headless browser.</p></article>
-      <article><h3>Start on any page</h3><p>Go directly to page one, page 10,000, or any page in between. The rest of the document is read as your app needs it.</p></article>
+      <article><h3>Start on any page</h3><p>Go directly to page one, page 10,000, or any page in between. The rest of the document is read only when requested.</p></article>
       <article><h3>Keep the page layout</h3><p>Visual HTML includes positioned text, embedded fonts, images, vector graphics, opacity, rotation, clipping, and paint order.</p></article>
-      <article class="benefit-wide"><h3>Choose the kind of HTML you need</h3><p>Visual mode recreates the PDF page for viewers and previews. Semantic mode turns the same content into headings, paragraphs, lists, and tables that reflow like a web page.</p></article>
+      <article class="benefit-wide"><h3>Visual and semantic HTML</h3><p>Visual mode recreates the PDF page for viewers and previews. Semantic mode turns the same content into headings, paragraphs, lists, and tables that reflow like a web page.</p></article>
     </div>
   </section>
 
@@ -99,7 +99,7 @@ viewer.innerHTML = await pageToHtml(page, &#123; profile: "visual" &#125;);</cod
 
   <section id="speed" class="block spotlight">
     <p class="eyebrow">Large PDFs</p>
-    <h2>Start with the page you need.</h2>
+    <h2>Open any page directly.</h2>
     <p class="block-lede">Opening the 1,000-page example reads the PDF's page index and page one. The other 999 pages stay on the server until your app asks for them.</p>
     <div class="speed-grid">
       <div class="timeline-card">
@@ -137,7 +137,7 @@ viewer.innerHTML = await pageToHtml(page, &#123; profile: "visual" &#125;);</cod
   </section>
 
   <section id="profiles" class="block">
-    <h2>Choose how the HTML should work</h2>
+    <h2>Two HTML output modes</h2>
     <div class="profile-grid">
       <article><span class="profile-tag">visual</span><h3>Looks like the PDF</h3><p>Text and graphics stay in their original positions. Use visual mode for viewers, previews, and page-by-page PDF-to-HTML conversion.</p></article>
       <article><span class="profile-tag semantic">semantic</span><h3>Reads like a web page</h3><p>Headings, paragraphs, lists, cards, addresses, summaries, and tables follow the normal document flow and adapt to the available width. <a href="./semantic/">Explore semantic HTML →</a></p></article>
