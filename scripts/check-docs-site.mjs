@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../docs");
 const html = await readFile(join(root, "index.html"), "utf8");
+const readerHtml = await readFile(join(root, "reader/index.html"), "utf8");
 const failures = [];
 
 const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]);
@@ -42,6 +43,39 @@ for (const match of html.matchAll(/<a\b([^>]*)target="_blank"([^>]*)>/g)) {
   const attributes = `${match[1]} ${match[2]}`;
   if (!/\srel="[^"]*\bnoopener\b[^"]*"/.test(attributes)) {
     failures.push(`target="_blank" link is missing rel="noopener": ${match[0]}`);
+  }
+}
+
+// boxpdf.dev can serve this directory index at the slashless `/reader` URL.
+// Resolve its references exactly as a browser does so directory-relative assets
+// cannot accidentally point at the site root.
+for (const match of readerHtml.matchAll(/\s(?:href|src)="([^"]+)"/g)) {
+  const reference = match[1];
+  if (reference.startsWith("#")) continue;
+
+  const deployed = new URL(reference, "https://boxpdf.dev/reader");
+  if (deployed.origin !== "https://boxpdf.dev") continue;
+
+  const pathname = decodeURIComponent(deployed.pathname).replace(/^\/+/, "");
+  const candidates = [
+    join(root, pathname),
+    join(root, `${pathname}.html`),
+    join(root, pathname, "index.html"),
+  ];
+  let found = false;
+  for (const candidate of candidates) {
+    try {
+      await access(candidate);
+      found = true;
+      break;
+    } catch {
+      // Try the next public-file form.
+    }
+  }
+  if (!found) {
+    failures.push(
+      `missing slashless /reader target: ${reference} resolves to ${deployed.pathname}`,
+    );
   }
 }
 
