@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../docs");
 const html = await readFile(join(root, "index.html"), "utf8");
 const readerHtml = await readFile(join(root, "reader/index.html"), "utf8");
+const supportHtml = await readFile(join(root, "support.html"), "utf8");
 const failures = [];
 
 const ids = [...html.matchAll(/\sid="([^"]+)"/g)].map((match) => match[1]);
@@ -43,6 +44,15 @@ for (const match of html.matchAll(/<a\b([^>]*)target="_blank"([^>]*)>/g)) {
   const attributes = `${match[1]} ${match[2]}`;
   if (!/\srel="[^"]*\bnoopener\b[^"]*"/.test(attributes)) {
     failures.push(`target="_blank" link is missing rel="noopener": ${match[0]}`);
+  }
+}
+
+for (const [page, contents] of [["reader/index.html", readerHtml], ["support.html", supportHtml]]) {
+  for (const match of contents.matchAll(/<a\b([^>]*)target="_blank"([^>]*)>/g)) {
+    const attributes = `${match[1]} ${match[2]}`;
+    if (!/\srel="[^"]*\bnoopener\b[^"]*"/.test(attributes)) {
+      failures.push(`${page}: target="_blank" link is missing rel="noopener": ${match[0]}`);
+    }
   }
 }
 
